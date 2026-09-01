@@ -2,7 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Enums\PlotStatus;
 use App\Enums\RoleName;
+use App\Models\Block;
+use App\Models\Buyer;
+use App\Models\Plot;
+use App\Models\Project;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Spatie\Permission\Models\Permission;
@@ -119,4 +124,96 @@ function leadAgent(): User
         'leads.view', 'leads.create', 'leads.update', 'leads.convert', 'leads.follow_up',
         'buyers.view', 'buyers.create', 'buyers.update',
     ]);
+}
+
+/**
+ * Full bookings.* + pricing.* including confirm, cancel, delete and override.
+ */
+function bookingManager(): User
+{
+    return makeUser(permissions: [
+        'bookings.view', 'bookings.create', 'bookings.update', 'bookings.confirm',
+        'bookings.cancel', 'bookings.delete',
+        'pricing.view', 'pricing.manage', 'pricing.override',
+        'plots.view', 'buyers.view',
+    ]);
+}
+
+/**
+ * A booking clerk — can build and edit bookings but not confirm, cancel,
+ * delete or override pricing.
+ */
+function bookingClerk(): User
+{
+    return makeUser(permissions: [
+        'bookings.view', 'bookings.create', 'bookings.update',
+        'pricing.view',
+        'plots.view', 'buyers.view',
+    ]);
+}
+
+/*
+| ---------------------------------------------------------------------------
+| Booking scenario builders (M6)
+| ---------------------------------------------------------------------------
+*/
+
+/**
+ * A ready-to-book project → block → AVAILABLE plot plus two active buyers.
+ *
+ * @return array{actor: User, project: Project, block: Block, plot: Plot, buyerA: Buyer, buyerB: Buyer}
+ */
+function bookingScenario(array $plotAttributes = []): array
+{
+    $project = Project::factory()->create();
+    $block = Block::factory()->create(['project_id' => $project->id]);
+    $plot = Plot::factory()->create(array_merge([
+        'project_id' => $project->id,
+        'block_id' => $block->id,
+        'status' => PlotStatus::Available->value,
+        'area' => 1000,
+    ], $plotAttributes));
+
+    return [
+        'actor' => User::factory()->create(),
+        'project' => $project,
+        'block' => $block,
+        'plot' => $plot,
+        'buyerA' => Buyer::factory()->create(['status' => 'active']),
+        'buyerB' => Buyer::factory()->create(['status' => 'active']),
+    ];
+}
+
+/**
+ * @param  array<string, mixed>  $s  a bookingScenario()
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function bookingPayload(array $s, array $overrides = []): array
+{
+    $base = [
+        'project_id' => $s['project']->id,
+        'block_id' => $s['block']->id,
+        'plot_id' => $s['plot']->id,
+        'booking_date' => now()->toDateString(),
+        'notes' => null,
+        'pricing' => [
+            'base_area' => '1000',
+            'base_rate' => '2000',
+            'components' => [
+                ['type' => 'tax', 'name' => 'GST', 'calculation_type' => 'percentage', 'rate' => '5'],
+            ],
+        ],
+        'buyers' => [
+            ['buyer_id' => $s['buyerA']->id, 'ownership_percentage' => '100', 'is_primary' => true],
+        ],
+    ];
+
+    $payload = array_merge($base, $overrides);
+
+    if (isset($overrides['pricing'])) {
+        $payload['pricing'] = array_merge($base['pricing'], $overrides['pricing']);
+    }
+
+    return $payload;
 }

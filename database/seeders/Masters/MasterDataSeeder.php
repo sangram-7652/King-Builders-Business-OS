@@ -24,6 +24,8 @@ class MasterDataSeeder extends Seeder
             LeadSourceSeeder::class,
             TdsRuleSeeder::class,
             InterestRuleSeeder::class,
+            ChargeTypeSeeder::class,
+            TaxRateSeeder::class,
             PaymentTypeSeeder::class,
             PaymentModeSeeder::class,
             BankSeeder::class,

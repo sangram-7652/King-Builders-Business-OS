@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\BookingStatus;
 use App\Enums\Masters\AreaUnit;
 use App\Enums\PlotFacing;
 use App\Enums\PlotStatus;
@@ -16,6 +17,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -92,6 +95,32 @@ class Plot extends Model
     public function heldBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'held_by');
+    }
+
+    /** All bookings ever raised against this plot (M6). @return HasMany<Booking, $this> */
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class);
+    }
+
+    /**
+     * The single live booking reserving this plot, if any (PENDING / CONFIRMED).
+     *
+     * @return HasOne<Booking, $this>
+     */
+    public function activeBooking(): HasOne
+    {
+        return $this->hasOne(Booking::class)
+            ->whereIn('status', [BookingStatus::Pending->value, BookingStatus::Confirmed->value])
+            ->latestOfMany();
+    }
+
+    /**
+     * @return array<string, \Illuminate\Database\Eloquent\Relations\Relation<*, *, *>>
+     */
+    protected function businessDependents(): array
+    {
+        return ['bookings' => $this->bookings()];
     }
 
     // --- Scopes ------------------------------------------------------

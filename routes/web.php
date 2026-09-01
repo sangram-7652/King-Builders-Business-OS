@@ -7,6 +7,9 @@ use App\Http\Controllers\Auth\LogoutController;
 use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\ResetPassword;
+use App\Livewire\Bookings\BookingForm;
+use App\Livewire\Bookings\BookingIndex;
+use App\Livewire\Bookings\BookingShow;
 use App\Livewire\Buyers\BuyerForm;
 use App\Livewire\Buyers\BuyerIndex;
 use App\Livewire\Buyers\BuyerShow;
@@ -130,6 +133,22 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         ->middleware('permission:'.Permission::BuyersView->value)
         ->whereNumber('buyer')
         ->name('buyers.show');
+
+    // --- Bookings (M6) -------------------------------------------------
+    Route::get('/bookings/create', BookingForm::class)
+        ->middleware('permission:'.Permission::BookingsCreate->value)
+        ->name('bookings.create');
+    Route::get('/bookings/{booking}/edit', BookingForm::class)
+        ->middleware('permission:'.Permission::BookingsUpdate->value)
+        ->whereNumber('booking')
+        ->name('bookings.edit');
+    Route::get('/bookings', BookingIndex::class)
+        ->middleware('permission:'.Permission::BookingsView->value)
+        ->name('bookings.index');
+    Route::get('/bookings/{booking}', BookingShow::class)
+        ->middleware('permission:'.Permission::BookingsView->value)
+        ->whereNumber('booking')
+        ->name('bookings.show');
 
     // --- Users -------------------------------------------------------------
     Route::get('/users/create', UserForm::class)

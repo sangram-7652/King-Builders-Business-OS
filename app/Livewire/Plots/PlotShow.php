@@ -38,7 +38,10 @@ class PlotShow extends Component
         $this->authorize('view', $plot);
         $this->project = $project;
         $this->block = $block;
-        $this->plot = $plot->load(['category', 'size', 'dimension', 'heldBy']);
+        $this->plot = $plot->load([
+            'category', 'size', 'dimension', 'heldBy',
+            'activeBooking.primaryBookingBuyer.buyer',
+        ]);
     }
 
     public function openHold(): void
@@ -129,7 +132,10 @@ class PlotShow extends Component
 
     private function refreshPlot(): void
     {
-        $this->plot = $this->plot->fresh(['category', 'size', 'dimension', 'heldBy']);
+        $this->plot = $this->plot->fresh([
+            'category', 'size', 'dimension', 'heldBy',
+            'activeBooking.primaryBookingBuyer.buyer',
+        ]);
     }
 
     public function render(): View

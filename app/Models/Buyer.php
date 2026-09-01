@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
@@ -88,12 +89,26 @@ class Buyer extends Model
         return $this->hasMany(Lead::class);
     }
 
+    /** Bookings this buyer co-owns (M6). @return BelongsToMany<Booking, $this> */
+    public function bookings(): BelongsToMany
+    {
+        return $this->belongsToMany(Booking::class, 'booking_buyers')
+            ->withPivot(['ownership_percentage', 'is_primary'])
+            ->withTimestamps();
+    }
+
+    /** @return HasMany<BookingBuyer, $this> */
+    public function bookingBuyers(): HasMany
+    {
+        return $this->hasMany(BookingBuyer::class);
+    }
+
     /**
      * @return array<string, \Illuminate\Database\Eloquent\Relations\Relation<*, *, *>>
      */
     protected function businessDependents(): array
     {
-        return ['leads' => $this->leads()];
+        return ['leads' => $this->leads(), 'bookings' => $this->bookingBuyers()];
     }
 
     // --- Scopes ------------------------------------------------------

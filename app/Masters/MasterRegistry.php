@@ -8,6 +8,7 @@ use App\Enums\Masters\MasterGroup;
 use App\Masters\Resources\BankBranchResource;
 use App\Masters\Resources\BankResource;
 use App\Masters\Resources\CancellationReasonResource;
+use App\Masters\Resources\ChargeTypeResource;
 use App\Masters\Resources\CityResource;
 use App\Masters\Resources\DocumentTypeResource;
 use App\Masters\Resources\InterestRuleResource;
@@ -19,6 +20,7 @@ use App\Masters\Resources\PlotCategoryResource;
 use App\Masters\Resources\PlotDimensionResource;
 use App\Masters\Resources\PlotSizeResource;
 use App\Masters\Resources\StateResource;
+use App\Masters\Resources\TaxRateResource;
 use App\Masters\Resources\TdsRuleResource;
 use App\Masters\Resources\TransferReasonResource;
 use Illuminate\Support\Collection;
@@ -40,6 +42,8 @@ final class MasterRegistry
         // Finance
         TdsRuleResource::class,
         InterestRuleResource::class,
+        ChargeTypeResource::class,
+        TaxRateResource::class,
         PaymentTypeResource::class,
         PaymentModeResource::class,
         BankResource::class,

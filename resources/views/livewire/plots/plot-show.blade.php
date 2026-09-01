@@ -99,10 +99,33 @@
         </x-ui.card>
     </div>
 
-    {{-- Reserved sections (not implemented in M4) --}}
+    {{-- Current booking (M6) --}}
+    @if ($plot->activeBooking)
+        @php $booking = $plot->activeBooking; @endphp
+        <x-ui.card title="Current booking">
+            <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                <div>
+                    <dt class="text-(--content-muted)">Booking</dt>
+                    <dd class="mt-0.5">
+                        @can('view', $booking)
+                            <a class="text-(--brand-primary) hover:underline" wire:navigate href="{{ route('bookings.show', $booking) }}">{{ $booking->booking_number }}</a>
+                        @else
+                            {{ $booking->booking_number }}
+                        @endcan
+                        <x-ui.badge :variant="$booking->status->color()" size="sm" class="ml-1">{{ $booking->status->label() }}</x-ui.badge>
+                    </dd>
+                </div>
+                <div><dt class="text-(--content-muted)">Primary buyer</dt><dd class="mt-0.5">{{ $booking->primaryBookingBuyer?->buyer?->fullName() ?? '—' }}</dd></div>
+                <div><dt class="text-(--content-muted)">Booking date</dt><dd class="mt-0.5">{{ $booking->booking_date?->format('d M Y') ?? '—' }}</dd></div>
+                <div><dt class="text-(--content-muted)">Final amount</dt><dd class="mt-0.5 tabular-nums">₹{{ number_format((float) $booking->final_amount, 2) }}</dd></div>
+            </dl>
+        </x-ui.card>
+    @endif
+
+    {{-- Reserved sections --}}
     <x-ui.card title="Coming later">
         <div class="grid gap-3 text-sm text-(--content-muted) sm:grid-cols-2 lg:grid-cols-3">
-            @foreach (['Pricing (M6)', 'Booking (M5)', 'Payments', 'Documents', 'History'] as $section)
+            @foreach (['Payments', 'Documents', 'History'] as $section)
                 <div class="rounded-lg border border-dashed border-(--border) px-3 py-2">{{ $section }}</div>
             @endforeach
         </div>

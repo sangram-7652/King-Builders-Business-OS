@@ -59,7 +59,14 @@ enum Permission: string
     case BookingsView = 'bookings.view';
     case BookingsCreate = 'bookings.create';
     case BookingsUpdate = 'bookings.update';
+    case BookingsConfirm = 'bookings.confirm';
     case BookingsCancel = 'bookings.cancel';
+    case BookingsDelete = 'bookings.delete';
+
+    // --- Finance ------------------------------------------------------
+    case PricingView = 'pricing.view';
+    case PricingManage = 'pricing.manage';
+    case PricingOverride = 'pricing.override';
 
     // --- Finance (future modules) ---------------------------------------
     case PaymentsView = 'payments.view';
@@ -123,7 +130,7 @@ enum Permission: string
         return match ($this->module()) {
             'projects', 'plots' => PermissionGroup::Inventory,
             'leads', 'buyers', 'bookings' => PermissionGroup::Sales,
-            'payments' => PermissionGroup::Finance,
+            'payments', 'pricing' => PermissionGroup::Finance,
             'registry', 'possession' => PermissionGroup::Operations,
             'associates' => PermissionGroup::Associates,
             'reports' => PermissionGroup::Reports,

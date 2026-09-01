@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Models\Masters;
 
 use App\Enums\Masters\PlcCalculationType;
+use App\Models\BookingPriceLine;
 use Database\Factories\Masters\PlcTypeFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PlcType extends MasterModel
 {
@@ -23,5 +25,17 @@ class PlcType extends MasterModel
             'calculation_type' => PlcCalculationType::class,
             'value' => 'decimal:2',
         ]);
+    }
+
+    /** Booking price lines that applied this PLC type (M6). @return HasMany<BookingPriceLine, $this> */
+    public function priceLines(): HasMany
+    {
+        return $this->hasMany(BookingPriceLine::class);
+    }
+
+    /** @return list<string> */
+    public function referencingRelations(): array
+    {
+        return ['priceLines'];
     }
 }
