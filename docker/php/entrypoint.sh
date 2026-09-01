@@ -46,6 +46,12 @@ if [ "$BOOTSTRAP" = "true" ]; then
         echo "[entrypoint] database not ready yet (attempt $i) — retrying in 3s"
         sleep 3
     done
+
+    # Idempotent: creates roles/permissions and the seeded super admin if absent.
+    if [ "${AUTO_SEED:-true}" = "true" ]; then
+        echo "[entrypoint] seeding roles, permissions and the super admin"
+        php artisan db:seed --force --no-interaction || true
+    fi
 else
     # queue / scheduler: don't start until the app has written an APP_KEY
     i=0

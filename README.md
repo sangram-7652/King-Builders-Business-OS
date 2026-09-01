@@ -3,8 +3,11 @@
 A modern real-estate ERP (Laravel 12 + Livewire 3 + Tailwind v4) replacing a
 legacy PHP real-estate CRM.
 
-> **Status: M0 — Foundation.** Docker environment, application shell, UI kit and
-> conventions only. No business modules yet. M1 is Authentication + RBAC.
+> **Status: M1 — Authentication + RBAC.** Docker environment, admin shell, UI kit,
+> conventions (M0) + login/logout/password-reset, users & roles/permissions
+> management (M1). No business modules yet.
+>
+> Seeded super admin: `super@kingbuilders.test` / `password`. See [`docs/RBAC.md`](docs/RBAC.md).
 
 ---
 
@@ -20,8 +23,11 @@ Nothing else. PHP, Composer, MySQL, Node and Redis all run in containers.
 cp .env.example .env
 docker compose up -d --build          # app, nginx, mysql, redis, queue, scheduler
 docker compose run --rm app php artisan key:generate
+docker compose run --rm app php artisan migrate --seed   # tables + roles/permissions + super admin
 docker compose run --rm vite sh -c "npm install && npm run build"   # build assets once
 ```
+
+Sign in at <http://localhost:8080/login> with `super@kingbuilders.test` / `password`.
 
 Open <http://localhost:8080>.
 
