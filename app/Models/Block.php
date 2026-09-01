@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -38,6 +39,20 @@ class Block extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /** @return HasMany<Plot, $this> */
+    public function plots(): HasMany
+    {
+        return $this->hasMany(Plot::class);
+    }
+
+    /**
+     * @return array<string, \Illuminate\Database\Eloquent\Relations\Relation<*, *, *>>
+     */
+    protected function businessDependents(): array
+    {
+        return ['plots' => $this->plots()];
     }
 
     /** @param  Builder<Block>  $query */

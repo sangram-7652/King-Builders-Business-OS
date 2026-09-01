@@ -3,13 +3,14 @@
 A modern real-estate ERP (Laravel 12 + Livewire 3 + Tailwind v4) replacing a
 legacy PHP real-estate CRM.
 
-> **Status: M3 — Projects / Sites.** Docker + admin shell + UI kit (M0);
+> **Status: M4 — Plot Inventory + Lifecycle.** Docker + admin shell + UI kit (M0);
 > auth + users/roles/permissions (M1); 15 master-data modules (M2);
-> Projects & Blocks with a centralised status lifecycle (M3). Plot inventory is M4.
+> Projects & Blocks (M3); Plot inventory with a centralised status lifecycle,
+> concurrency-safe holds, hold expiry and bulk creation (M4).
 >
 > Seeded super admin: `super@kingbuilders.test` / `password`.
-> See [`docs/RBAC.md`](docs/RBAC.md), [`docs/MASTER-DATA.md`](docs/MASTER-DATA.md)
-> and [`docs/PROJECTS.md`](docs/PROJECTS.md).
+> See [`docs/RBAC.md`](docs/RBAC.md), [`docs/MASTER-DATA.md`](docs/MASTER-DATA.md),
+> [`docs/PROJECTS.md`](docs/PROJECTS.md) and [`docs/PLOTS.md`](docs/PLOTS.md).
 
 ---
 

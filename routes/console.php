@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Jobs\ExpirePlotHoldsJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -23,4 +24,11 @@ Schedule::command('queue:prune-batches --hours=48')->daily();
 Schedule::call(fn () => logger()->info('scheduler heartbeat'))
     ->everyFifteenMinutes()
     ->name('scheduler-heartbeat')
+    ->withoutOverlapping();
+
+// M4: release plots whose hold has lapsed. Queued (ExpirePlotHoldsJob is
+// ShouldBeUnique) and idempotent — safe to run every few minutes.
+Schedule::job(new ExpirePlotHoldsJob)
+    ->everyFiveMinutes()
+    ->name('expire-plot-holds')
     ->withoutOverlapping();

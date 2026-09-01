@@ -49,6 +49,11 @@
                                 </td>
                                 <td class="px-4 py-3">
                                     <div class="flex items-center justify-end gap-1">
+                                        @can('viewAny', App\Models\Plot::class)
+                                            <x-ui.button variant="ghost" size="sm"
+                                                :href="route('plots.index', ['project' => $project->id, 'block' => $block->id])"
+                                                wire:navigate>Plots</x-ui.button>
+                                        @endcan
                                         @if ($this->canManage)
                                             <x-ui.button variant="ghost" size="sm" wire:click="openEdit({{ $block->id }})">Edit</x-ui.button>
                                             <x-ui.button variant="ghost" size="sm"

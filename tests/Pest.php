@@ -84,3 +84,15 @@ function projectManager(): User
         'projects.delete', 'projects.activate', 'projects.archive',
     ]);
 }
+
+/**
+ * A user holding the full plots.* permission set (no other access).
+ */
+function plotManager(): User
+{
+    return makeUser(permissions: [
+        'plots.view', 'plots.create', 'plots.update', 'plots.delete',
+        'plots.hold', 'plots.release', 'plots.activate', 'plots.archive',
+        'plots.bulk_create',
+    ]);
+}

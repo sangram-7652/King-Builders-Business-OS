@@ -119,6 +119,11 @@
         </div>
     @endif
 
+    {{-- Tab: Inventory --}}
+    @if ($tab === 'inventory')
+        @livewire('plots.project-inventory', ['project' => $project], key('inventory-'.$project->id))
+    @endif
+
     {{-- Tab: Location --}}
     @if ($tab === 'location')
         <x-ui.card title="Location">

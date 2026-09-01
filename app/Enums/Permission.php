@@ -33,6 +33,11 @@ enum Permission: string
     case PlotsCreate = 'plots.create';
     case PlotsUpdate = 'plots.update';
     case PlotsDelete = 'plots.delete';
+    case PlotsHold = 'plots.hold';
+    case PlotsRelease = 'plots.release';
+    case PlotsActivate = 'plots.activate';
+    case PlotsArchive = 'plots.archive';
+    case PlotsBulkCreate = 'plots.bulk_create';
 
     // --- Sales (future modules) ------------------------------------------
     case BuyersView = 'buyers.view';

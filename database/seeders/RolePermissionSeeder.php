@@ -55,7 +55,8 @@ class RolePermissionSeeder extends Seeder
 
             RoleName::SalesManager => [
                 'projects.view', 'projects.create', 'projects.update', 'projects.activate', 'projects.archive',
-                'plots.view', 'plots.create', 'plots.update',
+                'plots.view', 'plots.create', 'plots.update', 'plots.delete',
+                'plots.hold', 'plots.release', 'plots.activate', 'plots.archive', 'plots.bulk_create',
                 'buyers.view', 'buyers.create', 'buyers.update', 'buyers.delete',
                 'bookings.view', 'bookings.create', 'bookings.update', 'bookings.cancel',
                 'payments.view',
@@ -65,7 +66,7 @@ class RolePermissionSeeder extends Seeder
 
             RoleName::SalesExecutive => [
                 'projects.view',
-                'plots.view',
+                'plots.view', 'plots.hold', 'plots.release',
                 'buyers.view', 'buyers.create', 'buyers.update',
                 'bookings.view', 'bookings.create',
                 'payments.view',

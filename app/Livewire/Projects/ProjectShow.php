@@ -24,7 +24,7 @@ class ProjectShow extends Component
     public string $tab = 'overview';
 
     /** @var list<string> */
-    public array $tabs = ['overview', 'location', 'blocks', 'activity'];
+    public array $tabs = ['overview', 'inventory', 'location', 'blocks', 'activity'];
 
     public function mount(Project $project): void
     {

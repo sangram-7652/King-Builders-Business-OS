@@ -11,6 +11,10 @@ use App\Livewire\Dashboard;
 use App\Livewire\Masters\MasterDashboard;
 use App\Livewire\Masters\MasterForm;
 use App\Livewire\Masters\MasterIndex;
+use App\Livewire\Plots\PlotBulkCreate;
+use App\Livewire\Plots\PlotForm;
+use App\Livewire\Plots\PlotIndex;
+use App\Livewire\Plots\PlotShow;
 use App\Livewire\Projects\ProjectForm;
 use App\Livewire\Projects\ProjectIndex;
 use App\Livewire\Projects\ProjectShow;
@@ -59,6 +63,30 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         ->middleware('permission:'.Permission::ProjectsView->value)
         ->whereNumber('project')
         ->name('projects.show');
+
+    // --- Plot Inventory (M4) — nested under project + block --------------
+    Route::prefix('projects/{project}/blocks/{block}/plots')
+        ->scopeBindings()
+        ->whereNumber('project')->whereNumber('block')
+        ->group(function (): void {
+            Route::get('/create', PlotForm::class)
+                ->middleware('permission:'.Permission::PlotsCreate->value)
+                ->name('plots.create');
+            Route::get('/bulk', PlotBulkCreate::class)
+                ->middleware('permission:'.Permission::PlotsBulkCreate->value)
+                ->name('plots.bulk');
+            Route::get('/{plot}/edit', PlotForm::class)
+                ->middleware('permission:'.Permission::PlotsUpdate->value)
+                ->whereNumber('plot')
+                ->name('plots.edit');
+            Route::get('/{plot}', PlotShow::class)
+                ->middleware('permission:'.Permission::PlotsView->value)
+                ->whereNumber('plot')
+                ->name('plots.show');
+            Route::get('/', PlotIndex::class)
+                ->middleware('permission:'.Permission::PlotsView->value)
+                ->name('plots.index');
+        });
 
     // --- Users -------------------------------------------------------------
     Route::get('/users/create', UserForm::class)

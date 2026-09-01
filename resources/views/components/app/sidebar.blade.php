@@ -12,7 +12,7 @@
     ], fn ($item) => $item['can']));
 
     // Modules that are live now — excluded from the "coming soon" roadmap list.
-    $liveModules = ['projects'];
+    $liveModules = ['projects', 'plots'];
 
     // --- Administration ---------------------------------------------------
     $adminNav = array_values(array_filter([

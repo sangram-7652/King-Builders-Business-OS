@@ -74,6 +74,20 @@ class Project extends Model
         return $this->blocks()->where('is_active', true);
     }
 
+    /** @return HasMany<Plot, $this> */
+    public function plots(): HasMany
+    {
+        return $this->hasMany(Plot::class);
+    }
+
+    /**
+     * @return array<string, \Illuminate\Database\Eloquent\Relations\Relation<*, *, *>>
+     */
+    protected function businessDependents(): array
+    {
+        return ['plots' => $this->plots()];
+    }
+
     // --- Scopes ------------------------------------------------------
 
     /** @param  Builder<Project>  $query */
