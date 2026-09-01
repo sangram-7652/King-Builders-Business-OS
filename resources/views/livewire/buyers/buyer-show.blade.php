@@ -29,6 +29,9 @@
                     </div>
                 </div>
             @endcan
+            @if (auth()->user()?->can('documents.view'))
+                <x-ui.button size="sm" variant="secondary" :href="route('buyers.documents', $buyer)" wire:navigate>KYC documents</x-ui.button>
+            @endif
             @can('update', $buyer)
                 <x-ui.button size="sm" :href="route('buyers.edit', $buyer)" wire:navigate>Edit</x-ui.button>
             @endcan

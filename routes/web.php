@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 use App\Enums\Permission;
 use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\DocumentDownloadController;
 use App\Http\Controllers\ReceiptPdfController;
 use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\ResetPassword;
+use App\Livewire\Bookings\BookingDocuments;
 use App\Livewire\Bookings\BookingForm;
 use App\Livewire\Bookings\BookingIndex;
+use App\Livewire\Bookings\BookingRegistry;
 use App\Livewire\Bookings\BookingShow;
+use App\Livewire\Buyers\BuyerDocuments;
 use App\Livewire\Buyers\BuyerForm;
 use App\Livewire\Buyers\BuyerIndex;
 use App\Livewire\Buyers\BuyerShow;
@@ -20,6 +24,7 @@ use App\Livewire\Collections\CollectionDashboard;
 use App\Livewire\Collections\CollectionQueue;
 use App\Livewire\Collections\CollectionReports;
 use App\Livewire\Dashboard;
+use App\Livewire\Documents\DocumentDashboard;
 use App\Livewire\Leads\LeadConvert;
 use App\Livewire\Leads\LeadForm;
 use App\Livewire\Leads\LeadIndex;
@@ -39,6 +44,7 @@ use App\Livewire\Plots\PlotShow;
 use App\Livewire\Projects\ProjectForm;
 use App\Livewire\Projects\ProjectIndex;
 use App\Livewire\Projects\ProjectShow;
+use App\Livewire\Registry\RegistryDashboard;
 use App\Livewire\Roles\RoleForm;
 use App\Livewire\Roles\RoleIndex;
 use App\Livewire\Roles\RoleShow;
@@ -206,6 +212,32 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         ->middleware('permission:'.Permission::CollectionsView->value)
         ->whereNumber('booking')
         ->name('collections.booking');
+
+    // --- Documentation / Agreement / Registry (M9) --------------------
+    Route::get('/documents', DocumentDashboard::class)
+        ->middleware('permission:'.Permission::DocumentsView->value)
+        ->name('documents.dashboard');
+    Route::get('/registry', RegistryDashboard::class)
+        ->middleware('permission:'.Permission::RegistryView->value)
+        ->name('registry.dashboard');
+
+    Route::get('/buyers/{buyer}/documents', BuyerDocuments::class)
+        ->middleware('permission:'.Permission::DocumentsView->value)
+        ->whereNumber('buyer')
+        ->name('buyers.documents');
+    Route::get('/bookings/{booking}/documents', BookingDocuments::class)
+        ->middleware('permission:'.Permission::DocumentsView->value)
+        ->whereNumber('booking')
+        ->name('documents.booking');
+    Route::get('/bookings/{booking}/registry', BookingRegistry::class)
+        ->middleware('permission:'.Permission::RegistryView->value)
+        ->whereNumber('booking')
+        ->name('registry.booking');
+
+    Route::get('/documents/{document}/versions/{version}/download', DocumentDownloadController::class)
+        ->middleware('permission:'.Permission::DocumentsDownload->value)
+        ->whereNumber('document')->whereNumber('version')
+        ->name('documents.download');
 
     // --- Users -------------------------------------------------------------
     Route::get('/users/create', UserForm::class)

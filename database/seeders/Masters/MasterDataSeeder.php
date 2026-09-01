@@ -33,6 +33,7 @@ class MasterDataSeeder extends Seeder
             StateSeeder::class,
             CitySeeder::class,
             DocumentTypeSeeder::class,
+            DocumentRequirementSeeder::class,
             CancellationReasonSeeder::class,
             TransferReasonSeeder::class,
         ]);

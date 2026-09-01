@@ -104,10 +104,34 @@ enum Permission: string
     case PenaltiesAssess = 'penalties.assess';
     case PenaltiesApprove = 'penalties.approve';
 
-    // --- Operations (future modules) ----------------------------------
-    case RegistryView = 'registry.view';
-    case RegistryUpdate = 'registry.update';
+    // --- Documentation / Agreement / Registry (M9) --------------------
+    case DocumentsView = 'documents.view';
+    case DocumentsUpload = 'documents.upload';
+    case DocumentsVerify = 'documents.verify';
+    case DocumentsReject = 'documents.reject';
+    case DocumentsDownload = 'documents.download';
+    case DocumentsDelete = 'documents.delete';
 
+    case AgreementsView = 'agreements.view';
+    case AgreementsCreate = 'agreements.create';
+    case AgreementsUpdate = 'agreements.update';
+    case AgreementsApprove = 'agreements.approve';
+
+    case RegistryView = 'registry.view';
+    case RegistryCreate = 'registry.create';
+    case RegistryUpdate = 'registry.update';
+    case RegistrySchedule = 'registry.schedule';
+    case RegistryComplete = 'registry.complete';
+
+    case RegistryExpensesView = 'registry_expenses.view';
+    case RegistryExpensesCreate = 'registry_expenses.create';
+    case RegistryExpensesApprove = 'registry_expenses.approve';
+
+    case HandoverView = 'handover.view';
+    case HandoverCreate = 'handover.create';
+    case HandoverComplete = 'handover.complete';
+
+    // --- Operations (future modules) ----------------------------------
     case PossessionView = 'possession.view';
     case PossessionUpdate = 'possession.update';
 
@@ -162,7 +186,7 @@ enum Permission: string
             'leads', 'buyers', 'bookings' => PermissionGroup::Sales,
             'payments', 'pricing', 'payment_plans', 'receipts' => PermissionGroup::Finance,
             'collections', 'promises', 'cheques', 'penalties' => PermissionGroup::Collections,
-            'registry', 'possession' => PermissionGroup::Operations,
+            'documents', 'agreements', 'registry', 'registry_expenses', 'handover', 'possession' => PermissionGroup::Operations,
             'associates' => PermissionGroup::Associates,
             'reports' => PermissionGroup::Reports,
             'users', 'roles' => PermissionGroup::Administration,

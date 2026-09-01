@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -170,6 +171,36 @@ class Booking extends Model
     public function paymentPromises(): HasMany
     {
         return $this->hasMany(PaymentPromise::class);
+    }
+
+    /** Booking-level documents (M9). @return \Illuminate\Database\Eloquent\Relations\MorphMany<Document, $this> */
+    public function documents(): MorphMany
+    {
+        return $this->morphMany(Document::class, 'documentable')->latest('id');
+    }
+
+    /** The current agreement (M9). @return HasOne<Agreement, $this> */
+    public function agreement(): HasOne
+    {
+        return $this->hasOne(Agreement::class)->latestOfMany();
+    }
+
+    /** @return HasMany<Agreement, $this> */
+    public function agreements(): HasMany
+    {
+        return $this->hasMany(Agreement::class)->latest('id');
+    }
+
+    /** @return HasOne<RegistryCase, $this> */
+    public function registryCase(): HasOne
+    {
+        return $this->hasOne(RegistryCase::class);
+    }
+
+    /** @return HasOne<DocumentHandover, $this> */
+    public function documentHandover(): HasOne
+    {
+        return $this->hasOne(DocumentHandover::class);
     }
 
     /**

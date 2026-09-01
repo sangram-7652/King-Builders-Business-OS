@@ -47,6 +47,18 @@ return [
             'report' => false,
         ],
 
+        // M9 — private document store. NEVER web-served: no `serve`, no `url`.
+        // Downloads go only through App\Http\Controllers\DocumentDownloadController
+        // after an authorization check.
+        'documents' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/documents'),
+            'serve' => false,
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

@@ -46,6 +46,12 @@
             @if ($booking->isConfirmed() && auth()->user()?->can('payment_plans.view'))
                 <x-ui.button size="sm" variant="secondary" :href="route('payments.booking', $booking)" wire:navigate>Payments</x-ui.button>
             @endif
+            @if ($booking->isConfirmed() && auth()->user()?->can('documents.view'))
+                <x-ui.button size="sm" variant="secondary" :href="route('documents.booking', $booking)" wire:navigate>Documents</x-ui.button>
+            @endif
+            @if ($booking->isConfirmed() && auth()->user()?->can('registry.view'))
+                <x-ui.button size="sm" variant="secondary" :href="route('registry.booking', $booking)" wire:navigate>Registry</x-ui.button>
+            @endif
 
             @can('cancel', $booking)
                 <x-ui.button variant="danger" size="sm" wire:click="openCancel">Cancel booking</x-ui.button>

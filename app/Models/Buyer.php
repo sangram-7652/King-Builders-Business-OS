@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
@@ -101,6 +102,12 @@ class Buyer extends Model
     public function bookingBuyers(): HasMany
     {
         return $this->hasMany(BookingBuyer::class);
+    }
+
+    /** Buyer KYC documents (M9). @return \Illuminate\Database\Eloquent\Relations\MorphMany<\App\Models\Document, $this> */
+    public function documents(): MorphMany
+    {
+        return $this->morphMany(Document::class, 'documentable')->latest('id');
     }
 
     /**

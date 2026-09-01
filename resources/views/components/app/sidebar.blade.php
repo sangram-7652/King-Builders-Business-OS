@@ -13,11 +13,13 @@
         ['label' => 'Bookings', 'route' => 'bookings.index', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::BookingsView->value)],
         ['label' => 'Finance', 'route' => 'finance.dashboard', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::PaymentsView->value)],
         ['label' => 'Collections', 'route' => 'collections.queue', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::CollectionsView->value)],
+        ['label' => 'Documents', 'route' => 'documents.dashboard', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::DocumentsView->value)],
+        ['label' => 'Registry', 'route' => 'registry.dashboard', 'params' => [], 'icon' => 'building', 'can' => (bool) $user?->can(Permission::RegistryView->value)],
         ['label' => 'Projects', 'route' => 'projects.index', 'params' => [], 'icon' => 'building', 'can' => (bool) $user?->can(Permission::ProjectsView->value)],
     ], fn ($item) => $item['can']));
 
     // Modules that are live now — excluded from the "coming soon" roadmap list.
-    $liveModules = ['projects', 'plots', 'leads', 'buyers', 'bookings', 'pricing', 'payments', 'payment_plans', 'receipts', 'collections', 'promises', 'cheques', 'penalties'];
+    $liveModules = ['projects', 'plots', 'leads', 'buyers', 'bookings', 'pricing', 'payments', 'payment_plans', 'receipts', 'collections', 'promises', 'cheques', 'penalties', 'documents', 'agreements', 'registry', 'registry_expenses', 'handover'];
 
     // --- Administration ---------------------------------------------------
     $adminNav = array_values(array_filter([

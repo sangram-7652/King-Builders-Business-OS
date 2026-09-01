@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Jobs\ExpireDocumentsJob;
 use App\Jobs\ExpirePlotHoldsJob;
 use App\Jobs\RefreshCollectionQueueJob;
 use Illuminate\Foundation\Inspiring;
@@ -39,4 +40,10 @@ Schedule::job(new ExpirePlotHoldsJob)
 Schedule::job(new RefreshCollectionQueueJob)
     ->dailyAt('01:30')
     ->name('refresh-collection-queue')
+    ->withoutOverlapping();
+
+// M9: mark documents past their expiry as EXPIRED. Idempotent + unique.
+Schedule::job(new ExpireDocumentsJob)
+    ->dailyAt('02:00')
+    ->name('expire-documents')
     ->withoutOverlapping();

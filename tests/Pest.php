@@ -7,17 +7,23 @@ use App\Actions\Payments\ActivatePaymentPlanAction;
 use App\Actions\Payments\CreatePaymentPlanAction;
 use App\Enums\PlotStatus;
 use App\Enums\RoleName;
+use App\Models\Agreement;
 use App\Models\Block;
 use App\Models\Booking;
 use App\Models\BookingBuyer;
 use App\Models\Buyer;
 use App\Models\CollectionCase;
+use App\Models\Document;
+use App\Models\Masters\DocumentType;
 use App\Models\Masters\PaymentMode;
 use App\Models\PaymentPlan;
 use App\Models\Plot;
 use App\Models\Project;
 use App\Models\User;
+use Database\Seeders\Masters\DocumentRequirementSeeder;
+use Database\Seeders\Masters\DocumentTypeSeeder;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Http\UploadedFile;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -377,4 +383,73 @@ function overdueCaseScenario(string $finalAmount = '1000000', ?array $schedule =
     $case = app(EnsureCollectionCaseAction::class)->handle($s['booking']->fresh(), $s['actor']);
 
     return $s + ['case' => $case];
+}
+
+/*
+| ---------------------------------------------------------------------------
+| Documentation / Registry helpers (M9)
+| ---------------------------------------------------------------------------
+*/
+
+/** Seed the document-type masters + their global checklist requirements. */
+function seedDocumentMasters(): void
+{
+    (new DocumentTypeSeeder)->run();
+    (new DocumentRequirementSeeder)->run();
+}
+
+function docType(string $code): DocumentType
+{
+    return DocumentType::query()->where('code', $code)->firstOrFail();
+}
+
+/** Full documents.* + agreements.* + registry.* + registry_expenses.* + handover.* (+ view of buyers/bookings). */
+function registryOfficer(): User
+{
+    return makeUser(permissions: [
+        'documents.view', 'documents.upload', 'documents.verify', 'documents.reject', 'documents.download', 'documents.delete',
+        'agreements.view', 'agreements.create', 'agreements.update', 'agreements.approve',
+        'registry.view', 'registry.create', 'registry.update', 'registry.schedule', 'registry.complete',
+        'registry_expenses.view', 'registry_expenses.create', 'registry_expenses.approve',
+        'handover.view', 'handover.create', 'handover.complete',
+        'buyers.view', 'bookings.view', 'buyers.documents',
+    ]);
+}
+
+/** A fake PDF UploadedFile with unique content, so each upload has a distinct sha256 checksum. */
+function fakeDocument(string $name = 'scan.pdf', ?string $content = null): UploadedFile
+{
+    return UploadedFile::fake()->createWithContent(
+        $name,
+        $content ?? ('%PDF-1.4 '.bin2hex(random_bytes(64))),
+    );
+}
+
+/**
+ * A confirmed booking whose registry eligibility passes: required buyer KYC +
+ * booking documents verified, agreement signed, payment threshold relaxed.
+ *
+ * @return array{actor: User, booking: Booking, buyer: Buyer}
+ */
+function registryReadyScenario(string $finalAmount = '1000000'): array
+{
+    seedDocumentMasters();
+    config()->set('registry.eligibility.required_paid_percent', 0);
+    config()->set('registry.eligibility.block_on_overdue', true);
+
+    $s = confirmedBookingScenario($finalAmount);
+
+    foreach (['AADHAAR', 'PAN', 'ADDRESS_PROOF', 'PHOTO'] as $code) {
+        Document::factory()->verified()->forDocumentable($s['buyer'])
+            ->state(['document_type_id' => docType($code)->id])->create();
+    }
+
+    foreach (['BOOKING_FORM', 'BOOKING_AGREEMENT'] as $code) {
+        Document::factory()->verified()->forDocumentable($s['booking'])
+            ->state(['document_type_id' => docType($code)->id])->create();
+    }
+
+    Agreement::factory()->signed()->create(['booking_id' => $s['booking']->id]);
+
+    return $s;
 }
