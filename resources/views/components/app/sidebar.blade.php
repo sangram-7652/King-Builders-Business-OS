@@ -8,7 +8,11 @@
     // --- Primary (always-visible workspace) --------------------------------
     $primaryNav = array_values(array_filter([
         ['label' => 'Dashboard', 'route' => 'dashboard', 'params' => [], 'icon' => 'home', 'can' => true],
+        ['label' => 'Projects', 'route' => 'projects.index', 'params' => [], 'icon' => 'building', 'can' => (bool) $user?->can(Permission::ProjectsView->value)],
     ], fn ($item) => $item['can']));
+
+    // Modules that are live now — excluded from the "coming soon" roadmap list.
+    $liveModules = ['projects'];
 
     // --- Administration ---------------------------------------------------
     $adminNav = array_values(array_filter([
@@ -27,9 +31,10 @@
         if (in_array($group, [PermissionGroup::Administration, PermissionGroup::MasterData, PermissionGroup::Settings], true)) {
             continue;
         }
-        $names = array_map(fn (Permission $p) => $p->value, $perms);
-        if ($user?->canAny($names)) {
-            $modules = collect($perms)->map(fn (Permission $p) => \Illuminate\Support\Str::headline($p->module()))->unique()->values()->all();
+        $futurePerms = array_values(array_filter($perms, fn (Permission $p) => ! in_array($p->module(), $liveModules, true)));
+        $names = array_map(fn (Permission $p) => $p->value, $futurePerms);
+        if ($futurePerms !== [] && $user?->canAny($names)) {
+            $modules = collect($futurePerms)->map(fn (Permission $p) => \Illuminate\Support\Str::headline($p->module()))->unique()->values()->all();
             $upcoming[$group->label()] = $modules;
         }
     }

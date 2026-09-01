@@ -11,6 +11,9 @@ use App\Livewire\Dashboard;
 use App\Livewire\Masters\MasterDashboard;
 use App\Livewire\Masters\MasterForm;
 use App\Livewire\Masters\MasterIndex;
+use App\Livewire\Projects\ProjectForm;
+use App\Livewire\Projects\ProjectIndex;
+use App\Livewire\Projects\ProjectShow;
 use App\Livewire\Roles\RoleForm;
 use App\Livewire\Roles\RoleIndex;
 use App\Livewire\Roles\RoleShow;
@@ -40,6 +43,22 @@ Route::middleware(['auth', 'active'])->group(function (): void {
 
     Route::get('/dashboard', Dashboard::class)->name('dashboard');
     Route::view('/ui-kit', 'ui-kit')->name('ui-kit');
+
+    // --- Projects / Sites (M3) -----------------------------------------
+    Route::get('/projects/create', ProjectForm::class)
+        ->middleware('permission:'.Permission::ProjectsCreate->value)
+        ->name('projects.create');
+    Route::get('/projects/{project}/edit', ProjectForm::class)
+        ->middleware('permission:'.Permission::ProjectsUpdate->value)
+        ->whereNumber('project')
+        ->name('projects.edit');
+    Route::get('/projects', ProjectIndex::class)
+        ->middleware('permission:'.Permission::ProjectsView->value)
+        ->name('projects.index');
+    Route::get('/projects/{project}', ProjectShow::class)
+        ->middleware('permission:'.Permission::ProjectsView->value)
+        ->whereNumber('project')
+        ->name('projects.show');
 
     // --- Users -------------------------------------------------------------
     Route::get('/users/create', UserForm::class)

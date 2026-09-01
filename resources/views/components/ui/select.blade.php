@@ -13,6 +13,10 @@
     $error ??= $name ? $errors->first($name) : null;
     $control = 'block w-full rounded-lg border bg-(--surface) px-3 py-2 text-sm text-(--content) focus-brand disabled:opacity-50 '
         . ($error ? 'border-red-400' : 'border-(--border)');
+
+    // A sequential list (['Active', 'Inactive']) uses the label as the value;
+    // an associative map (['active' => 'Active'] or [5 => 'Haryana']) uses the key.
+    $optionsIsList = is_array($options) && array_is_list($options);
 @endphp
 
 <x-ui.field :label="$label" :for="$id" :hint="$hint" :error="$error" :required="$required">
@@ -28,7 +32,7 @@
 
         @if (! empty($options))
             @foreach ($options as $value => $text)
-                <option value="{{ is_int($value) ? $text : $value }}">{{ $text }}</option>
+                <option value="{{ $optionsIsList ? $text : $value }}">{{ $text }}</option>
             @endforeach
         @else
             {{ $slot }}

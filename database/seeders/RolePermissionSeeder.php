@@ -54,7 +54,7 @@ class RolePermissionSeeder extends Seeder
             RoleName::SuperAdmin, RoleName::Admin => $all,
 
             RoleName::SalesManager => [
-                'projects.view',
+                'projects.view', 'projects.create', 'projects.update', 'projects.activate', 'projects.archive',
                 'plots.view', 'plots.create', 'plots.update',
                 'buyers.view', 'buyers.create', 'buyers.update', 'buyers.delete',
                 'bookings.view', 'bookings.create', 'bookings.update', 'bookings.cancel',

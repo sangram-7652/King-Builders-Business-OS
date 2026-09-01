@@ -73,3 +73,14 @@ function masterAdmin(): User
         'masters.view', 'masters.create', 'masters.update', 'masters.delete',
     ]);
 }
+
+/**
+ * A user holding the full projects.* permission set (no other access).
+ */
+function projectManager(): User
+{
+    return makeUser(permissions: [
+        'projects.view', 'projects.create', 'projects.update',
+        'projects.delete', 'projects.activate', 'projects.archive',
+    ]);
+}

@@ -21,11 +21,13 @@ enum Permission: string
 {
     use HasLabel;
 
-    // --- Inventory (future modules) ---------------------------------------
+    // --- Inventory ------------------------------------------------------
     case ProjectsView = 'projects.view';
     case ProjectsCreate = 'projects.create';
     case ProjectsUpdate = 'projects.update';
     case ProjectsDelete = 'projects.delete';
+    case ProjectsActivate = 'projects.activate';
+    case ProjectsArchive = 'projects.archive';
 
     case PlotsView = 'plots.view';
     case PlotsCreate = 'plots.create';
