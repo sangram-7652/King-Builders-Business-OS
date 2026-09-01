@@ -1,0 +1,97 @@
+@php use App\Enums\BuyerStatus; @endphp
+
+<div class="space-y-6">
+    <x-ui.breadcrumb :items="[
+        ['label' => 'Buyers', 'url' => route('buyers.index')],
+        ['label' => $buyer->fullName()],
+    ]" />
+
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <div class="flex flex-wrap items-center gap-2">
+                <h1 class="text-xl font-semibold tracking-tight text-(--content)">{{ $buyer->fullName() }}</h1>
+                <x-ui.badge :variant="$buyer->status->color()">{{ $buyer->status->label() }}</x-ui.badge>
+            </div>
+            <p class="mt-1 font-mono text-sm text-(--content-muted)">{{ $buyer->customer_code }}</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+            @can('changeStatus', $buyer)
+                <div x-data="{ open: false }" class="relative">
+                    <x-ui.button variant="secondary" size="sm" x-on:click="open = !open" @click.outside="open = false">
+                        Status <x-app.icon name="chevron-down" class="size-3.5" />
+                    </x-ui.button>
+                    <div x-show="open" x-transition style="display:none" class="absolute right-0 z-10 mt-1 w-40 rounded-lg border border-(--border) bg-(--surface) p-1 shadow-lg">
+                        @foreach ($allowedStatuses as $s)
+                            <button type="button" wire:click="changeStatus('{{ $s->value }}')" x-on:click="open = false"
+                                class="block w-full rounded-md px-3 py-1.5 text-left text-sm hover:bg-(--surface-muted)">→ {{ $s->label() }}</button>
+                        @endforeach
+                    </div>
+                </div>
+            @endcan
+            @can('update', $buyer)
+                <x-ui.button size="sm" :href="route('buyers.edit', $buyer)" wire:navigate>Edit</x-ui.button>
+            @endcan
+        </div>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-3">
+        <x-ui.card title="Personal" class="lg:col-span-2">
+            <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                <div><dt class="text-(--content-muted)">Phone</dt><dd class="mt-0.5">{{ $buyer->phone }}</dd></div>
+                <div><dt class="text-(--content-muted)">Alternate phone</dt><dd class="mt-0.5">{{ $buyer->alternate_phone ?: '—' }}</dd></div>
+                <div><dt class="text-(--content-muted)">Email</dt><dd class="mt-0.5">{{ $buyer->email ?: '—' }}</dd></div>
+                <div><dt class="text-(--content-muted)">Date of birth</dt><dd class="mt-0.5">{{ $buyer->date_of_birth?->format('d M Y') ?? '—' }}</dd></div>
+                <div><dt class="text-(--content-muted)">Gender</dt><dd class="mt-0.5">{{ $buyer->gender?->label() ?? '—' }}</dd></div>
+                <div><dt class="text-(--content-muted)">Occupation</dt><dd class="mt-0.5">{{ $buyer->occupation ?: '—' }}</dd></div>
+            </dl>
+        </x-ui.card>
+
+        <x-ui.card title="Address">
+            <dl class="space-y-2 text-sm">
+                <div><dt class="text-(--content-muted)">Address</dt><dd>{{ $buyer->address ?: '—' }}</dd></div>
+                <div><dt class="text-(--content-muted)">City / State</dt><dd>{{ $buyer->locationLabel() }}</dd></div>
+                <div><dt class="text-(--content-muted)">Pincode</dt><dd>{{ $buyer->pincode ?: '—' }}</dd></div>
+            </dl>
+        </x-ui.card>
+    </div>
+
+    {{-- Sensitive identifiers --}}
+    <x-ui.card title="KYC identifiers">
+        <x-slot:actions>
+            @if ($canViewDocuments && ($pan || $aadhaar))
+                <x-ui.button variant="ghost" size="sm" wire:click="toggleReveal">
+                    {{ $revealDocuments ? 'Hide' : 'Reveal' }}
+                </x-ui.button>
+            @endif
+        </x-slot:actions>
+
+        @if (! $pan && ! $aadhaar)
+            <p class="text-sm text-(--content-muted)">No KYC identifiers on record.</p>
+        @else
+            <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                <div><dt class="text-(--content-muted)">PAN</dt><dd class="mt-0.5 font-mono">{{ $pan ?? '—' }}</dd></div>
+                <div><dt class="text-(--content-muted)">Aadhaar</dt><dd class="mt-0.5 font-mono">{{ $aadhaar ?? '—' }}</dd></div>
+            </dl>
+            @unless ($canViewDocuments)
+                <p class="mt-2 text-xs text-(--content-muted)">You do not have permission to view the full values.</p>
+            @endunless
+        @endif
+    </x-ui.card>
+
+    {{-- Converted from --}}
+    <x-ui.card title="Origin">
+        @if ($buyer->leads->isEmpty())
+            <p class="text-sm text-(--content-muted)">Created directly (not from a lead).</p>
+        @else
+            <ul class="space-y-1 text-sm">
+                @foreach ($buyer->leads as $l)
+                    <li>
+                        <a href="{{ route('leads.show', $l) }}" wire:navigate class="text-(--brand-primary) hover:underline">{{ $l->name }}</a>
+                        <span class="text-(--content-muted)"> · converted {{ $l->converted_at?->format('d M Y') }}</span>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+    </x-ui.card>
+</div>

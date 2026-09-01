@@ -39,11 +39,22 @@ enum Permission: string
     case PlotsArchive = 'plots.archive';
     case PlotsBulkCreate = 'plots.bulk_create';
 
-    // --- Sales (future modules) ------------------------------------------
+    // --- Sales ---------------------------------------------------------
+    case LeadsView = 'leads.view';
+    case LeadsViewAll = 'leads.view_all';
+    case LeadsCreate = 'leads.create';
+    case LeadsUpdate = 'leads.update';
+    case LeadsDelete = 'leads.delete';
+    case LeadsAssign = 'leads.assign';
+    case LeadsConvert = 'leads.convert';
+    case LeadsFollowUp = 'leads.follow_up';
+
     case BuyersView = 'buyers.view';
     case BuyersCreate = 'buyers.create';
     case BuyersUpdate = 'buyers.update';
     case BuyersDelete = 'buyers.delete';
+    case BuyersArchive = 'buyers.archive';
+    case BuyersDocuments = 'buyers.documents';
 
     case BookingsView = 'bookings.view';
     case BookingsCreate = 'bookings.create';
@@ -111,7 +122,7 @@ enum Permission: string
     {
         return match ($this->module()) {
             'projects', 'plots' => PermissionGroup::Inventory,
-            'buyers', 'bookings' => PermissionGroup::Sales,
+            'leads', 'buyers', 'bookings' => PermissionGroup::Sales,
             'payments' => PermissionGroup::Finance,
             'registry', 'possession' => PermissionGroup::Operations,
             'associates' => PermissionGroup::Associates,

@@ -15,6 +15,7 @@ enum MasterGroup: string
     use HasLabel;
 
     case Property = 'property';
+    case Sales = 'sales';
     case Finance = 'finance';
     case Location = 'location';
     case Documents = 'documents';
@@ -24,6 +25,7 @@ enum MasterGroup: string
     {
         return match ($this) {
             self::Property => 'Property',
+            self::Sales => 'Sales',
             self::Finance => 'Finance',
             self::Location => 'Location',
             self::Documents => 'Documents',

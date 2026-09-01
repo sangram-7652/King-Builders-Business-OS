@@ -7,7 +7,14 @@ use App\Http\Controllers\Auth\LogoutController;
 use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\ResetPassword;
+use App\Livewire\Buyers\BuyerForm;
+use App\Livewire\Buyers\BuyerIndex;
+use App\Livewire\Buyers\BuyerShow;
 use App\Livewire\Dashboard;
+use App\Livewire\Leads\LeadConvert;
+use App\Livewire\Leads\LeadForm;
+use App\Livewire\Leads\LeadIndex;
+use App\Livewire\Leads\LeadShow;
 use App\Livewire\Masters\MasterDashboard;
 use App\Livewire\Masters\MasterForm;
 use App\Livewire\Masters\MasterIndex;
@@ -87,6 +94,42 @@ Route::middleware(['auth', 'active'])->group(function (): void {
                 ->middleware('permission:'.Permission::PlotsView->value)
                 ->name('plots.index');
         });
+
+    // --- Leads (M5) ------------------------------------------------------
+    Route::get('/leads/create', LeadForm::class)
+        ->middleware('permission:'.Permission::LeadsCreate->value)
+        ->name('leads.create');
+    Route::get('/leads/{lead}/edit', LeadForm::class)
+        ->middleware('permission:'.Permission::LeadsUpdate->value)
+        ->whereNumber('lead')
+        ->name('leads.edit');
+    Route::get('/leads/{lead}/convert', LeadConvert::class)
+        ->middleware('permission:'.Permission::LeadsConvert->value)
+        ->whereNumber('lead')
+        ->name('leads.convert');
+    Route::get('/leads', LeadIndex::class)
+        ->middleware('permission:'.Permission::LeadsView->value)
+        ->name('leads.index');
+    Route::get('/leads/{lead}', LeadShow::class)
+        ->middleware('permission:'.Permission::LeadsView->value)
+        ->whereNumber('lead')
+        ->name('leads.show');
+
+    // --- Buyers / Customers (M5) --------------------------------------
+    Route::get('/buyers/create', BuyerForm::class)
+        ->middleware('permission:'.Permission::BuyersCreate->value)
+        ->name('buyers.create');
+    Route::get('/buyers/{buyer}/edit', BuyerForm::class)
+        ->middleware('permission:'.Permission::BuyersUpdate->value)
+        ->whereNumber('buyer')
+        ->name('buyers.edit');
+    Route::get('/buyers', BuyerIndex::class)
+        ->middleware('permission:'.Permission::BuyersView->value)
+        ->name('buyers.index');
+    Route::get('/buyers/{buyer}', BuyerShow::class)
+        ->middleware('permission:'.Permission::BuyersView->value)
+        ->whereNumber('buyer')
+        ->name('buyers.show');
 
     // --- Users -------------------------------------------------------------
     Route::get('/users/create', UserForm::class)

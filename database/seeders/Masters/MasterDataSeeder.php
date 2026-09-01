@@ -21,6 +21,7 @@ class MasterDataSeeder extends Seeder
             PlotSizeSeeder::class,
             PlotDimensionSeeder::class,
             PlcTypeSeeder::class,
+            LeadSourceSeeder::class,
             TdsRuleSeeder::class,
             InterestRuleSeeder::class,
             PaymentTypeSeeder::class,

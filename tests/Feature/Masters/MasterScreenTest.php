@@ -25,7 +25,7 @@ it('renders the master data overview with every group', function () {
         ->assertSee('Operations');
 });
 
-it('renders the list and create form for every one of the 15 masters', function () {
+it('renders the list and create form for every one of the 16 masters', function () {
     $this->actingAs(masterAdmin());
 
     MasterRegistry::all()->each(function ($resource): void {

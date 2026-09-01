@@ -96,3 +96,27 @@ function plotManager(): User
         'plots.bulk_create',
     ]);
 }
+
+/**
+ * Full leads.* + buyers.* including view-all and KYC access.
+ */
+function leadManager(): User
+{
+    return makeUser(permissions: [
+        'leads.view', 'leads.view_all', 'leads.create', 'leads.update', 'leads.delete',
+        'leads.assign', 'leads.convert', 'leads.follow_up',
+        'buyers.view', 'buyers.create', 'buyers.update', 'buyers.delete',
+        'buyers.archive', 'buyers.documents',
+    ]);
+}
+
+/**
+ * A scoped sales agent — sees only their own leads, no assign, no KYC.
+ */
+function leadAgent(): User
+{
+    return makeUser(permissions: [
+        'leads.view', 'leads.create', 'leads.update', 'leads.convert', 'leads.follow_up',
+        'buyers.view', 'buyers.create', 'buyers.update',
+    ]);
+}

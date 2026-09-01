@@ -8,11 +8,13 @@
     // --- Primary (always-visible workspace) --------------------------------
     $primaryNav = array_values(array_filter([
         ['label' => 'Dashboard', 'route' => 'dashboard', 'params' => [], 'icon' => 'home', 'can' => true],
+        ['label' => 'Leads', 'route' => 'leads.index', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::LeadsView->value)],
+        ['label' => 'Buyers', 'route' => 'buyers.index', 'params' => [], 'icon' => 'user', 'can' => (bool) $user?->can(Permission::BuyersView->value)],
         ['label' => 'Projects', 'route' => 'projects.index', 'params' => [], 'icon' => 'building', 'can' => (bool) $user?->can(Permission::ProjectsView->value)],
     ], fn ($item) => $item['can']));
 
     // Modules that are live now — excluded from the "coming soon" roadmap list.
-    $liveModules = ['projects', 'plots'];
+    $liveModules = ['projects', 'plots', 'leads', 'buyers'];
 
     // --- Administration ---------------------------------------------------
     $adminNav = array_values(array_filter([

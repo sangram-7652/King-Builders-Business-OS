@@ -57,7 +57,10 @@ class RolePermissionSeeder extends Seeder
                 'projects.view', 'projects.create', 'projects.update', 'projects.activate', 'projects.archive',
                 'plots.view', 'plots.create', 'plots.update', 'plots.delete',
                 'plots.hold', 'plots.release', 'plots.activate', 'plots.archive', 'plots.bulk_create',
+                'leads.view', 'leads.view_all', 'leads.create', 'leads.update', 'leads.delete',
+                'leads.assign', 'leads.convert', 'leads.follow_up',
                 'buyers.view', 'buyers.create', 'buyers.update', 'buyers.delete',
+                'buyers.archive', 'buyers.documents',
                 'bookings.view', 'bookings.create', 'bookings.update', 'bookings.cancel',
                 'payments.view',
                 'reports.view',
@@ -67,6 +70,7 @@ class RolePermissionSeeder extends Seeder
             RoleName::SalesExecutive => [
                 'projects.view',
                 'plots.view', 'plots.hold', 'plots.release',
+                'leads.view', 'leads.create', 'leads.update', 'leads.convert', 'leads.follow_up',
                 'buyers.view', 'buyers.create', 'buyers.update',
                 'bookings.view', 'bookings.create',
                 'payments.view',
@@ -75,7 +79,7 @@ class RolePermissionSeeder extends Seeder
 
             RoleName::Accountant => [
                 'payments.view', 'payments.create', 'payments.update', 'payments.approve',
-                'buyers.view', 'bookings.view', 'registry.view',
+                'buyers.view', 'buyers.documents', 'bookings.view', 'registry.view',
                 'reports.view',
                 'masters.view', 'masters.create', 'masters.update',
             ],
@@ -100,7 +104,7 @@ class RolePermissionSeeder extends Seeder
                 'masters.view',
             ],
 
-            RoleName::Viewer => $viewOnly,
+            RoleName::Viewer => [...$viewOnly, 'leads.view_all'],
         };
     }
 }

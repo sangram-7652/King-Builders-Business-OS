@@ -11,6 +11,7 @@ use App\Masters\Resources\CancellationReasonResource;
 use App\Masters\Resources\CityResource;
 use App\Masters\Resources\DocumentTypeResource;
 use App\Masters\Resources\InterestRuleResource;
+use App\Masters\Resources\LeadSourceResource;
 use App\Masters\Resources\PaymentModeResource;
 use App\Masters\Resources\PaymentTypeResource;
 use App\Masters\Resources\PlcTypeResource;
@@ -34,6 +35,8 @@ final class MasterRegistry
         PlotSizeResource::class,
         PlotDimensionResource::class,
         PlcTypeResource::class,
+        // Sales
+        LeadSourceResource::class,
         // Finance
         TdsRuleResource::class,
         InterestRuleResource::class,

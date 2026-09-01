@@ -14,9 +14,10 @@ use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
-it('creates all 15 master tables with the standard columns', function () {
+it('creates all 16 master tables with the standard columns', function () {
     $tables = [
         'plot_categories', 'plot_sizes', 'plot_dimensions', 'plc_types',
+        'lead_sources',
         'tds_rules', 'interest_rules', 'payment_types', 'payment_modes',
         'banks', 'bank_branches', 'states', 'cities',
         'document_types', 'cancellation_reasons', 'transfer_reasons',
@@ -29,10 +30,10 @@ it('creates all 15 master tables with the standard columns', function () {
     }
 });
 
-it('registers exactly 15 master resources, each mapping to a real model', function () {
+it('registers exactly 16 master resources, each mapping to a real model', function () {
     $resources = MasterRegistry::all();
 
-    expect($resources)->toHaveCount(15);
+    expect($resources)->toHaveCount(16);
 
     $resources->each(function ($resource): void {
         expect(class_exists($resource->model()))->toBeTrue()
