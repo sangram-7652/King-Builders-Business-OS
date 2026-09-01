@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+
+/*
+| ---------------------------------------------------------------------------
+| Branding tokens
+| ---------------------------------------------------------------------------
+| These are *fallback* values only. The real values are injected at runtime
+| as inline CSS custom properties by <x-app.branding-style> which reads them
+| from config('branding') (env-driven, per-project / per-tenant).
+|
+| UI components must reference these tokens — never a hard-coded hex — e.g.
+|   class="bg-(--brand-primary) text-(--brand-primary-fg)"
+*/
+@layer base {
+    :root {
+        --brand-name: 'King Builders';
+        --brand-primary: #2563eb;
+        --brand-primary-fg: #ffffff;
+        --brand-primary-hover: #1d4ed8;
+        --brand-accent: #0ea5e9;
+        --brand-ring: color-mix(in srgb, var(--brand-primary) 45%, transparent);
+
+        --surface: #ffffff;
+        --surface-muted: #f8fafc;
+        --border: #e2e8f0;
+        --content: #0f172a;
+        --content-muted: #64748b;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --surface: #0f172a;
+            --surface-muted: #1e293b;
+            --border: #334155;
+            --content: #f1f5f9;
+            --content-muted: #94a3b8;
+        }
+    }
+
+    html {
+        -webkit-text-size-adjust: 100%;
+        scrollbar-gutter: stable;
+    }
+
+    body {
+        background-color: var(--surface-muted);
+        color: var(--content);
+    }
+}
+
+/* Focus ring helper tied to the active brand colour. */
+@utility focus-brand {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand-ring);
+}
