@@ -2,10 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Actions\Payments\ActivatePaymentPlanAction;
+use App\Actions\Payments\CreatePaymentPlanAction;
 use App\Enums\PlotStatus;
 use App\Enums\RoleName;
 use App\Models\Block;
+use App\Models\Booking;
+use App\Models\BookingBuyer;
 use App\Models\Buyer;
+use App\Models\Masters\PaymentMode;
+use App\Models\PaymentPlan;
 use App\Models\Plot;
 use App\Models\Project;
 use App\Models\User;
@@ -152,6 +158,31 @@ function bookingClerk(): User
     ]);
 }
 
+/**
+ * Full payments.* + payment_plans.* + receipts.* (finance manager).
+ */
+function financeManager(): User
+{
+    return makeUser(permissions: [
+        'payment_plans.view', 'payment_plans.create', 'payment_plans.update', 'payment_plans.activate',
+        'payments.view', 'payments.create', 'payments.verify', 'payments.allocate', 'payments.reverse',
+        'receipts.view', 'receipts.generate',
+        'bookings.view', 'buyers.view',
+    ]);
+}
+
+/**
+ * A cashier — records payments and views, but cannot verify, allocate or
+ * reverse, and cannot touch payment plans.
+ */
+function cashier(): User
+{
+    return makeUser(permissions: [
+        'payment_plans.view', 'payments.view', 'payments.create', 'receipts.view',
+        'bookings.view',
+    ]);
+}
+
 /*
 | ---------------------------------------------------------------------------
 | Booking scenario builders (M6)
@@ -216,4 +247,81 @@ function bookingPayload(array $s, array $overrides = []): array
     }
 
     return $payload;
+}
+
+/*
+| ---------------------------------------------------------------------------
+| Payment scenario builders (M7)
+| ---------------------------------------------------------------------------
+*/
+
+/**
+ * A CONFIRMED booking (final_amount = ₹1,000,000) with a BOOKED plot and one
+ * primary buyer, plus an actor. Ready for a payment plan.
+ *
+ * @return array{actor: User, booking: Booking, buyer: Buyer}
+ */
+function confirmedBookingScenario(string $finalAmount = '1000000'): array
+{
+    $project = Project::factory()->create();
+    $block = Block::factory()->create(['project_id' => $project->id]);
+    $plot = Plot::factory()->create([
+        'project_id' => $project->id,
+        'block_id' => $block->id,
+        'status' => PlotStatus::Booked->value,
+    ]);
+
+    $booking = Booking::factory()->confirmed()->forPlot($plot)->create([
+        'final_amount' => $finalAmount,
+        'base_amount' => $finalAmount,
+        'subtotal' => $finalAmount,
+    ]);
+
+    $buyer = Buyer::factory()->create(['status' => 'active']);
+    BookingBuyer::factory()->create([
+        'booking_id' => $booking->id,
+        'buyer_id' => $buyer->id,
+        'ownership_percentage' => 100,
+        'is_primary' => true,
+    ]);
+
+    return ['actor' => User::factory()->create(), 'booking' => $booking, 'buyer' => $buyer];
+}
+
+/**
+ * The CASH payment mode (seeded, or created for the test).
+ */
+function cashMode(): PaymentMode
+{
+    return PaymentMode::query()->firstOrCreate(
+        ['code' => 'CASH'],
+        ['name' => 'Cash', 'requires_reference' => false, 'is_cheque' => false, 'is_active' => true, 'is_system' => true, 'sort_order' => 0],
+    );
+}
+
+function chequeMode(): PaymentMode
+{
+    return PaymentMode::query()->firstOrCreate(
+        ['code' => 'CHEQUE'],
+        ['name' => 'Cheque', 'requires_reference' => true, 'is_cheque' => true, 'is_active' => true, 'is_system' => true, 'sort_order' => 1],
+    );
+}
+
+/**
+ * Create + activate a plan with the given schedule (defaults to 4 × 25%).
+ *
+ * @param  list<array<string, mixed>>|null  $schedule
+ */
+function activePlanFor(Booking $booking, User $actor, ?array $schedule = null): PaymentPlan
+{
+    $schedule ??= [
+        ['type' => 'percentage', 'value' => '25', 'due_date' => now()->subMonths(2)->toDateString()],
+        ['type' => 'percentage', 'value' => '25', 'due_date' => now()->subMonth()->toDateString()],
+        ['type' => 'percentage', 'value' => '25', 'due_date' => now()->addMonth()->toDateString()],
+        ['type' => 'percentage', 'value' => '25', 'due_date' => now()->addMonths(2)->toDateString()],
+    ];
+
+    $plan = app(CreatePaymentPlanAction::class)->handle($booking, ['schedule' => $schedule], $actor);
+
+    return app(ActivatePaymentPlanAction::class)->handle($plan, $actor);
 }

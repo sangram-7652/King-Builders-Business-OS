@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\Permission;
 use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\ReceiptPdfController;
 use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\ResetPassword;
@@ -21,6 +22,11 @@ use App\Livewire\Leads\LeadShow;
 use App\Livewire\Masters\MasterDashboard;
 use App\Livewire\Masters\MasterForm;
 use App\Livewire\Masters\MasterIndex;
+use App\Livewire\Payments\BookingPayments;
+use App\Livewire\Payments\PaymentDashboard;
+use App\Livewire\Payments\PaymentIndex;
+use App\Livewire\Payments\PaymentShow;
+use App\Livewire\Payments\ReceiptShow;
 use App\Livewire\Plots\PlotBulkCreate;
 use App\Livewire\Plots\PlotForm;
 use App\Livewire\Plots\PlotIndex;
@@ -149,6 +155,33 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         ->middleware('permission:'.Permission::BookingsView->value)
         ->whereNumber('booking')
         ->name('bookings.show');
+
+    // --- Payments / Installments / Receipts (M7) ----------------------
+    Route::get('/finance', PaymentDashboard::class)
+        ->middleware('permission:'.Permission::PaymentsView->value)
+        ->name('finance.dashboard');
+
+    Route::get('/bookings/{booking}/payments', BookingPayments::class)
+        ->middleware('permission:'.Permission::PaymentPlansView->value)
+        ->whereNumber('booking')
+        ->name('payments.booking');
+
+    Route::get('/payments', PaymentIndex::class)
+        ->middleware('permission:'.Permission::PaymentsView->value)
+        ->name('payments.index');
+    Route::get('/payments/{payment}', PaymentShow::class)
+        ->middleware('permission:'.Permission::PaymentsView->value)
+        ->whereNumber('payment')
+        ->name('payments.show');
+
+    Route::get('/receipts/{receipt}', ReceiptShow::class)
+        ->middleware('permission:'.Permission::ReceiptsView->value)
+        ->whereNumber('receipt')
+        ->name('receipts.show');
+    Route::get('/receipts/{receipt}/pdf', ReceiptPdfController::class)
+        ->middleware('permission:'.Permission::ReceiptsView->value)
+        ->whereNumber('receipt')
+        ->name('receipts.pdf');
 
     // --- Users -------------------------------------------------------------
     Route::get('/users/create', UserForm::class)

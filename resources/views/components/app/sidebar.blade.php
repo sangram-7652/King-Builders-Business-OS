@@ -11,11 +11,12 @@
         ['label' => 'Leads', 'route' => 'leads.index', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::LeadsView->value)],
         ['label' => 'Buyers', 'route' => 'buyers.index', 'params' => [], 'icon' => 'user', 'can' => (bool) $user?->can(Permission::BuyersView->value)],
         ['label' => 'Bookings', 'route' => 'bookings.index', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::BookingsView->value)],
+        ['label' => 'Finance', 'route' => 'finance.dashboard', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::PaymentsView->value)],
         ['label' => 'Projects', 'route' => 'projects.index', 'params' => [], 'icon' => 'building', 'can' => (bool) $user?->can(Permission::ProjectsView->value)],
     ], fn ($item) => $item['can']));
 
     // Modules that are live now — excluded from the "coming soon" roadmap list.
-    $liveModules = ['projects', 'plots', 'leads', 'buyers', 'bookings', 'pricing'];
+    $liveModules = ['projects', 'plots', 'leads', 'buyers', 'bookings', 'pricing', 'payments', 'payment_plans', 'receipts'];
 
     // --- Administration ---------------------------------------------------
     $adminNav = array_values(array_filter([

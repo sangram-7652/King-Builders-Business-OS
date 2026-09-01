@@ -11,6 +11,7 @@ use App\Actions\Bookings\OverrideBookingPriceAction;
 use App\Actions\Bookings\SubmitBookingAction;
 use App\Exceptions\DomainException;
 use App\Models\Booking;
+use App\Services\Payments\PaymentLedger;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -154,7 +155,11 @@ class BookingShow extends Component
 
     public function render(): View
     {
-        return view('livewire.bookings.booking-show')
+        $summary = $this->booking->isConfirmed()
+            ? app(PaymentLedger::class)->summary($this->booking)
+            : null;
+
+        return view('livewire.bookings.booking-show', ['financials' => $summary])
             ->title($this->booking->booking_number);
     }
 }

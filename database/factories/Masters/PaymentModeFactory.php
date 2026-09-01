@@ -24,6 +24,7 @@ class PaymentModeFactory extends Factory
             'code' => strtoupper(Str::slug($name, '_')),
             'description' => fake()->optional()->sentence(),
             'requires_reference' => fake()->boolean(),
+            'is_cheque' => false,
             'is_active' => true,
             'is_system' => false,
             'sort_order' => 0,
@@ -33,6 +34,11 @@ class PaymentModeFactory extends Factory
     public function system(): static
     {
         return $this->state(fn () => ['is_system' => true]);
+    }
+
+    public function cheque(): static
+    {
+        return $this->state(fn () => ['is_cheque' => true, 'requires_reference' => true]);
     }
 
     public function inactive(): static

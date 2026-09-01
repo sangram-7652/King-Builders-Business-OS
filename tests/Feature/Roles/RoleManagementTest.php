@@ -56,7 +56,7 @@ it('blocks toggling all permissions in a group helper', function () {
         ->call('toggleGroup', 'finance', true);
 
     expect($component->get('permissions'))
-        ->toContain(Permission::PaymentsApprove->value)
+        ->toContain(Permission::PaymentsVerify->value)
         ->toContain(Permission::PaymentsView->value);
 
     $component->call('toggleGroup', 'finance', false);

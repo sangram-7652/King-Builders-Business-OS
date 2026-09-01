@@ -45,6 +45,8 @@ class PaymentModeResource extends MasterResource
             Field::text('description', 'Description'),
             Field::toggle('requires_reference', 'Requires a reference number')
                 ->help('e.g. cheque number, UTR, transaction id.'),
+            Field::toggle('is_cheque', 'Is a cheque mode')
+                ->help('Payments with this mode collect cheque details and run the cheque lifecycle.'),
             Field::sortOrder(),
             Field::toggle('is_active', 'Active'),
         ];
@@ -57,6 +59,7 @@ class PaymentModeResource extends MasterResource
             'code' => ['required', 'string', 'max:32', Rule::unique('payment_modes', 'code')->ignore($id)->withoutTrashed()],
             'description' => ['nullable', 'string', 'max:255'],
             'requires_reference' => ['boolean'],
+            'is_cheque' => ['boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:65535'],
             'is_active' => ['boolean'],
         ];

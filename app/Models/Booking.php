@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\BookingStatus;
+use App\Enums\PaymentPlanStatus;
 use App\Models\Concerns\GuardsAgainstDestructiveDelete;
 use Database\Factories\BookingFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -137,6 +138,34 @@ class Booking extends Model
     public function priceLines(): HasMany
     {
         return $this->hasMany(BookingPriceLine::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /** @return HasMany<PaymentPlan, $this> */
+    public function paymentPlans(): HasMany
+    {
+        return $this->hasMany(PaymentPlan::class);
+    }
+
+    /** The single live (draft/active) payment plan, if any. @return HasOne<PaymentPlan, $this> */
+    public function activePaymentPlan(): HasOne
+    {
+        return $this->hasOne(PaymentPlan::class)
+            ->whereIn('status', [PaymentPlanStatus::Draft->value, PaymentPlanStatus::Active->value])
+            ->latestOfMany();
+    }
+
+    /** @return HasMany<Payment, $this> */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * @return array<string, \Illuminate\Database\Eloquent\Relations\Relation<*, *, *>>
+     */
+    protected function businessDependents(): array
+    {
+        return ['payments' => $this->payments(), 'paymentPlans' => $this->paymentPlans()];
     }
 
     // --- Scopes ------------------------------------------------------

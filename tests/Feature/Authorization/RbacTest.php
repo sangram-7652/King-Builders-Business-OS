@@ -47,7 +47,7 @@ it('rejects a direct action call when the permission is missing', function () {
 it('grants a Super Admin every permission via Gate::before', function () {
     $user = makeUser([RoleName::SuperAdmin->value]);
 
-    expect($user->can(Permission::PaymentsApprove->value))->toBeTrue()
+    expect($user->can(Permission::PaymentsVerify->value))->toBeTrue()
         ->and($user->can('anything.at.all'))->toBeTrue()
         ->and($user->can(Permission::UsersDelete->value))->toBeTrue();
 });
@@ -77,11 +77,11 @@ it('assigns and removes roles on a user', function () {
 
     $user->assignRole(RoleName::Accountant->value);
     expect($user->fresh()->hasRole(RoleName::Accountant->value))->toBeTrue()
-        ->and($user->fresh()->can(Permission::PaymentsApprove->value))->toBeTrue();
+        ->and($user->fresh()->can(Permission::PaymentsVerify->value))->toBeTrue();
 
     $user->removeRole(RoleName::Accountant->value);
     expect($user->fresh()->hasRole(RoleName::Accountant->value))->toBeFalse()
-        ->and($user->fresh()->can(Permission::PaymentsApprove->value))->toBeFalse();
+        ->and($user->fresh()->can(Permission::PaymentsVerify->value))->toBeFalse();
 });
 
 it('seeds all nine system roles and every permission', function () {

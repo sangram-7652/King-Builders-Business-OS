@@ -68,11 +68,20 @@ enum Permission: string
     case PricingManage = 'pricing.manage';
     case PricingOverride = 'pricing.override';
 
-    // --- Finance (future modules) ---------------------------------------
+    // --- Finance: Payments / Installments / Receipts (M7) ---------------
+    case PaymentPlansView = 'payment_plans.view';
+    case PaymentPlansCreate = 'payment_plans.create';
+    case PaymentPlansUpdate = 'payment_plans.update';
+    case PaymentPlansActivate = 'payment_plans.activate';
+
     case PaymentsView = 'payments.view';
     case PaymentsCreate = 'payments.create';
-    case PaymentsUpdate = 'payments.update';
-    case PaymentsApprove = 'payments.approve';
+    case PaymentsVerify = 'payments.verify';
+    case PaymentsAllocate = 'payments.allocate';
+    case PaymentsReverse = 'payments.reverse';
+
+    case ReceiptsView = 'receipts.view';
+    case ReceiptsGenerate = 'receipts.generate';
 
     // --- Operations (future modules) ----------------------------------
     case RegistryView = 'registry.view';
@@ -130,7 +139,7 @@ enum Permission: string
         return match ($this->module()) {
             'projects', 'plots' => PermissionGroup::Inventory,
             'leads', 'buyers', 'bookings' => PermissionGroup::Sales,
-            'payments', 'pricing' => PermissionGroup::Finance,
+            'payments', 'pricing', 'payment_plans', 'receipts' => PermissionGroup::Finance,
             'registry', 'possession' => PermissionGroup::Operations,
             'associates' => PermissionGroup::Associates,
             'reports' => PermissionGroup::Reports,

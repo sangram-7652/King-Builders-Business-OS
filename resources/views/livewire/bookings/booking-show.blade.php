@@ -43,6 +43,10 @@
                     wire:confirm="Confirm this booking? Pricing will be frozen and the plot marked BOOKED.">Confirm</x-ui.button>
             @endcan
 
+            @if ($booking->isConfirmed() && auth()->user()?->can('payment_plans.view'))
+                <x-ui.button size="sm" variant="secondary" :href="route('payments.booking', $booking)" wire:navigate>Payments</x-ui.button>
+            @endif
+
             @can('cancel', $booking)
                 <x-ui.button variant="danger" size="sm" wire:click="openCancel">Cancel booking</x-ui.button>
             @endcan
@@ -170,6 +174,29 @@
             @endif
         </x-ui.card>
     @endcan
+
+    {{-- Financials (M7) --}}
+    @if ($financials)
+        <x-ui.card title="Financials"
+            subtitle="Derived from the payment ledger — not a stored balance.">
+            <x-slot:actions>
+                @if (auth()->user()?->can('payment_plans.view'))
+                    <x-ui.button size="sm" variant="secondary" :href="route('payments.booking', $booking)" wire:navigate>Manage payments</x-ui.button>
+                @endif
+            </x-slot:actions>
+            <dl class="grid gap-4 text-sm sm:grid-cols-4">
+                <div><dt class="text-(--content-muted)">Total</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums">₹{{ number_format((float) $financials->total->store(), 2) }}</dd></div>
+                <div><dt class="text-(--content-muted)">Paid</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums">₹{{ number_format((float) $financials->paid->store(), 2) }}</dd></div>
+                <div><dt class="text-(--content-muted)">Outstanding</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums">₹{{ number_format((float) $financials->outstanding->store(), 2) }}</dd></div>
+                <div><dt class="text-(--content-muted)">Overdue</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums text-red-600">₹{{ number_format((float) $financials->overdue->store(), 2) }}</dd></div>
+            </dl>
+            @if ($financials->installmentCount === 0)
+                <p class="mt-3 text-xs text-(--content-muted)">No payment plan yet.</p>
+            @else
+                <p class="mt-3 text-xs text-(--content-muted)">{{ $financials->settledInstallmentCount }} of {{ $financials->installmentCount }} installments settled.</p>
+            @endif
+        </x-ui.card>
+    @endif
 
     @if ($booking->isCancelled())
         <x-ui.card title="Cancellation">
