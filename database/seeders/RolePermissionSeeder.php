@@ -60,6 +60,7 @@ class RolePermissionSeeder extends Seeder
                 'bookings.view', 'bookings.create', 'bookings.update', 'bookings.cancel',
                 'payments.view',
                 'reports.view',
+                'masters.view',
             ],
 
             RoleName::SalesExecutive => [
@@ -68,29 +69,34 @@ class RolePermissionSeeder extends Seeder
                 'buyers.view', 'buyers.create', 'buyers.update',
                 'bookings.view', 'bookings.create',
                 'payments.view',
+                'masters.view',
             ],
 
             RoleName::Accountant => [
                 'payments.view', 'payments.create', 'payments.update', 'payments.approve',
                 'buyers.view', 'bookings.view', 'registry.view',
                 'reports.view',
+                'masters.view', 'masters.create', 'masters.update',
             ],
 
             RoleName::RegistryManager => [
                 'registry.view', 'registry.update',
                 'plots.view', 'buyers.view', 'bookings.view',
                 'reports.view',
+                'masters.view',
             ],
 
             RoleName::PossessionManager => [
                 'possession.view', 'possession.update',
                 'plots.view', 'buyers.view', 'bookings.view',
                 'reports.view',
+                'masters.view',
             ],
 
             RoleName::AssociateManager => [
                 'associates.view', 'associates.create', 'associates.update',
                 'reports.view',
+                'masters.view',
             ],
 
             RoleName::Viewer => $viewOnly,

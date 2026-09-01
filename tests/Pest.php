@@ -63,3 +63,13 @@ function superAdmin(): User
 
     return makeUser([RoleName::SuperAdmin->value]);
 }
+
+/**
+ * A user holding the full masters.* permission set (no other access).
+ */
+function masterAdmin(): User
+{
+    return makeUser(permissions: [
+        'masters.view', 'masters.create', 'masters.update', 'masters.delete',
+    ]);
+}

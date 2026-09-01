@@ -75,6 +75,12 @@ enum Permission: string
     case RolesUpdate = 'roles.update';
     case RolesDelete = 'roles.delete';
 
+    // --- Master Data (M2) ------------------------------------------
+    case MastersView = 'masters.view';
+    case MastersCreate = 'masters.create';
+    case MastersUpdate = 'masters.update';
+    case MastersDelete = 'masters.delete';
+
     // --- Settings (M1 placeholder) ----------------------------------
     case SettingsView = 'settings.view';
     case SettingsUpdate = 'settings.update';
@@ -104,6 +110,7 @@ enum Permission: string
             'associates' => PermissionGroup::Associates,
             'reports' => PermissionGroup::Reports,
             'users', 'roles' => PermissionGroup::Administration,
+            'masters' => PermissionGroup::MasterData,
             'settings' => PermissionGroup::Settings,
         };
     }

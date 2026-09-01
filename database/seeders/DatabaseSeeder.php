@@ -7,6 +7,7 @@ namespace Database\Seeders;
 use App\Enums\RoleName;
 use App\Enums\UserStatus;
 use App\Models\User;
+use Database\Seeders\Masters\MasterDataSeeder;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -15,6 +16,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(RolePermissionSeeder::class);
+        $this->call(MasterDataSeeder::class);
 
         $this->ensureUser(
             email: 'super@kingbuilders.test',

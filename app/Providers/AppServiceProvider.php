@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Enums\RoleName;
+use App\Masters\MasterRegistry;
 use App\Models\User;
+use App\Policies\MasterDataPolicy;
 use App\Support\Branding;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
@@ -38,6 +40,11 @@ class AppServiceProvider extends ServiceProvider
         Gate::before(static function (User $user, string $ability): ?bool {
             return $user->hasRole(RoleName::SuperAdmin->value) ? true : null;
         });
+
+        // Every Master Data model shares one policy (M2).
+        foreach (MasterRegistry::modelClasses() as $modelClass) {
+            Gate::policy($modelClass, MasterDataPolicy::class);
+        }
 
         // --- Branding available to every view as `$branding` --------------
         View::share('branding', $this->app->make(Branding::class));

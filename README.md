@@ -3,11 +3,12 @@
 A modern real-estate ERP (Laravel 12 + Livewire 3 + Tailwind v4) replacing a
 legacy PHP real-estate CRM.
 
-> **Status: M1 — Authentication + RBAC.** Docker environment, admin shell, UI kit,
-> conventions (M0) + login/logout/password-reset, users & roles/permissions
-> management (M1). No business modules yet.
+> **Status: M2 — Master Data.** Docker environment, admin shell, UI kit,
+> conventions (M0); auth + users/roles/permissions (M1); 15 master-data modules
+> under Settings → Master Data (M2). No business modules yet.
 >
-> Seeded super admin: `super@kingbuilders.test` / `password`. See [`docs/RBAC.md`](docs/RBAC.md).
+> Seeded super admin: `super@kingbuilders.test` / `password`.
+> See [`docs/RBAC.md`](docs/RBAC.md) and [`docs/MASTER-DATA.md`](docs/MASTER-DATA.md).
 
 ---
 

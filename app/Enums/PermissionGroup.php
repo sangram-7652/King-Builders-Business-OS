@@ -20,6 +20,7 @@ enum PermissionGroup: string
     case Associates = 'associates';
     case Reports = 'reports';
     case Administration = 'administration';
+    case MasterData = 'master_data';
     case Settings = 'settings';
 
     public function label(): string
@@ -32,6 +33,7 @@ enum PermissionGroup: string
             self::Associates => 'Associates',
             self::Reports => 'Reports',
             self::Administration => 'Administration',
+            self::MasterData => 'Master Data',
             self::Settings => 'Settings',
         };
     }

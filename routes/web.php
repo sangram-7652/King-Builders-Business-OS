@@ -8,6 +8,9 @@ use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\ResetPassword;
 use App\Livewire\Dashboard;
+use App\Livewire\Masters\MasterDashboard;
+use App\Livewire\Masters\MasterForm;
+use App\Livewire\Masters\MasterIndex;
 use App\Livewire\Roles\RoleForm;
 use App\Livewire\Roles\RoleIndex;
 use App\Livewire\Roles\RoleShow;
@@ -67,4 +70,24 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         ->middleware('permission:'.Permission::RolesView->value)
         ->whereNumber('role')
         ->name('roles.show');
+
+    // --- Settings › Master Data (M2) ------------------------------------
+    Route::prefix('settings/masters')->name('masters.')->group(function (): void {
+        Route::get('/', MasterDashboard::class)
+            ->middleware('permission:'.Permission::MastersView->value)
+            ->name('dashboard');
+
+        Route::get('/{resource}/create', MasterForm::class)
+            ->middleware('permission:'.Permission::MastersCreate->value)
+            ->name('create');
+
+        Route::get('/{resource}/{record}/edit', MasterForm::class)
+            ->middleware('permission:'.Permission::MastersUpdate->value)
+            ->whereNumber('record')
+            ->name('edit');
+
+        Route::get('/{resource}', MasterIndex::class)
+            ->middleware('permission:'.Permission::MastersView->value)
+            ->name('index');
+    });
 });
