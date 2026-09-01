@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Jobs\ExpirePlotHoldsJob;
+use App\Jobs\RefreshCollectionQueueJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -31,4 +32,11 @@ Schedule::call(fn () => logger()->info('scheduler heartbeat'))
 Schedule::job(new ExpirePlotHoldsJob)
     ->everyFiveMinutes()
     ->name('expire-plot-holds')
+    ->withoutOverlapping();
+
+// M8: nightly collection sweep — open cases for newly-overdue bookings, break
+// stale promises, re-prioritise, regenerate reminders. Idempotent + unique.
+Schedule::job(new RefreshCollectionQueueJob)
+    ->dailyAt('01:30')
+    ->name('refresh-collection-queue')
     ->withoutOverlapping();

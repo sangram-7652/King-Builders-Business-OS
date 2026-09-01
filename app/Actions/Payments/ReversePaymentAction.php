@@ -18,7 +18,9 @@ use Illuminate\Support\Facades\Log;
 /**
  * SUCCESS → REVERSED (M7). A confirmed payment is never deleted.
  *
- *  - `payments.reverse` only (policy re-checks)
+ *  - `payments.reverse` only (policy re-checks) — EXCEPT when M8 triggers it as
+ *    the consequence of an authorised cheque bounce (`$systemInitiated`), where
+ *    the caller (RecordChequeBounceAction) has already checked `cheques.bounce`
  *  - a reason is mandatory and stored with who / when
  *  - allocation rows are KEPT (financial history stays intact) — they simply
  *    stop counting because the ledger only sums allocations of SUCCESS payments
@@ -31,9 +33,9 @@ class ReversePaymentAction
     use RecalculatesLedger;
     use RunsInTransaction;
 
-    public function handle(Payment $payment, string $reason, User $actor): Payment
+    public function handle(Payment $payment, string $reason, User $actor, bool $systemInitiated = false): Payment
     {
-        if (! $actor->can('payments.reverse')) {
+        if (! $systemInitiated && ! $actor->can('payments.reverse')) {
             throw new DomainException('You are not authorised to reverse a payment.');
         }
 

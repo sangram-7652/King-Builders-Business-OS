@@ -84,6 +84,12 @@ class Payment extends Model
         return $this->hasOne(Receipt::class);
     }
 
+    /** Cheque bounce record, if this cheque payment bounced (M8). @return HasOne<\App\Models\ChequeBounce, $this> */
+    public function chequeBounce(): HasOne
+    {
+        return $this->hasOne(ChequeBounce::class);
+    }
+
     /** @return BelongsTo<User, $this> */
     public function receivedBy(): BelongsTo
     {

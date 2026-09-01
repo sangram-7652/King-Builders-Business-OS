@@ -67,6 +67,8 @@ class RolePermissionSeeder extends Seeder
                 'payment_plans.view', 'payment_plans.create', 'payment_plans.update', 'payment_plans.activate',
                 'payments.view', 'payments.create',
                 'receipts.view',
+                'collections.view', 'collections.view_all', 'collections.assign', 'collections.reports',
+                'promises.view', 'cheques.view', 'penalties.view',
                 'reports.view',
                 'masters.view',
             ],
@@ -86,10 +88,32 @@ class RolePermissionSeeder extends Seeder
                 'payment_plans.view', 'payment_plans.create', 'payment_plans.update', 'payment_plans.activate',
                 'payments.view', 'payments.create', 'payments.verify', 'payments.allocate', 'payments.reverse',
                 'receipts.view', 'receipts.generate',
+                'collections.view', 'collections.view_all', 'collections.reports',
+                'promises.view', 'cheques.view', 'cheques.update', 'cheques.bounce',
+                'penalties.view', 'penalties.assess', 'penalties.approve',
                 'buyers.view', 'buyers.documents', 'bookings.view', 'registry.view',
                 'pricing.view', 'pricing.manage',
                 'reports.view',
                 'masters.view', 'masters.create', 'masters.update',
+            ],
+
+            RoleName::CollectionManager => [
+                'collections.view', 'collections.view_all', 'collections.create', 'collections.update',
+                'collections.assign', 'collections.follow_up', 'collections.reports',
+                'promises.view', 'promises.create', 'promises.update',
+                'cheques.view', 'cheques.update', 'cheques.bounce',
+                'penalties.view', 'penalties.assess', 'penalties.approve',
+                'bookings.view', 'buyers.view', 'payments.view', 'payment_plans.view', 'receipts.view',
+                'reports.view', 'masters.view',
+            ],
+
+            RoleName::CollectionExecutive => [
+                'collections.view', 'collections.create', 'collections.update', 'collections.follow_up',
+                'promises.view', 'promises.create', 'promises.update',
+                'cheques.view',
+                'penalties.view',
+                'bookings.view', 'buyers.view', 'payments.view', 'payment_plans.view', 'receipts.view',
+                'masters.view',
             ],
 
             RoleName::RegistryManager => [

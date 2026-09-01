@@ -16,6 +16,7 @@ enum PermissionGroup: string
     case Sales = 'sales';
     case Inventory = 'inventory';
     case Finance = 'finance';
+    case Collections = 'collections';
     case Operations = 'operations';
     case Associates = 'associates';
     case Reports = 'reports';
@@ -29,6 +30,7 @@ enum PermissionGroup: string
             self::Sales => 'Sales',
             self::Inventory => 'Inventory',
             self::Finance => 'Finance',
+            self::Collections => 'Collections',
             self::Operations => 'Operations',
             self::Associates => 'Associates',
             self::Reports => 'Reports',

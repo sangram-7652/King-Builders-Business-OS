@@ -6,7 +6,9 @@ namespace App\Providers;
 
 use App\Enums\RoleName;
 use App\Masters\MasterRegistry;
+use App\Models\Payment;
 use App\Models\User;
+use App\Observers\PaymentCollectionObserver;
 use App\Policies\MasterDataPolicy;
 use App\Support\Branding;
 use Illuminate\Database\Eloquent\Model;
@@ -45,6 +47,9 @@ class AppServiceProvider extends ServiceProvider
         foreach (MasterRegistry::modelClasses() as $modelClass) {
             Gate::policy($modelClass, MasterDataPolicy::class);
         }
+
+        // M8: keep collection state in step with M7 payment state.
+        Payment::observe(PaymentCollectionObserver::class);
 
         // --- Branding available to every view as `$branding` --------------
         View::share('branding', $this->app->make(Branding::class));

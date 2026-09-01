@@ -79,6 +79,30 @@
         @endif
     </x-ui.card>
 
+    {{-- Collection profile (M8) --}}
+    @if ($collectionProfile)
+        <x-ui.card title="Collection profile" subtitle="Across all confirmed bookings where this buyer is primary. Figures from the M7 ledger.">
+            <dl class="grid gap-4 text-sm sm:grid-cols-3 lg:grid-cols-4">
+                <div><dt class="text-(--content-muted)">Total bookings</dt><dd class="mt-0.5 text-lg font-semibold">{{ $collectionProfile['total_bookings'] }}</dd></div>
+                <div><dt class="text-(--content-muted)">Total value</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums">₹{{ number_format((float) $collectionProfile['total_value'], 2) }}</dd></div>
+                <div><dt class="text-(--content-muted)">Total paid</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums">₹{{ number_format((float) $collectionProfile['total_paid'], 2) }}</dd></div>
+                <div><dt class="text-(--content-muted)">Outstanding</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums">₹{{ number_format((float) $collectionProfile['total_outstanding'], 2) }}</dd></div>
+                <div><dt class="text-(--content-muted)">Overdue</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums text-red-600">₹{{ number_format((float) $collectionProfile['total_overdue'], 2) }}</dd></div>
+                <div><dt class="text-(--content-muted)">Open promises</dt><dd class="mt-0.5 text-lg font-semibold">{{ $collectionProfile['open_promises'] }}</dd></div>
+                <div><dt class="text-(--content-muted)">Broken promises</dt><dd class="mt-0.5 text-lg font-semibold">{{ $collectionProfile['broken_promises'] }}</dd></div>
+                <div>
+                    <dt class="text-(--content-muted)">Last payment</dt>
+                    <dd class="mt-0.5">
+                        @if ($collectionProfile['last_payment_date'])
+                            ₹{{ number_format((float) $collectionProfile['last_payment_amount'], 2) }}
+                            <span class="text-(--content-muted)">on {{ \Illuminate\Support\Carbon::parse($collectionProfile['last_payment_date'])->format('d M Y') }}</span>
+                        @else — @endif
+                    </dd>
+                </div>
+            </dl>
+        </x-ui.card>
+    @endif
+
     {{-- Converted from --}}
     <x-ui.card title="Origin">
         @if ($buyer->leads->isEmpty())

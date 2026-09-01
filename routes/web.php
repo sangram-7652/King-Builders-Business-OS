@@ -14,6 +14,11 @@ use App\Livewire\Bookings\BookingShow;
 use App\Livewire\Buyers\BuyerForm;
 use App\Livewire\Buyers\BuyerIndex;
 use App\Livewire\Buyers\BuyerShow;
+use App\Livewire\Collections\BookingCollection;
+use App\Livewire\Collections\CollectionCaseShow;
+use App\Livewire\Collections\CollectionDashboard;
+use App\Livewire\Collections\CollectionQueue;
+use App\Livewire\Collections\CollectionReports;
 use App\Livewire\Dashboard;
 use App\Livewire\Leads\LeadConvert;
 use App\Livewire\Leads\LeadForm;
@@ -182,6 +187,25 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         ->middleware('permission:'.Permission::ReceiptsView->value)
         ->whereNumber('receipt')
         ->name('receipts.pdf');
+
+    // --- Collections / Dues / Aging (M8) ------------------------------
+    Route::get('/collections/dashboard', CollectionDashboard::class)
+        ->middleware('permission:'.Permission::CollectionsView->value)
+        ->name('collections.dashboard');
+    Route::get('/collections/reports', CollectionReports::class)
+        ->middleware('permission:'.Permission::CollectionsReports->value)
+        ->name('collections.reports');
+    Route::get('/collections', CollectionQueue::class)
+        ->middleware('permission:'.Permission::CollectionsView->value)
+        ->name('collections.queue');
+    Route::get('/collections/{case}', CollectionCaseShow::class)
+        ->middleware('permission:'.Permission::CollectionsView->value)
+        ->whereNumber('case')
+        ->name('collections.show');
+    Route::get('/bookings/{booking}/collection', BookingCollection::class)
+        ->middleware('permission:'.Permission::CollectionsView->value)
+        ->whereNumber('booking')
+        ->name('collections.booking');
 
     // --- Users -------------------------------------------------------------
     Route::get('/users/create', UserForm::class)

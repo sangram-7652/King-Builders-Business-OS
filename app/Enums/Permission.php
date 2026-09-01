@@ -83,6 +83,27 @@ enum Permission: string
     case ReceiptsView = 'receipts.view';
     case ReceiptsGenerate = 'receipts.generate';
 
+    // --- Collections (M8) -------------------------------------------
+    case CollectionsView = 'collections.view';
+    case CollectionsViewAll = 'collections.view_all';
+    case CollectionsCreate = 'collections.create';
+    case CollectionsUpdate = 'collections.update';
+    case CollectionsAssign = 'collections.assign';
+    case CollectionsFollowUp = 'collections.follow_up';
+    case CollectionsReports = 'collections.reports';
+
+    case PromisesView = 'promises.view';
+    case PromisesCreate = 'promises.create';
+    case PromisesUpdate = 'promises.update';
+
+    case ChequesView = 'cheques.view';
+    case ChequesUpdate = 'cheques.update';
+    case ChequesBounce = 'cheques.bounce';
+
+    case PenaltiesView = 'penalties.view';
+    case PenaltiesAssess = 'penalties.assess';
+    case PenaltiesApprove = 'penalties.approve';
+
     // --- Operations (future modules) ----------------------------------
     case RegistryView = 'registry.view';
     case RegistryUpdate = 'registry.update';
@@ -140,6 +161,7 @@ enum Permission: string
             'projects', 'plots' => PermissionGroup::Inventory,
             'leads', 'buyers', 'bookings' => PermissionGroup::Sales,
             'payments', 'pricing', 'payment_plans', 'receipts' => PermissionGroup::Finance,
+            'collections', 'promises', 'cheques', 'penalties' => PermissionGroup::Collections,
             'registry', 'possession' => PermissionGroup::Operations,
             'associates' => PermissionGroup::Associates,
             'reports' => PermissionGroup::Reports,

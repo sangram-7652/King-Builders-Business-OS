@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Collections\EnsureCollectionCaseAction;
 use App\Actions\Payments\ActivatePaymentPlanAction;
 use App\Actions\Payments\CreatePaymentPlanAction;
 use App\Enums\PlotStatus;
@@ -10,6 +11,7 @@ use App\Models\Block;
 use App\Models\Booking;
 use App\Models\BookingBuyer;
 use App\Models\Buyer;
+use App\Models\CollectionCase;
 use App\Models\Masters\PaymentMode;
 use App\Models\PaymentPlan;
 use App\Models\Plot;
@@ -324,4 +326,55 @@ function activePlanFor(Booking $booking, User $actor, ?array $schedule = null): 
     $plan = app(CreatePaymentPlanAction::class)->handle($booking, ['schedule' => $schedule], $actor);
 
     return app(ActivatePaymentPlanAction::class)->handle($plan, $actor);
+}
+
+/*
+| ---------------------------------------------------------------------------
+| Collection helpers (M8)
+| ---------------------------------------------------------------------------
+*/
+
+/** Full collections.* + promises.* + cheques.* + penalties.* incl. view_all. */
+function collectionManager(): User
+{
+    return makeUser(permissions: [
+        'collections.view', 'collections.view_all', 'collections.create', 'collections.update',
+        'collections.assign', 'collections.follow_up', 'collections.reports',
+        'promises.view', 'promises.create', 'promises.update',
+        'cheques.view', 'cheques.update', 'cheques.bounce',
+        'penalties.view', 'penalties.assess', 'penalties.approve',
+        'bookings.view', 'buyers.view', 'payments.view', 'payment_plans.view',
+    ]);
+}
+
+/** A scoped collection executive — assigned cases only, no assign, no penalty approval. */
+function collectionExecutive(): User
+{
+    return makeUser(permissions: [
+        'collections.view', 'collections.create', 'collections.update', 'collections.follow_up',
+        'promises.view', 'promises.create', 'promises.update',
+        'cheques.view', 'penalties.view',
+        'bookings.view', 'buyers.view',
+    ]);
+}
+
+/**
+ * A confirmed booking with an ACTIVE, OVERDUE plan plus an ensured collection case.
+ *
+ * @param  list<array<string, mixed>>|null  $schedule
+ * @return array{actor: User, booking: Booking, buyer: Buyer, case: CollectionCase}
+ */
+function overdueCaseScenario(string $finalAmount = '1000000', ?array $schedule = null): array
+{
+    $s = confirmedBookingScenario($finalAmount);
+
+    activePlanFor($s['booking'], $s['actor'], $schedule ?? [
+        ['type' => 'amount', 'value' => '400000', 'due_date' => now()->subDays(75)->toDateString()],
+        ['type' => 'amount', 'value' => '300000', 'due_date' => now()->subDays(20)->toDateString()],
+        ['type' => 'amount', 'value' => '300000', 'due_date' => now()->addDays(30)->toDateString()],
+    ]);
+
+    $case = app(EnsureCollectionCaseAction::class)->handle($s['booking']->fresh(), $s['actor']);
+
+    return $s + ['case' => $case];
 }

@@ -160,6 +160,18 @@ class Booking extends Model
         return $this->hasMany(Payment::class);
     }
 
+    /** Collection case for this booking (M8). @return HasOne<\App\Models\CollectionCase, $this> */
+    public function collectionCase(): HasOne
+    {
+        return $this->hasOne(CollectionCase::class);
+    }
+
+    /** @return HasMany<PaymentPromise, $this> */
+    public function paymentPromises(): HasMany
+    {
+        return $this->hasMany(PaymentPromise::class);
+    }
+
     /**
      * @return array<string, \Illuminate\Database\Eloquent\Relations\Relation<*, *, *>>
      */

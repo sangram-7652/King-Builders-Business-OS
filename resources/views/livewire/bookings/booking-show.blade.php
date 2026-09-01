@@ -183,6 +183,9 @@
                 @if (auth()->user()?->can('payment_plans.view'))
                     <x-ui.button size="sm" variant="secondary" :href="route('payments.booking', $booking)" wire:navigate>Manage payments</x-ui.button>
                 @endif
+                @if (auth()->user()?->can('collections.view'))
+                    <x-ui.button size="sm" variant="secondary" :href="route('collections.booking', $booking)" wire:navigate>Collection</x-ui.button>
+                @endif
             </x-slot:actions>
             <dl class="grid gap-4 text-sm sm:grid-cols-4">
                 <div><dt class="text-(--content-muted)">Total</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums">₹{{ number_format((float) $financials->total->store(), 2) }}</dd></div>

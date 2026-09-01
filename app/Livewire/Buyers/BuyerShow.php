@@ -8,6 +8,7 @@ use App\Actions\Buyers\ChangeBuyerStatus;
 use App\Enums\BuyerStatus;
 use App\Exceptions\DomainException;
 use App\Models\Buyer;
+use App\Services\Collections\BuyerCollectionProfile;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -59,6 +60,9 @@ class BuyerShow extends Component
             'pan' => $this->displaySensitive('pan_number', $canViewDocuments),
             'aadhaar' => $this->displaySensitive('aadhaar_number', $canViewDocuments),
             'allowedStatuses' => $this->buyer->status->allowedTransitions(),
+            'collectionProfile' => auth()->user()->can('collections.view')
+                ? app(BuyerCollectionProfile::class)->for($this->buyer)
+                : null,
         ])->title($this->buyer->fullName());
     }
 
