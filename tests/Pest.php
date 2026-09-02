@@ -5,7 +5,14 @@ declare(strict_types=1);
 use App\Actions\Collections\EnsureCollectionCaseAction;
 use App\Actions\Payments\ActivatePaymentPlanAction;
 use App\Actions\Payments\CreatePaymentPlanAction;
+use App\Actions\Possession\InitiatePossessionCaseAction;
+use App\Actions\Possession\RecordClearanceAction;
+use App\Actions\Possession\RecordInspectionAction;
+use App\Actions\Possession\SchedulePossessionAppointmentAction;
+use App\Enums\ClearanceStatus;
+use App\Enums\InspectionStatus;
 use App\Enums\PlotStatus;
+use App\Enums\RegistryCaseStatus;
 use App\Enums\RoleName;
 use App\Models\Agreement;
 use App\Models\Block;
@@ -18,7 +25,9 @@ use App\Models\Masters\DocumentType;
 use App\Models\Masters\PaymentMode;
 use App\Models\PaymentPlan;
 use App\Models\Plot;
+use App\Models\PossessionCase;
 use App\Models\Project;
+use App\Models\RegistryCase;
 use App\Models\User;
 use Database\Seeders\Masters\DocumentRequirementSeeder;
 use Database\Seeders\Masters\DocumentTypeSeeder;
@@ -452,4 +461,102 @@ function registryReadyScenario(string $finalAmount = '1000000'): array
     Agreement::factory()->signed()->create(['booking_id' => $s['booking']->id]);
 
     return $s;
+}
+
+/*
+| ---------------------------------------------------------------------------
+| Possession / Transfer / Ownership helpers (M10)
+| ---------------------------------------------------------------------------
+*/
+
+/** Full possession.* + transfer.* + ownership.view (+ documents / view of buyers/bookings). */
+function possessionOfficer(): User
+{
+    return makeUser(permissions: [
+        'possession.view', 'possession.create', 'possession.schedule', 'possession.inspect', 'possession.complete', 'possession.clear',
+        'transfer.view', 'transfer.create', 'transfer.review', 'transfer.approve', 'transfer.complete',
+        'ownership.view',
+        'documents.view', 'documents.upload', 'documents.verify', 'documents.download',
+        'plots.view', 'buyers.view', 'bookings.view', 'buyers.documents',
+    ]);
+}
+
+/**
+ * A confirmed booking whose possession eligibility passes: registry COMPLETED,
+ * required booking documents verified, no overdue, payment threshold relaxed.
+ *
+ * @return array{actor: User, booking: Booking, buyer: Buyer}
+ */
+function possessionReadyScenario(string $finalAmount = '1000000'): array
+{
+    $s = registryReadyScenario($finalAmount);
+
+    config()->set('possession.eligibility.required_paid_percent', 0);
+    config()->set('possession.eligibility.block_on_overdue', true);
+    // Relax the financial-clearance guard for scenario setup; the dedicated
+    // "reads M7/M8 truth" test tightens it again explicitly.
+    config()->set('possession.financial_clearance.max_outstanding', '100000000');
+
+    RegistryCase::factory()
+        ->forBooking($s['booking'])
+        ->status(RegistryCaseStatus::Completed)
+        ->create(['registered_document_number' => 'RD-'.fake()->numerify('#####')]);
+
+    return $s;
+}
+
+/**
+ * A possession case at READY, with all clearances CLEARED and a PASSED
+ * inspection — i.e. one `markReadyForHandover()` away from handover.
+ *
+ * @return array{actor: User, booking: Booking, buyer: Buyer, case: PossessionCase}
+ */
+function scheduledPossessionScenario(): array
+{
+    $s = possessionReadyScenario();
+    $officer = possessionOfficer();
+
+    $case = app(InitiatePossessionCaseAction::class)->handle($s['booking']->fresh(), $officer);
+
+    foreach ($case->clearances as $clearance) {
+        app(RecordClearanceAction::class)->handle(
+            $case, $clearance->category, ClearanceStatus::Cleared, $officer,
+        );
+    }
+
+    $case = app(SchedulePossessionAppointmentAction::class)->handle($case->fresh(), [
+        'scheduled_at' => now()->addWeek()->toDateTimeString(),
+        'site_location' => 'Site office',
+    ], $officer);
+
+    app(RecordInspectionAction::class)->handle($case->fresh(), [
+        'status' => InspectionStatus::Passed->value,
+        'inspection_date' => now()->toDateString(),
+    ], $officer);
+
+    return $s + ['case' => $case->fresh(['clearances', 'latestInspection', 'handover'])];
+}
+
+/**
+ * A confirmed booking ready for an ownership transfer: the incoming buyer
+ * exists, the required transfer documents are verified and the financial gate
+ * is relaxed.
+ *
+ * @return array{actor: User, booking: Booking, buyer: Buyer, newBuyer: Buyer}
+ */
+function transferReadyScenario(string $finalAmount = '1000000'): array
+{
+    seedDocumentMasters();
+    config()->set('transfer.financial.block_on_outstanding', false);
+    config()->set('transfer.financial.block_on_overdue', false);
+
+    $s = confirmedBookingScenario($finalAmount);
+    $newBuyer = Buyer::factory()->create(['status' => 'active']);
+
+    foreach (['TRANSFER_APPLICATION', 'TRANSFER_CONSENT', 'TRANSFER_ID_PROOF'] as $code) {
+        Document::factory()->verified()->forDocumentable($s['booking'])
+            ->state(['document_type_id' => docType($code)->id])->create();
+    }
+
+    return $s + ['newBuyer' => $newBuyer];
 }

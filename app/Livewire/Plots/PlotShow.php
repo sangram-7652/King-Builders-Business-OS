@@ -140,8 +140,17 @@ class PlotShow extends Component
 
     public function render(): View
     {
+        $user = auth()->user();
+
         return view('livewire.plots.plot-show', [
             'allowedTransitions' => $this->plot->status->allowedTransitions(),
+            'ownershipHistory' => $user->can('ownership.view')
+                ? $this->plot->ownershipHistory()->with('buyer:id,first_name,middle_name,last_name,customer_code')->limit(30)->get()
+                : collect(),
+            'possessionCase' => $user->can('possession.view') ? $this->plot->possessionCase()->first() : null,
+            'plotTransfers' => $user->can('transfer.view')
+                ? $this->plot->transferRequests()->with(['currentBuyer:id,first_name,middle_name,last_name', 'newBuyer:id,first_name,middle_name,last_name'])->limit(15)->get()
+                : collect(),
         ])->title("Plot {$this->plot->plot_number}");
     }
 }

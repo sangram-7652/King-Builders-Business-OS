@@ -3,7 +3,7 @@
 A modern real-estate ERP (Laravel 12 + Livewire 3 + Tailwind v4) replacing a
 legacy PHP real-estate CRM.
 
-> **Status: M9 — Registry & Documentation Management.** Docker + admin shell + UI kit (M0);
+> **Status: M10 — Possession, Transfer & Ownership History.** Docker + admin shell + UI kit (M0);
 > auth + users/roles/permissions (M1); 18 master-data modules (M2);
 > Projects & Blocks (M3); Plot inventory + lifecycle (M4);
 > lead management, assignment, follow-ups, activity timeline, Lead → Buyer
@@ -21,7 +21,11 @@ legacy PHP real-estate CRM.
 > immutable versioning, private storage with authorised-only download, a
 > verification workflow, the agreement lifecycle (prepare → sign → approve), a
 > registry eligibility engine that consumes M6/M7/M8 state, registry cases +
-> appointments + expense tracking, and document handover (M9).
+> appointments + expense tracking, and document handover (M9);
+> possession eligibility + clearances + site inspection + customer handover with
+> a branded possession certificate, ownership transfer requests (review →
+> approve → transactional completion), an append-only plot ownership ledger, a
+> nominee foundation, and customer / plot 360 views (M10).
 >
 > Seeded super admin: `super@kingbuilders.test` / `password`.
 > See [`docs/RBAC.md`](docs/RBAC.md), [`docs/MASTER-DATA.md`](docs/MASTER-DATA.md),
@@ -29,8 +33,9 @@ legacy PHP real-estate CRM.
 > [`docs/LEADS-BUYERS.md`](docs/LEADS-BUYERS.md),
 > [`docs/BOOKINGS-PRICING.md`](docs/BOOKINGS-PRICING.md),
 > [`docs/PAYMENTS.md`](docs/PAYMENTS.md),
-> [`docs/COLLECTIONS.md`](docs/COLLECTIONS.md)
-> and [`docs/REGISTRY-DOCUMENTATION.md`](docs/REGISTRY-DOCUMENTATION.md).
+> [`docs/COLLECTIONS.md`](docs/COLLECTIONS.md),
+> [`docs/REGISTRY-DOCUMENTATION.md`](docs/REGISTRY-DOCUMENTATION.md)
+> and [`docs/POSSESSION-TRANSFER.md`](docs/POSSESSION-TRANSFER.md).
 
 ---
 

@@ -12,8 +12,10 @@ use App\Livewire\Auth\ResetPassword;
 use App\Livewire\Bookings\BookingDocuments;
 use App\Livewire\Bookings\BookingForm;
 use App\Livewire\Bookings\BookingIndex;
+use App\Livewire\Bookings\BookingPossession;
 use App\Livewire\Bookings\BookingRegistry;
 use App\Livewire\Bookings\BookingShow;
+use App\Livewire\Bookings\BookingTransfers;
 use App\Livewire\Buyers\BuyerDocuments;
 use App\Livewire\Buyers\BuyerForm;
 use App\Livewire\Buyers\BuyerIndex;
@@ -41,6 +43,7 @@ use App\Livewire\Plots\PlotBulkCreate;
 use App\Livewire\Plots\PlotForm;
 use App\Livewire\Plots\PlotIndex;
 use App\Livewire\Plots\PlotShow;
+use App\Livewire\Possession\PossessionDashboard;
 use App\Livewire\Projects\ProjectForm;
 use App\Livewire\Projects\ProjectIndex;
 use App\Livewire\Projects\ProjectShow;
@@ -48,6 +51,7 @@ use App\Livewire\Registry\RegistryDashboard;
 use App\Livewire\Roles\RoleForm;
 use App\Livewire\Roles\RoleIndex;
 use App\Livewire\Roles\RoleShow;
+use App\Livewire\Transfer\TransferDashboard;
 use App\Livewire\Users\UserForm;
 use App\Livewire\Users\UserIndex;
 use App\Livewire\Users\UserShow;
@@ -238,6 +242,22 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         ->middleware('permission:'.Permission::DocumentsDownload->value)
         ->whereNumber('document')->whereNumber('version')
         ->name('documents.download');
+
+    // --- Possession / Transfer / Ownership (M10) ---------------------
+    Route::get('/possession', PossessionDashboard::class)
+        ->middleware('permission:'.Permission::PossessionView->value)
+        ->name('possession.dashboard');
+    Route::get('/transfers', TransferDashboard::class)
+        ->middleware('permission:'.Permission::TransferView->value)
+        ->name('transfers.dashboard');
+    Route::get('/bookings/{booking}/possession', BookingPossession::class)
+        ->middleware('permission:'.Permission::PossessionView->value)
+        ->whereNumber('booking')
+        ->name('possession.booking');
+    Route::get('/bookings/{booking}/transfers', BookingTransfers::class)
+        ->middleware('permission:'.Permission::TransferView->value)
+        ->whereNumber('booking')
+        ->name('transfers.booking');
 
     // --- Users -------------------------------------------------------------
     Route::get('/users/create', UserForm::class)

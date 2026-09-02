@@ -8,6 +8,7 @@ use App\Actions\Buyers\ChangeBuyerStatus;
 use App\Enums\BuyerStatus;
 use App\Exceptions\DomainException;
 use App\Models\Buyer;
+use App\Models\TransferRequest;
 use App\Services\Collections\BuyerCollectionProfile;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
@@ -63,6 +64,15 @@ class BuyerShow extends Component
             'collectionProfile' => auth()->user()->can('collections.view')
                 ? app(BuyerCollectionProfile::class)->for($this->buyer)
                 : null,
+            'ownerships' => auth()->user()->can('ownership.view')
+                ? $this->buyer->plotOwnerships()->with(['plot:id,plot_number', 'booking:id,booking_number'])->limit(20)->get()
+                : collect(),
+            'nominees' => $this->buyer->nominees()->limit(10)->get(),
+            'transfers' => auth()->user()->can('transfer.view')
+                ? TransferRequest::query()
+                    ->where(fn ($q) => $q->where('new_buyer_id', $this->buyer->id)->orWhere('current_buyer_id', $this->buyer->id))
+                    ->with('booking:id,booking_number')->latest('id')->limit(15)->get()
+                : collect(),
         ])->title($this->buyer->fullName());
     }
 

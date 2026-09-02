@@ -203,6 +203,24 @@ class Booking extends Model
         return $this->hasOne(DocumentHandover::class);
     }
 
+    /** Possession case (M10). @return HasOne<\App\Models\PossessionCase, $this> */
+    public function possessionCase(): HasOne
+    {
+        return $this->hasOne(PossessionCase::class);
+    }
+
+    /** @return HasMany<TransferRequest, $this> */
+    public function transferRequests(): HasMany
+    {
+        return $this->hasMany(TransferRequest::class)->latest('id');
+    }
+
+    /** Ownership ledger for this booking's plot (M10). @return HasMany<\App\Models\PlotOwnershipHistory, $this> */
+    public function ownershipHistory(): HasMany
+    {
+        return $this->hasMany(PlotOwnershipHistory::class)->orderByDesc('started_at')->orderByDesc('id');
+    }
+
     /**
      * @return array<string, \Illuminate\Database\Eloquent\Relations\Relation<*, *, *>>
      */

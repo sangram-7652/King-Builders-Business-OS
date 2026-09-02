@@ -24,6 +24,7 @@ enum PlotStatus: string
     case Sold = 'sold';
     case Cancelled = 'cancelled';
     case Transferred = 'transferred';
+    case PossessionCompleted = 'possession_completed';
 
     public function label(): string
     {
@@ -34,6 +35,7 @@ enum PlotStatus: string
             self::Sold => 'Sold',
             self::Cancelled => 'Cancelled',
             self::Transferred => 'Transferred',
+            self::PossessionCompleted => 'Possession completed',
         };
     }
 
@@ -47,6 +49,7 @@ enum PlotStatus: string
             self::Sold => 'brand',
             self::Cancelled => 'danger',
             self::Transferred => 'muted',
+            self::PossessionCompleted => 'success',
         };
     }
 
@@ -64,10 +67,11 @@ enum PlotStatus: string
         return [
             self::Available->value => [self::Hold],
             self::Hold->value => [self::Available, self::Booked],
-            self::Booked->value => [self::Sold, self::Cancelled],
-            self::Sold->value => [],
+            self::Booked->value => [self::Sold, self::Cancelled, self::PossessionCompleted],
+            self::Sold->value => [self::PossessionCompleted],
             self::Cancelled->value => [],
             self::Transferred->value => [],
+            self::PossessionCompleted->value => [],
         ];
     }
 

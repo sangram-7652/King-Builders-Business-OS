@@ -115,6 +115,30 @@ class Plot extends Model
             ->latestOfMany();
     }
 
+    /** Possession case for this plot's booking (M10). @return HasOne<\App\Models\PossessionCase, $this> */
+    public function possessionCase(): HasOne
+    {
+        return $this->hasOne(PossessionCase::class);
+    }
+
+    /** @return HasMany<TransferRequest, $this> */
+    public function transferRequests(): HasMany
+    {
+        return $this->hasMany(TransferRequest::class)->latest('id');
+    }
+
+    /** Full ownership ledger, newest first (M10). @return HasMany<\App\Models\PlotOwnershipHistory, $this> */
+    public function ownershipHistory(): HasMany
+    {
+        return $this->hasMany(PlotOwnershipHistory::class)->orderByDesc('started_at')->orderByDesc('id');
+    }
+
+    /** The current owner period(s) — `ended_at` NULL. @return HasMany<\App\Models\PlotOwnershipHistory, $this> */
+    public function currentOwnerships(): HasMany
+    {
+        return $this->hasMany(PlotOwnershipHistory::class)->whereNull('ended_at');
+    }
+
     /**
      * @return array<string, \Illuminate\Database\Eloquent\Relations\Relation<*, *, *>>
      */

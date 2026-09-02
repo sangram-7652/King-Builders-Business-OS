@@ -28,6 +28,13 @@ class DocumentTypeSeeder extends Seeder
             ['code' => 'HANDOVER_ACK', 'name' => 'Handover Acknowledgement', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'POSSESSION_LETTER', 'name' => 'Possession Letter', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'NOC', 'name' => 'NOC', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => true],
+            // Possession + transfer (M10)
+            ['code' => 'POSSESSION_CERTIFICATE', 'name' => 'Possession Certificate', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
+            ['code' => 'POSSESSION_ACK', 'name' => 'Possession Acknowledgement', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
+            ['code' => 'SITE_INSPECTION_REPORT', 'name' => 'Site Inspection Report', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
+            ['code' => 'TRANSFER_APPLICATION', 'name' => 'Transfer Application', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
+            ['code' => 'TRANSFER_CONSENT', 'name' => 'Transfer Consent', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
+            ['code' => 'TRANSFER_ID_PROOF', 'name' => 'Transfer ID Proof', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
         ];
 
         foreach ($rows as $i => $row) {

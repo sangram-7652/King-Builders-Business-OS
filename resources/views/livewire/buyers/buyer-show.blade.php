@@ -106,6 +106,44 @@
         </x-ui.card>
     @endif
 
+    {{-- Ownership & transfers (M10) --}}
+    @if ($ownerships->isNotEmpty() || $transfers->isNotEmpty() || $nominees->isNotEmpty())
+        <x-ui.card title="Ownership, transfers & nominees">
+            @if ($ownerships->isNotEmpty())
+                <p class="text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Plot ownership</p>
+                <ul class="mt-1 space-y-1 text-sm">
+                    @foreach ($ownerships as $o)
+                        <li>Plot {{ $o->plot?->plot_number ?? '—' }} · {{ $o->booking?->booking_number }} ·
+                            {{ rtrim(rtrim(number_format((float) $o->ownership_percentage, 2), '0'), '.') }}% · {{ $o->ownership_type->label() }}
+                            <span class="text-(--content-muted)">
+                                {{ $o->started_at?->format('d M Y') }} – {{ $o->ended_at?->format('d M Y') ?? 'present' }}
+                            </span>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+            @if ($transfers->isNotEmpty())
+                <p class="mt-3 text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Transfers</p>
+                <ul class="mt-1 space-y-1 text-sm">
+                    @foreach ($transfers as $t)
+                        <li>{{ $t->request_number }} · {{ $t->transfer_type->label() }} · {{ $t->booking?->booking_number }}
+                            <x-ui.badge size="sm" :variant="$t->status->color()">{{ $t->status->label() }}</x-ui.badge>
+                            <span class="text-(--content-muted)">{{ $t->new_buyer_id === $buyer->id ? 'incoming' : 'outgoing' }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+            @if ($nominees->isNotEmpty())
+                <p class="mt-3 text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Nominees</p>
+                <ul class="mt-1 space-y-1 text-sm">
+                    @foreach ($nominees as $n)
+                        <li>{{ $n->name }} <span class="text-(--content-muted)">· {{ $n->relation ?? '—' }} · {{ ucfirst($n->status) }}</span></li>
+                    @endforeach
+                </ul>
+            @endif
+        </x-ui.card>
+    @endif
+
     {{-- Converted from --}}
     <x-ui.card title="Origin">
         @if ($buyer->leads->isEmpty())

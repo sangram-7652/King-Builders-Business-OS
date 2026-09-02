@@ -131,9 +131,21 @@ enum Permission: string
     case HandoverCreate = 'handover.create';
     case HandoverComplete = 'handover.complete';
 
-    // --- Operations (future modules) ----------------------------------
+    // --- Possession / Transfer / Ownership (M10) ---------------------
     case PossessionView = 'possession.view';
-    case PossessionUpdate = 'possession.update';
+    case PossessionCreate = 'possession.create';
+    case PossessionSchedule = 'possession.schedule';
+    case PossessionInspect = 'possession.inspect';
+    case PossessionComplete = 'possession.complete';
+    case PossessionClear = 'possession.clear';
+
+    case TransferView = 'transfer.view';
+    case TransferCreate = 'transfer.create';
+    case TransferReview = 'transfer.review';
+    case TransferApprove = 'transfer.approve';
+    case TransferComplete = 'transfer.complete';
+
+    case OwnershipView = 'ownership.view';
 
     // --- Associates (future modules) --------------------------------
     case AssociatesView = 'associates.view';
@@ -186,7 +198,8 @@ enum Permission: string
             'leads', 'buyers', 'bookings' => PermissionGroup::Sales,
             'payments', 'pricing', 'payment_plans', 'receipts' => PermissionGroup::Finance,
             'collections', 'promises', 'cheques', 'penalties' => PermissionGroup::Collections,
-            'documents', 'agreements', 'registry', 'registry_expenses', 'handover', 'possession' => PermissionGroup::Operations,
+            'documents', 'agreements', 'registry', 'registry_expenses', 'handover',
+            'possession', 'transfer', 'ownership' => PermissionGroup::Operations,
             'associates' => PermissionGroup::Associates,
             'reports' => PermissionGroup::Reports,
             'users', 'roles' => PermissionGroup::Administration,

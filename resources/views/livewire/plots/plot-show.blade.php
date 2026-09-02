@@ -122,6 +122,43 @@
         </x-ui.card>
     @endif
 
+    {{-- Possession & ownership (M10) --}}
+    @if ($possessionCase || $ownershipHistory->isNotEmpty() || $plotTransfers->isNotEmpty())
+        <x-ui.card title="Possession & ownership">
+            @if ($possessionCase)
+                <p class="text-sm">Possession case
+                    <a href="{{ route('possession.booking', $possessionCase->booking_id) }}" wire:navigate class="text-(--brand-primary) hover:underline">{{ $possessionCase->case_number }}</a>
+                    <x-ui.badge size="sm" :variant="$possessionCase->status->color()">{{ $possessionCase->status->label() }}</x-ui.badge>
+                </p>
+            @endif
+
+            @if ($ownershipHistory->isNotEmpty())
+                <p class="mt-3 text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Ownership history</p>
+                <ul class="mt-1 space-y-1 text-sm">
+                    @foreach ($ownershipHistory as $o)
+                        <li>{{ $o->buyer?->fullName() ?? '—' }}
+                            <span class="text-(--content-muted)">· {{ rtrim(rtrim(number_format((float) $o->ownership_percentage, 2), '0'), '.') }}% · {{ $o->ownership_type->label() }}
+                            · {{ $o->started_at?->format('d M Y') }} – {{ $o->ended_at?->format('d M Y') ?? 'present' }}</span>
+                            @if (! $o->ended_at)<x-ui.badge size="sm" variant="success">current</x-ui.badge>@endif
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+
+            @if ($plotTransfers->isNotEmpty())
+                <p class="mt-3 text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Transfers</p>
+                <ul class="mt-1 space-y-1 text-sm">
+                    @foreach ($plotTransfers as $t)
+                        <li>{{ $t->request_number }} · {{ $t->transfer_type->label() }} ·
+                            {{ $t->currentBuyer?->fullName() ?? '—' }} → {{ $t->newBuyer?->fullName() ?? '—' }}
+                            <x-ui.badge size="sm" :variant="$t->status->color()">{{ $t->status->label() }}</x-ui.badge>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </x-ui.card>
+    @endif
+
     {{-- Reserved sections --}}
     <x-ui.card title="Coming later">
         <div class="grid gap-3 text-sm text-(--content-muted) sm:grid-cols-2 lg:grid-cols-3">

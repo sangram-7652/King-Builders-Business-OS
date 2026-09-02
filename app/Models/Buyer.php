@@ -110,6 +110,36 @@ class Buyer extends Model
         return $this->morphMany(Document::class, 'documentable')->latest('id');
     }
 
+    /** Plot ownership periods this buyer holds / held (M10). @return HasMany<\App\Models\PlotOwnershipHistory, $this> */
+    public function plotOwnerships(): HasMany
+    {
+        return $this->hasMany(PlotOwnershipHistory::class)->orderByDesc('started_at')->orderByDesc('id');
+    }
+
+    /** Current (open) ownership periods. @return HasMany<\App\Models\PlotOwnershipHistory, $this> */
+    public function currentOwnerships(): HasMany
+    {
+        return $this->hasMany(PlotOwnershipHistory::class)->whereNull('ended_at');
+    }
+
+    /** Nominee records, newest first (M10). @return HasMany<\App\Models\BuyerNominee, $this> */
+    public function nominees(): HasMany
+    {
+        return $this->hasMany(BuyerNominee::class)->latest('id');
+    }
+
+    /** @return HasMany<TransferRequest, $this> */
+    public function incomingTransfers(): HasMany
+    {
+        return $this->hasMany(TransferRequest::class, 'new_buyer_id')->latest('id');
+    }
+
+    /** @return HasMany<TransferRequest, $this> */
+    public function outgoingTransfers(): HasMany
+    {
+        return $this->hasMany(TransferRequest::class, 'current_buyer_id')->latest('id');
+    }
+
     /**
      * @return array<string, \Illuminate\Database\Eloquent\Relations\Relation<*, *, *>>
      */

@@ -13,9 +13,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('lists the six plot statuses', function () {
+it('lists the plot statuses', function () {
     expect(PlotStatus::values())
-        ->toBe(['available', 'hold', 'booked', 'sold', 'cancelled', 'transferred']);
+        ->toBe(['available', 'hold', 'booked', 'sold', 'cancelled', 'transferred', 'possession_completed']);
 });
 
 it('a new plot is AVAILABLE', function () {
