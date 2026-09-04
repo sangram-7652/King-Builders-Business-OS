@@ -3,14 +3,25 @@
 declare(strict_types=1);
 
 use App\Actions\Collections\EnsureCollectionCaseAction;
+use App\Actions\Commission\GenerateCommissionCases;
+use App\Actions\Customers\ActivateCustomerPortal;
+use App\Actions\Customers\InviteCustomerToPortal;
+use App\Actions\Partners\AuthorizePartnerForProjectAction;
+use App\Actions\Partners\SetBookingPartnerAttribution;
 use App\Actions\Payments\ActivatePaymentPlanAction;
 use App\Actions\Payments\CreatePaymentPlanAction;
+use App\Actions\Payments\RecordPaymentAction;
+use App\Actions\Payments\VerifyPaymentAction;
 use App\Actions\Possession\InitiatePossessionCaseAction;
 use App\Actions\Possession\RecordClearanceAction;
 use App\Actions\Possession\RecordInspectionAction;
 use App\Actions\Possession\SchedulePossessionAppointmentAction;
 use App\Enums\ClearanceStatus;
+use App\Enums\CommunicationCategory;
+use App\Enums\CommunicationChannel;
+use App\Enums\DatePreset;
 use App\Enums\InspectionStatus;
+use App\Enums\PaymentStatus;
 use App\Enums\PlotStatus;
 use App\Enums\RegistryCaseStatus;
 use App\Enums\RoleName;
@@ -20,15 +31,23 @@ use App\Models\Booking;
 use App\Models\BookingBuyer;
 use App\Models\Buyer;
 use App\Models\CollectionCase;
+use App\Models\CommissionCase;
+use App\Models\CommissionScheme;
 use App\Models\Document;
+use App\Models\Lead;
 use App\Models\Masters\DocumentType;
 use App\Models\Masters\PaymentMode;
+use App\Models\Partner;
 use App\Models\PaymentPlan;
 use App\Models\Plot;
 use App\Models\PossessionCase;
 use App\Models\Project;
 use App\Models\RegistryCase;
 use App\Models\User;
+use App\Services\Communication\CommunicationRequest;
+use App\Services\Reports\MisAnalytics;
+use App\Support\Reports\ReportFilterData;
+use Carbon\CarbonImmutable;
 use Database\Seeders\Masters\DocumentRequirementSeeder;
 use Database\Seeders\Masters\DocumentTypeSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -559,4 +578,211 @@ function transferReadyScenario(string $finalAmount = '1000000'): array
     }
 
     return $s + ['newBuyer' => $newBuyer];
+}
+
+/*
+| ---------------------------------------------------------------------------
+| Reporting — MIS + export helpers (M11.5)
+| ---------------------------------------------------------------------------
+*/
+
+/**
+ * Two projects, confirmed bookings on live plans, one partial payment, an
+ * overdue installment on the second booking, and September leads (one
+ * converted). Shared by the MIS and export tests.
+ *
+ *   Alpha Estate / A1 : 6 plots (4 avail, 2 booked) · booking A ₹10 L · sp Asha
+ *       i1 ₹5 L due 2026-09-10  → ₹3 L paid (cash 09-12), ₹2 L overdue
+ *       i2 ₹5 L due 2026-10-10  → unpaid
+ *   Beta Park / B1    : 4 plots (3 avail, 1 booked) · booking B ₹20 L · sp Ravi
+ *       i1 ₹8 L due 2026-08-20  → unpaid, overdue
+ *       i2 ₹12 L due 2026-11-01 → unpaid
+ *
+ * @return array<string, mixed>
+ */
+function misWorld(): array
+{
+    $actor = User::factory()->create();
+    $asha = User::factory()->create(['name' => 'Asha Rao']);
+    $ravi = User::factory()->create(['name' => 'Ravi Menon']);
+
+    $alpha = Project::factory()->create(['name' => 'Alpha Estate']);
+    $a1 = Block::factory()->create(['project_id' => $alpha->id, 'name' => 'Block A1']);
+    $beta = Project::factory()->create(['name' => 'Beta Park']);
+    $b1 = Block::factory()->create(['project_id' => $beta->id, 'name' => 'Block B1']);
+
+    // Alpha: 4 available + 1 booked + booking-A's plot = 6 total / 4 avail / 2 booked
+    // Beta:  3 available + booking-B's plot            = 4 total / 3 avail / 1 booked
+    Plot::factory()->count(4)->create(['project_id' => $alpha->id, 'block_id' => $a1->id, 'status' => PlotStatus::Available->value]);
+    Plot::factory()->create(['project_id' => $alpha->id, 'block_id' => $a1->id, 'status' => PlotStatus::Booked->value]);
+    Plot::factory()->count(3)->create(['project_id' => $beta->id, 'block_id' => $b1->id, 'status' => PlotStatus::Available->value]);
+
+    $mk = function (Project $p, Block $b, string $amount, User $sp, string $date, string $code): array {
+        $plot = Plot::factory()->create(['project_id' => $p->id, 'block_id' => $b->id, 'status' => PlotStatus::Booked->value]);
+        $booking = Booking::factory()->confirmed()->forPlot($plot)->create([
+            'created_by' => $sp->id, 'booking_date' => $date,
+            'final_amount' => $amount, 'base_amount' => $amount, 'subtotal' => $amount,
+        ]);
+        $buyer = Buyer::factory()->create(['status' => 'active', 'first_name' => 'Cust', 'last_name' => $code]);
+        BookingBuyer::factory()->create(['booking_id' => $booking->id, 'buyer_id' => $buyer->id, 'is_primary' => true, 'ownership_percentage' => 100]);
+
+        return ['booking' => $booking, 'buyer' => $buyer];
+    };
+
+    $A = $mk($alpha, $a1, '1000000', $asha, '2026-09-05', 'Aaa');
+    $B = $mk($beta, $b1, '2000000', $ravi, '2026-09-08', 'Bbb');
+
+    activePlanFor($A['booking']->fresh(), $actor, [
+        ['type' => 'amount', 'value' => '500000', 'due_date' => '2026-09-10'],
+        ['type' => 'amount', 'value' => '500000', 'due_date' => '2026-10-10'],
+    ]);
+    $payment = app(RecordPaymentAction::class)->handle([
+        'booking_id' => $A['booking']->id, 'payment_mode_id' => cashMode()->id,
+        'amount' => '300000', 'payment_date' => '2026-09-12',
+    ], $actor);
+    app(VerifyPaymentAction::class)->handle($payment, PaymentStatus::Success, $actor);
+
+    activePlanFor($B['booking']->fresh(), $actor, [
+        ['type' => 'amount', 'value' => '800000', 'due_date' => '2026-08-20'],
+        ['type' => 'amount', 'value' => '1200000', 'due_date' => '2026-11-01'],
+    ]);
+
+    Lead::factory()->count(2)->create(['assigned_to' => $asha->id, 'created_at' => '2026-09-03', 'status' => 'new']);
+    Lead::factory()->create(['assigned_to' => $asha->id, 'created_at' => '2026-09-03', 'status' => 'converted', 'converted_at' => '2026-09-05']);
+    Lead::factory()->count(2)->create(['assigned_to' => $ravi->id, 'created_at' => '2026-09-04', 'status' => 'new']);
+    Lead::factory()->create(['assigned_to' => $ravi->id, 'created_at' => '2026-08-10', 'status' => 'new']); // out of window
+
+    return compact('actor', 'asha', 'ravi', 'alpha', 'beta', 'a1', 'b1', 'A', 'B');
+}
+
+function misA(): MisAnalytics
+{
+    return app(MisAnalytics::class);
+}
+
+/**
+ * @param  array<string, mixed>  $o
+ */
+function misFilter(array $o = []): ReportFilterData
+{
+    return new ReportFilterData(
+        from: CarbonImmutable::parse($o['from'] ?? '2026-09-01')->startOfDay(),
+        to: CarbonImmutable::parse($o['to'] ?? '2026-09-30')->endOfDay(),
+        preset: DatePreset::Custom,
+        projectId: $o['projectId'] ?? null,
+        blockId: $o['blockId'] ?? null,
+        salespersonId: $o['salespersonId'] ?? null,
+    );
+}
+
+/*
+| ---------------------------------------------------------------------------
+| Customer portal helpers (M15)
+| ---------------------------------------------------------------------------
+*/
+
+/**
+ * Invite a buyer to the portal and return the raw activation token + buyer.
+ *
+ * @return array{token: string, buyer: Buyer}
+ */
+function inviteBuyer(array $attrs = []): array
+{
+    $buyer = Buyer::factory()->create(array_merge(
+        ['status' => 'active', 'email' => fake()->unique()->safeEmail()],
+        $attrs,
+    ));
+
+    $result = app(InviteCustomerToPortal::class)
+        ->handle($buyer, User::factory()->create());
+
+    return ['token' => str($result['link'])->afterLast('/')->value(), 'buyer' => $buyer->fresh()];
+}
+
+/** An active portal customer with a known password. */
+function activePortalBuyer(string $password = 'Portal-pw-1234', array $attrs = []): Buyer
+{
+    ['token' => $token] = inviteBuyer($attrs);
+
+    return app(ActivateCustomerPortal::class)
+        ->handle($token, 'invite', $password)
+        ->fresh();
+}
+
+/**
+ * A confirmed ₹10L booking (4×25% plan, ₹300k paid) whose primary buyer is an
+ * active portal customer. Shared by the portal bookings + payments tests.
+ *
+ * @return array{customer: Buyer, booking: Booking}
+ */
+function portalBooking(): array
+{
+    $s = confirmedBookingScenario('1000000');
+    activePlanFor($s['booking'], $s['actor'], [
+        ['type' => 'amount', 'value' => '250000', 'due_date' => now()->subMonth()->toDateString()],
+        ['type' => 'amount', 'value' => '250000', 'due_date' => now()->addMonth()->toDateString()],
+        ['type' => 'amount', 'value' => '250000', 'due_date' => now()->addMonths(2)->toDateString()],
+        ['type' => 'amount', 'value' => '250000', 'due_date' => now()->addMonths(3)->toDateString()],
+    ]);
+    $payment = app(RecordPaymentAction::class)->handle([
+        'booking_id' => $s['booking']->id, 'payment_mode_id' => cashMode()->id,
+        'amount' => '300000', 'payment_date' => now()->toDateString(),
+    ], $s['actor']);
+    app(VerifyPaymentAction::class)->handle($payment, PaymentStatus::Success, $s['actor']);
+
+    $customer = $s['booking']->bookingBuyers()->where('is_primary', true)->first()->buyer;
+    $customer->forceFill([
+        'status' => 'active', 'email' => fake()->unique()->safeEmail(),
+        'portal_status' => 'active', 'password' => bcrypt('pw'), 'portal_activated_at' => now(),
+    ])->save();
+
+    return ['customer' => $customer->fresh(), 'booking' => $s['booking']->fresh()];
+}
+
+/*
+| ---------------------------------------------------------------------------
+| Channel partners / commission helpers (M14)
+| ---------------------------------------------------------------------------
+*/
+
+/**
+ * A generated PENDING_REVIEW commission case worth ₹100,000 (2% of a ₹50L
+ * booking), attributed 100% to one active, project-authorised partner. Shared
+ * by the commission workflow / payout / reversal / access tests.
+ *
+ * @return array{actor: User, booking: Booking, case: CommissionCase, partner: Partner}
+ */
+function pendingCase(): array
+{
+    $s = confirmedBookingScenario('5000000');
+    $actor = User::factory()->create();
+    CommissionScheme::factory()->default()->published('2')->create();
+    $partner = Partner::factory()->active()->create();
+    app(AuthorizePartnerForProjectAction::class)->handle($partner, $s['booking']->project, $actor);
+    app(SetBookingPartnerAttribution::class)->handle($s['booking'], [
+        ['partner_id' => $partner->id, 'share_percentage' => '100', 'role' => 'primary'],
+    ], $actor);
+    $case = app(GenerateCommissionCases::class)->handle($s['booking']->fresh(), $actor)->first();
+
+    return ['actor' => $actor, 'booking' => $s['booking']->fresh(), 'case' => $case, 'partner' => $partner];
+}
+
+/*
+| ---------------------------------------------------------------------------
+| Communication engine helpers (M16)
+| ---------------------------------------------------------------------------
+*/
+
+function commRequest(array $o = []): CommunicationRequest
+{
+    return new CommunicationRequest(
+        channel: $o['channel'] ?? CommunicationChannel::Email,
+        category: $o['category'] ?? CommunicationCategory::Transactional,
+        to: $o['to'] ?? 'customer@example.com',
+        body: $o['body'] ?? 'Your receipt RCPT-000001 is ready.',
+        subject: $o['subject'] ?? 'Payment received',
+        eventKey: $o['eventKey'] ?? 'payment.received',
+        idempotencyKey: $o['idempotencyKey'] ?? null,
+        context: $o['context'] ?? ['receipt_number' => 'RCPT-000001'],
+    );
 }

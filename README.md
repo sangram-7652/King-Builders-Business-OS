@@ -55,9 +55,13 @@ docker compose run --rm app php artisan migrate --seed   # tables + roles/permis
 docker compose run --rm vite sh -c "npm install && npm run build"   # build assets once
 ```
 
-Sign in at <http://localhost:8080/login> with `super@kingbuilders.test` / `password`.
+Sign in at <http://localhost:8087/login> with `super@kingbuilders.test` / `password`.
 
-Open <http://localhost:8080>.
+Open <http://localhost:8087>.
+
+> In **production** the seeder refuses to create the Super Admin unless
+> `SEED_SUPERADMIN_PASSWORD` (min 12 chars) is set — it never ships a known
+> credential. See `docs/DEPLOYMENT.md`.
 
 For front-end hot-reload instead of a one-off build:
 
@@ -70,9 +74,9 @@ docker compose --profile dev up -d    # also starts the `vite` container on :517
 | Service     | Image                     | Port (host) | Purpose                    |
 | ----------- | ------------------------- | ----------- | -------------------------- |
 | `app`       | `king-builders/app:local` | –           | Laravel / PHP-FPM          |
-| `nginx`     | `nginx:1.27-alpine`       | `8080`      | Web server                 |
-| `mysql`     | `mysql:8.0`               | `3307`      | Database `king_builders`   |
-| `redis`     | `redis:7-alpine`          | `6379`      | Cache / sessions / queue   |
+| `nginx`     | `nginx:1.27-alpine`       | `8087`      | Web server                 |
+| `mysql`     | `mysql:8.0`               | `13306`     | Database `king_builders`   |
+| `redis`     | `redis:7-alpine`          | `16379`     | Cache / sessions / queue   |
 | `queue`     | `king-builders/app:local` | –           | `queue:work redis`         |
 | `scheduler` | `king-builders/app:local` | –           | `schedule:work`            |
 | `vite`      | `node:22-alpine`          | `5173`      | Asset dev server (profile `dev`) |
@@ -103,3 +107,19 @@ resources/views/components/layouts/app.blade.php
 ```
 
 See [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) for engineering conventions.
+
+## Production
+
+The dev stack above is **not** the production stack. For real deployments:
+
+- [`docs/PRODUCTION-READINESS.md`](docs/PRODUCTION-READINESS.md) — the M12 audit, security posture, monitoring hooks, GO/NO-GO checklist
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — first deploy, `./docker/deploy.sh`, rollback, health checks, smoke test
+- [`docs/DISASTER-RECOVERY.md`](docs/DISASTER-RECOVERY.md) — backup (`./docker/backup/backup.sh`), restore test, full restore, fresh-server rebuild
+
+```bash
+# production overlay
+docker compose -f docker-compose.yml -f docker-compose.prod.yml <cmd>
+```
+
+`.env.production.example` is the production env template. `/up` = liveness,
+`/healthz` = readiness (DB + cache + private storage).
