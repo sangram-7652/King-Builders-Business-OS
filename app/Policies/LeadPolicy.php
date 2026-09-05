@@ -59,7 +59,20 @@ class LeadPolicy
     {
         return $user->can(Permission::LeadsConvert->value)
             && $lead->isVisibleTo($user)
-            && ($lead->status === LeadStatus::Qualified || $lead->status === LeadStatus::Converted);
+            && ($lead->status->canBeConverted() || $lead->status === LeadStatus::Converted);
+    }
+
+    public function merge(User $user, Lead $lead): bool
+    {
+        return $user->can(Permission::LeadsMerge->value) && $lead->isVisibleTo($user);
+    }
+
+    /** Attribute the lead to (or clear it from) a channel partner (M14.2). */
+    public function attributePartner(User $user, Lead $lead): bool
+    {
+        return $user->can(Permission::PartnersAttribute->value)
+            && $lead->isVisibleTo($user)
+            && ! $lead->isConverted();
     }
 
     public function delete(User $user, Lead $lead): bool

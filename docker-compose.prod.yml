@@ -1,0 +1,177 @@
+###############################################################################
+# King Builders Business OS — PRODUCTION overlay (M12)
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml <cmd>
+#
+# (or: export COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml)
+#
+# vs. the dev stack this overlay:
+#   - drops the source bind-mount — the code baked into the image is authoritative
+#   - puts storage/app (M9/M10 documents) + storage/logs on named volumes so a
+#     deploy (image swap) never loses them
+#   - gives MySQL / Redis NO host port and a required password
+#   - takes every secret from .env (see .env.production.example)
+#   - runs PHP in production mode (opcache validate_timestamps=0, display_errors Off)
+#   - adds restart policies + real healthchecks
+#   - disables the dev-only `vite` service
+#
+# Requires Docker Compose >= 2.24 (the `!reset` / `!override` merge tags).
+# See docs/DEPLOYMENT.md and docs/DISASTER-RECOVERY.md.
+###############################################################################
+
+services:
+  app:
+    image: king-builders/app:${APP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      APP_BOOTSTRAP: "true"
+      # Migrations run automatically (idempotent); seeding is a one-time
+      # first-deploy step — see docs/DEPLOYMENT.md § First deploy.
+      AUTO_SEED: "false"
+      # Read in bootstrap/app.php before the config service exists, so it must
+      # be a real env var (survives `config:cache`). Default '*' is safe — the
+      # app container publishes no port.
+      TRUSTED_PROXIES: "${TRUSTED_PROXIES:-*}"
+    volumes: !override
+      - ./.env:/var/www/html/.env:ro
+      - app-storage:/var/www/html/storage/app
+      - app-logs:/var/www/html/storage/logs
+      - ./docker/php/production.ini:/usr/local/etc/php/conf.d/zzz-production.ini:ro
+    healthcheck:
+      test: ["CMD", "php", "artisan", "health:check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # F-M12-5 — resource ceilings so a runaway request / job cannot starve the
+    # box. Sized for a small single-node deployment; override per host with the
+    # matching *_CPU / *_MEM env vars. `docker compose` (v2) honours these.
+    deploy:
+      resources:
+        limits:
+          cpus: "${APP_CPU:-1.0}"
+          memory: ${APP_MEM:-1024M}
+        reservations:
+          memory: ${APP_MEM_MIN:-256M}
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+      args:
+        APP_IMAGE: king-builders/app:${APP_IMAGE_TAG:-latest}
+    image: king-builders/nginx:${APP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports: !override
+      - "${WEB_HTTP_PORT:-80}:80"
+      - "${WEB_HTTPS_PORT:-443}:443"
+    volumes: !override
+      - app-storage:/var/www/html/storage/app:ro
+      - ${TLS_CERT_DIR:-./docker/nginx/certs}:/etc/nginx/certs:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "${NGINX_CPU:-0.5}"
+          memory: ${NGINX_MEM:-128M}
+
+  mysql:
+    restart: unless-stopped
+    ports: !reset []
+    command:
+      - "--default-authentication-plugin=caching_sha2_password"
+      - "--innodb-buffer-pool-size=${MYSQL_BUFFER_POOL:-512M}"
+      - "--max-connections=${MYSQL_MAX_CONNECTIONS:-150}"
+      - "--slow-query-log=1"
+      - "--slow-query-log-file=/var/lib/mysql/slow.log"
+      - "--long-query-time=1"
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-king_builders}
+      MYSQL_USER: ${DB_USERNAME:-king_builders}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_ROOT_PASSWORD}"]
+    deploy:
+      resources:
+        limits:
+          cpus: "${MYSQL_CPU:-1.0}"
+          memory: ${MYSQL_MEM:-1024M}
+        reservations:
+          memory: ${MYSQL_MEM_MIN:-512M}
+
+  redis:
+    restart: unless-stopped
+    ports: !reset []
+    command:
+      - "redis-server"
+      - "--appendonly"
+      - "yes"
+      - "--requirepass"
+      - "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
+      - "--maxmemory"
+      - "${REDIS_MAXMEMORY:-256mb}"
+      - "--maxmemory-policy"
+      - "noeviction"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+    deploy:
+      resources:
+        limits:
+          cpus: "${REDIS_CPU:-0.5}"
+          # Keep the container ceiling above redis' own --maxmemory so it is
+          # never OOM-killed mid-write.
+          memory: ${REDIS_MEM:-384M}
+
+  queue:
+    image: king-builders/app:${APP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      APP_BOOTSTRAP: "false"
+    volumes: !override
+      - ./.env:/var/www/html/.env:ro
+      - app-storage:/var/www/html/storage/app
+      - app-logs:/var/www/html/storage/logs
+      - ./docker/php/production.ini:/usr/local/etc/php/conf.d/zzz-production.ini:ro
+    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600 --backoff=5
+    healthcheck:
+      test: ["CMD", "php", "artisan", "health:check"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "${QUEUE_CPU:-0.5}"
+          memory: ${QUEUE_MEM:-512M}
+
+  scheduler:
+    image: king-builders/app:${APP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      APP_BOOTSTRAP: "false"
+    volumes: !override
+      - ./.env:/var/www/html/.env:ro
+      - app-storage:/var/www/html/storage/app
+      - app-logs:/var/www/html/storage/logs
+      - ./docker/php/production.ini:/usr/local/etc/php/conf.d/zzz-production.ini:ro
+    command: php artisan schedule:work
+    deploy:
+      resources:
+        limits:
+          cpus: "${SCHEDULER_CPU:-0.25}"
+          memory: ${SCHEDULER_MEM:-256M}
+
+  vite:
+    profiles: ["disabled"]
+
+volumes:
+  mysql-data:
+  redis-data:
+  app-storage:
+  app-logs:

@@ -5,7 +5,22 @@
 #
 # Single image used by the `app`, `queue` and `scheduler` services.
 # The runtime command is supplied by docker-compose, not baked in here.
+#
+# In production the compiled front-end assets (Vite + Tailwind v4) are baked in
+# from the `assets` stage below, so `public/build` always matches the code —
+# no separate asset deploy step, no stale manifest.
 ###############################################################################
+
+# --- Front-end asset build (Vite / Tailwind v4) --------------------------
+FROM node:22-alpine AS assets
+WORKDIR /var/www/html
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+# Tailwind v4 auto-detects content from the whole tree, so build with full source.
+COPY . .
+RUN npm run build
+
+
 FROM php:8.3-fpm-bookworm AS base
 
 LABEL org.opencontainers.image.title="king-builders-business-os" \
@@ -68,8 +83,17 @@ COPY --chown=www-data:www-data composer.json composer.lock ./
 RUN composer install --no-interaction --no-scripts --no-autoloader --prefer-dist
 
 COPY --chown=www-data:www-data . .
+
+# Compiled assets from the node stage (overrides any stale host public/build).
+COPY --from=assets --chown=www-data:www-data /var/www/html/public/build ./public/build
+
 RUN composer dump-autoload --optimize \
-    && mkdir -p storage/framework/{cache/data,sessions,testing,views} storage/logs bootstrap/cache \
+    && mkdir -p \
+        storage/framework/{cache/data,sessions,testing,views} \
+        storage/logs \
+        storage/app/public \
+        storage/app/private/documents \
+        bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
 USER www-data

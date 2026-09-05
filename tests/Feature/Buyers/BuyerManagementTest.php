@@ -111,9 +111,26 @@ it('archives and restores a buyer via status transitions', function () {
     expect($buyer->fresh()->status)->toBe(BuyerStatus::Active);
 });
 
-it('phone / email are not unique — households may share them', function () {
-    Buyer::factory()->create(['phone' => '9876543210', 'email' => 'family@example.com']);
-    Buyer::factory()->create(['phone' => '9876543210', 'email' => 'family@example.com']);
+it('phone is not unique — households may share a landline / number', function () {
+    Buyer::factory()->create(['phone' => '9876543210', 'email' => 'a@example.com']);
+    Buyer::factory()->create(['phone' => '9876543210', 'email' => 'b@example.com']);
 
     expect(Buyer::where('phone', '9876543210')->count())->toBe(2);
+});
+
+it('email IS unique among live buyers — it is the portal login identity (F-M5-1)', function () {
+    Buyer::factory()->create(['email' => 'family@example.com']);
+
+    expect(fn () => Buyer::factory()->create(['email' => 'FAMILY@example.com'])) // also case-normalised
+        ->toThrow(QueryException::class);
+});
+
+it('a soft-deleted buyer does not block re-registering the same email', function () {
+    $old = Buyer::factory()->create(['email' => 'reuse@example.com']);
+    $old->delete();
+
+    $new = Buyer::factory()->create(['email' => 'reuse@example.com']);
+
+    expect($new->exists)->toBeTrue()
+        ->and(Buyer::where('email', 'reuse@example.com')->count())->toBe(1);
 });

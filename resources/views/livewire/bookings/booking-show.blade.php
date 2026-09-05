@@ -58,6 +58,12 @@
             @if ($booking->isConfirmed() && auth()->user()?->can('transfer.view'))
                 <x-ui.button size="sm" variant="secondary" :href="route('transfers.booking', $booking)" wire:navigate>Transfers</x-ui.button>
             @endif
+            @can('attributePartners', $booking)
+                <x-ui.button size="sm" variant="secondary" :href="route('bookings.partners', $booking)" wire:navigate>Partners</x-ui.button>
+            @endcan
+            @if (auth()->user()?->can('commission.view'))
+                <x-ui.button size="sm" variant="secondary" :href="route('bookings.commission', $booking)" wire:navigate>Commission</x-ui.button>
+            @endif
 
             @can('cancel', $booking)
                 <x-ui.button variant="danger" size="sm" wire:click="openCancel">Cancel booking</x-ui.button>

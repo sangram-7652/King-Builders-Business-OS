@@ -7,6 +7,7 @@ namespace App\Actions\Leads;
 use App\Enums\LeadActivityType;
 use App\Enums\LeadStatus;
 use App\Models\Lead;
+use App\Models\LeadAssignment;
 use App\Models\User;
 use App\Support\Concerns\RunsInTransaction;
 use Illuminate\Support\Facades\Log;
@@ -37,6 +38,14 @@ class CreateLead
             ], $actor);
 
             if ($lead->assigned_to !== null) {
+                LeadAssignment::create([
+                    'lead_id' => $lead->id,
+                    'assigned_to' => $lead->assigned_to,
+                    'assigned_by' => $actor->id,
+                    'assigned_at' => now(),
+                    'reason' => 'Assigned on creation',
+                ]);
+
                 $lead->recordActivity(LeadActivityType::Assigned, 'Assigned on creation', [
                     'assigned_to' => $lead->assigned_to,
                 ], $actor);

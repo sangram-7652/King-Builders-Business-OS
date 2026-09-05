@@ -5,13 +5,19 @@ declare(strict_types=1);
 use App\Enums\Permission;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\DocumentDownloadController;
+use App\Http\Controllers\Portal\LogoutController as PortalLogoutController;
+use App\Http\Controllers\Portal\ReceiptDownloadController as PortalReceiptDownload;
 use App\Http\Controllers\ReceiptPdfController;
+use App\Http\Controllers\Reports\ReportController;
+use App\Http\Controllers\Reports\ReportExportController;
 use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\ResetPassword;
+use App\Livewire\Bookings\BookingCommission;
 use App\Livewire\Bookings\BookingDocuments;
 use App\Livewire\Bookings\BookingForm;
 use App\Livewire\Bookings\BookingIndex;
+use App\Livewire\Bookings\BookingPartners;
 use App\Livewire\Bookings\BookingPossession;
 use App\Livewire\Bookings\BookingRegistry;
 use App\Livewire\Bookings\BookingShow;
@@ -25,8 +31,14 @@ use App\Livewire\Collections\CollectionCaseShow;
 use App\Livewire\Collections\CollectionDashboard;
 use App\Livewire\Collections\CollectionQueue;
 use App\Livewire\Collections\CollectionReports;
+use App\Livewire\Commission\CommissionCaseShow;
+use App\Livewire\Commission\CommissionIndex;
+use App\Livewire\Commission\CommissionSchemeForm;
+use App\Livewire\Commission\CommissionSchemeIndex;
+use App\Livewire\Commission\CommissionSchemeShow;
 use App\Livewire\Dashboard;
 use App\Livewire\Documents\DocumentDashboard;
+use App\Livewire\FollowUps\FollowUpQueue;
 use App\Livewire\Leads\LeadConvert;
 use App\Livewire\Leads\LeadForm;
 use App\Livewire\Leads\LeadIndex;
@@ -34,6 +46,10 @@ use App\Livewire\Leads\LeadShow;
 use App\Livewire\Masters\MasterDashboard;
 use App\Livewire\Masters\MasterForm;
 use App\Livewire\Masters\MasterIndex;
+use App\Livewire\Partners\PartnerDocuments;
+use App\Livewire\Partners\PartnerForm;
+use App\Livewire\Partners\PartnerIndex;
+use App\Livewire\Partners\PartnerShow;
 use App\Livewire\Payments\BookingPayments;
 use App\Livewire\Payments\PaymentDashboard;
 use App\Livewire\Payments\PaymentIndex;
@@ -43,6 +59,15 @@ use App\Livewire\Plots\PlotBulkCreate;
 use App\Livewire\Plots\PlotForm;
 use App\Livewire\Plots\PlotIndex;
 use App\Livewire\Plots\PlotShow;
+use App\Livewire\Portal\Auth\Activate as PortalActivate;
+use App\Livewire\Portal\Auth\ForgotPassword as PortalForgotPassword;
+use App\Livewire\Portal\Auth\Login as PortalLogin;
+use App\Livewire\Portal\Bookings\Index as PortalBookingIndex;
+use App\Livewire\Portal\Bookings\Show as PortalBookingShow;
+use App\Livewire\Portal\Dashboard as PortalDashboard;
+use App\Livewire\Portal\Payments\Index as PortalPaymentIndex;
+use App\Livewire\Portal\Payments\Show as PortalPaymentShow;
+use App\Livewire\Portal\Profile as PortalProfile;
 use App\Livewire\Possession\PossessionDashboard;
 use App\Livewire\Projects\ProjectForm;
 use App\Livewire\Projects\ProjectIndex;
@@ -73,7 +98,9 @@ Route::middleware('guest')->group(function (): void {
 });
 
 // --- Authenticated + active ---------------------------------------------
-Route::middleware(['auth', 'active'])->group(function (): void {
+// Staff area — pinned to the `web` guard so a customer-portal session can
+// never satisfy it (M15 added the separate `customer` guard).
+Route::middleware(['auth:web', 'active'])->group(function (): void {
     Route::post('/logout', LogoutController::class)->name('logout');
 
     Route::get('/dashboard', Dashboard::class)->name('dashboard');
@@ -139,6 +166,11 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         ->whereNumber('lead')
         ->name('leads.show');
 
+    // --- Follow-up queue (M13.1) --------------------------------------
+    Route::get('/follow-ups', FollowUpQueue::class)
+        ->middleware('permission:'.Permission::FollowUpsView->value)
+        ->name('follow-ups.index');
+
     // --- Buyers / Customers (M5) --------------------------------------
     Route::get('/buyers/create', BuyerForm::class)
         ->middleware('permission:'.Permission::BuyersCreate->value)
@@ -170,6 +202,14 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         ->middleware('permission:'.Permission::BookingsView->value)
         ->whereNumber('booking')
         ->name('bookings.show');
+    Route::get('/bookings/{booking}/partners', BookingPartners::class)
+        ->middleware('permission:'.Permission::PartnersAttribute->value)
+        ->whereNumber('booking')
+        ->name('bookings.partners');
+    Route::get('/bookings/{booking}/commission', BookingCommission::class)
+        ->middleware('permission:'.Permission::CommissionView->value)
+        ->whereNumber('booking')
+        ->name('bookings.commission');
 
     // --- Payments / Installments / Receipts (M7) ----------------------
     Route::get('/finance', PaymentDashboard::class)
@@ -259,6 +299,69 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         ->whereNumber('booking')
         ->name('transfers.booking');
 
+    // --- Reports (M11.1 — foundation + global filters) ----------------
+    Route::prefix('reports')->name('reports.')
+        ->middleware('permission:'.Permission::ReportsView->value)
+        ->group(function (): void {
+            Route::get('/', [ReportController::class, 'overview'])->name('overview');
+            Route::get('/sales', [ReportController::class, 'sales'])->name('sales');
+            Route::get('/inventory', [ReportController::class, 'inventory'])->name('inventory');
+            Route::get('/collections', [ReportController::class, 'collections'])->name('collections');
+            Route::get('/leads', [ReportController::class, 'leads'])->name('leads');
+            Route::get('/mis', [ReportController::class, 'mis'])->name('mis');
+
+            // Report export (M11.5) — additionally gated by reports.export.
+            Route::get('/{type}/export/{format}', ReportExportController::class)
+                ->middleware('permission:'.Permission::ReportsExport->value)
+                ->whereIn('type', ['sales', 'inventory', 'collections', 'mis'])
+                ->whereIn('format', ['csv', 'xlsx', 'pdf', 'print'])
+                ->name('export');
+        });
+
+    // --- Channel Partners / Brokers (M14) ---------------------------
+    Route::get('/partners/create', PartnerForm::class)
+        ->middleware('permission:'.Permission::PartnersCreate->value)
+        ->name('partners.create');
+    Route::get('/partners/{partner}/edit', PartnerForm::class)
+        ->middleware('permission:'.Permission::PartnersUpdate->value)
+        ->whereNumber('partner')
+        ->name('partners.edit');
+    Route::get('/partners/{partner}/documents', PartnerDocuments::class)
+        ->middleware('permission:'.Permission::DocumentsView->value)
+        ->whereNumber('partner')
+        ->name('partners.documents');
+    Route::get('/partners', PartnerIndex::class)
+        ->middleware('permission:'.Permission::PartnersView->value)
+        ->name('partners.index');
+    Route::get('/partners/{partner}', PartnerShow::class)
+        ->middleware('permission:'.Permission::PartnersView->value)
+        ->whereNumber('partner')
+        ->name('partners.show');
+
+    // --- Commission cases + schemes (M14.3–M14.5) ------------------
+    Route::get('/commissions', CommissionIndex::class)
+        ->middleware('permission:'.Permission::CommissionView->value)
+        ->name('commissions.index');
+
+    Route::get('/commissions/schemes/create', CommissionSchemeForm::class)
+        ->middleware('permission:'.Permission::CommissionSchemesManage->value)
+        ->name('commission-schemes.create');
+    Route::get('/commissions/schemes/{scheme}/edit', CommissionSchemeForm::class)
+        ->middleware('permission:'.Permission::CommissionSchemesManage->value)
+        ->whereNumber('scheme')
+        ->name('commission-schemes.edit');
+    Route::get('/commissions/schemes', CommissionSchemeIndex::class)
+        ->middleware('permission:'.Permission::CommissionSchemesView->value)
+        ->name('commission-schemes.index');
+    Route::get('/commissions/schemes/{scheme}', CommissionSchemeShow::class)
+        ->middleware('permission:'.Permission::CommissionSchemesView->value)
+        ->whereNumber('scheme')
+        ->name('commission-schemes.show');
+    Route::get('/commissions/cases/{case}', CommissionCaseShow::class)
+        ->middleware('permission:'.Permission::CommissionView->value)
+        ->whereNumber('case')
+        ->name('commission-cases.show');
+
     // --- Users -------------------------------------------------------------
     Route::get('/users/create', UserForm::class)
         ->middleware('permission:'.Permission::UsersCreate->value)
@@ -307,5 +410,39 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         Route::get('/{resource}', MasterIndex::class)
             ->middleware('permission:'.Permission::MastersView->value)
             ->name('index');
+    });
+});
+
+/*
+| ---------------------------------------------------------------------------
+| Customer self-service portal (M15) — the `customer` guard only
+| ---------------------------------------------------------------------------
+| Completely separate from the staff area: a customer is a Buyer on a different
+| auth guard and can never resolve a staff role/permission or reach an admin
+| route.
+*/
+Route::prefix('portal')->name('portal.')->group(function (): void {
+
+    Route::middleware('guest:customer')->group(function (): void {
+        Route::get('/login', PortalLogin::class)->name('login');
+        Route::get('/forgot-password', PortalForgotPassword::class)->name('password.request');
+        Route::get('/activate/{token}', PortalActivate::class)->name('activate');
+        Route::get('/reset-password/{token}', PortalActivate::class)
+            ->defaults('purpose', 'reset')
+            ->name('password.reset');
+    });
+
+    Route::middleware(['auth:customer', 'customer.active'])->group(function (): void {
+        Route::post('/logout', PortalLogoutController::class)->name('logout');
+
+        Route::get('/', PortalDashboard::class)->name('dashboard');
+        Route::get('/profile', PortalProfile::class)->name('profile');
+
+        // --- My bookings + payments (M15.2) ---------------------------
+        Route::get('/bookings', PortalBookingIndex::class)->name('bookings.index');
+        Route::get('/bookings/{booking}', PortalBookingShow::class)->whereNumber('booking')->name('bookings.show');
+        Route::get('/payments', PortalPaymentIndex::class)->name('payments.index');
+        Route::get('/payments/{payment}', PortalPaymentShow::class)->whereNumber('payment')->name('payments.show');
+        Route::get('/receipts/{receipt}/pdf', PortalReceiptDownload::class)->whereNumber('receipt')->name('receipts.pdf');
     });
 });

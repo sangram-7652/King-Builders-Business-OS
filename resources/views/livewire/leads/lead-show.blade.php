@@ -80,6 +80,39 @@
         </x-ui.card>
     </div>
 
+    {{-- Channel partner attribution (M14.2) --}}
+    <x-ui.card title="Channel partner">
+        <x-slot:actions>
+            @if ($canAttributePartner)
+                <x-ui.button variant="secondary" size="sm" wire:click="openAttribute">
+                    {{ $lead->partner ? 'Change' : 'Attribute' }}
+                </x-ui.button>
+            @endif
+        </x-slot:actions>
+
+        @if ($lead->partner)
+            <p class="text-sm">
+                <a href="{{ route('partners.show', $lead->partner) }}" wire:navigate class="font-medium text-(--brand-primary) hover:underline">{{ $lead->partner->displayName() }}</a>
+                <span class="text-(--content-muted)"> · {{ $lead->partner->partner_code }}</span>
+            </p>
+        @else
+            <p class="text-sm text-(--content-muted)">Direct lead — no channel partner attributed.</p>
+        @endif
+
+        @if ($lead->partnerAttributions->count() > 1 || ($lead->partnerAttributions->count() === 1 && ! $lead->partnerAttributions->first()->isCurrent()))
+            <ol class="mt-3 space-y-1 border-t border-(--border) pt-3 text-xs text-(--content-muted)">
+                @foreach ($lead->partnerAttributions as $span)
+                    <li wire:key="lpa-{{ $span->id }}">
+                        {{ $span->partner?->displayName() ?? 'Direct' }}
+                        · {{ $span->attributed_at->format('d M Y') }}
+                        @if ($span->ended_at) → {{ $span->ended_at->format('d M Y') }} @else <span class="text-(--content)">(current)</span> @endif
+                        · by {{ $span->attributedBy?->name ?? 'System' }}
+                    </li>
+                @endforeach
+            </ol>
+        @endif
+    </x-ui.card>
+
     {{-- Follow-ups --}}
     <x-ui.card title="Follow-ups" :padding="false">
         @if ($lead->followUps->isEmpty())
@@ -89,25 +122,38 @@
                 @foreach ($lead->followUps as $fu)
                     <li wire:key="fu-{{ $fu->id }}" class="flex items-start justify-between gap-4 px-5 py-3">
                         <div class="text-sm">
-                            <div class="flex items-center gap-2">
-                                <span class="font-medium text-(--content)">{{ $fu->due_at->format('d M Y H:i') }}</span>
-                                @if ($fu->isCompleted())
-                                    <x-ui.badge variant="success" size="sm">{{ $fu->outcome?->label() }}</x-ui.badge>
-                                @elseif ($fu->isOverdue())
-                                    <x-ui.badge variant="danger" size="sm">Overdue</x-ui.badge>
-                                @else
-                                    <x-ui.badge variant="warning" size="sm">Pending</x-ui.badge>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="font-medium text-(--content)">{{ $fu->type->label() }} · {{ $fu->due_at->format('d M Y H:i') }}</span>
+                                <x-ui.badge :variant="$fu->status->color()" size="sm">{{ $fu->status->label() }}</x-ui.badge>
+                                <x-ui.badge :variant="$fu->priority->color()" size="sm">{{ $fu->priority->label() }}</x-ui.badge>
+                                @if ($fu->isCompleted() && $fu->outcome)
+                                    <x-ui.badge variant="muted" size="sm">{{ $fu->outcome->label() }}</x-ui.badge>
                                 @endif
                             </div>
+                            @if ($fu->title)<p class="mt-0.5 font-medium text-(--content)">{{ $fu->title }}</p>@endif
                             @if ($fu->note)<p class="mt-0.5 text-(--content-muted)">{{ $fu->note }}</p>@endif
-                            <p class="mt-0.5 text-xs text-(--content-muted)">{{ $fu->createdBy?->name }}</p>
+                            <p class="mt-0.5 text-xs text-(--content-muted)">{{ $fu->assignee?->name ?? $fu->createdBy?->name }}</p>
                         </div>
-                        @if (! $fu->isCompleted())
+                        @if ($fu->isOpen())
                             @can('followUp', $lead)
-                                <x-ui.button variant="ghost" size="sm" wire:click="openComplete({{ $fu->id }})">Complete</x-ui.button>
+                                <div class="flex shrink-0 gap-1">
+                                    <x-ui.button variant="ghost" size="sm" wire:click="openComplete({{ $fu->id }})">Complete</x-ui.button>
+                                    <x-ui.button variant="ghost" size="sm" wire:click="startReschedule({{ $fu->id }})">Reschedule</x-ui.button>
+                                    <x-ui.button variant="ghost" size="sm" wire:click="cancelFollowUp({{ $fu->id }})" wire:confirm="Cancel this follow-up?">Cancel</x-ui.button>
+                                </div>
                             @endcan
                         @endif
                     </li>
+
+                    @if ($reschedulingId === $fu->id)
+                        <li wire:key="fu-resch-{{ $fu->id }}" class="bg-(--surface-muted)/40 px-5 py-3">
+                            <form wire:submit="reschedule" class="flex flex-wrap items-end gap-3">
+                                <x-ui.input type="datetime-local" label="New due" wire:model="rescheduleDueAt" :error="$errors->first('rescheduleDueAt')" />
+                                <x-ui.button type="submit" size="sm">Save</x-ui.button>
+                                <x-ui.button type="button" size="sm" variant="ghost" wire:click="$set('reschedulingId', null)">Cancel</x-ui.button>
+                            </form>
+                        </li>
+                    @endif
                 @endforeach
             </ul>
         @endif
@@ -136,6 +182,28 @@
         @endif
     </x-ui.card>
 
+    {{-- Assignment history --}}
+    @if ($lead->assignments->isNotEmpty())
+        <x-ui.card title="Assignment history">
+            <ol class="space-y-2 text-sm">
+                @foreach ($lead->assignments as $span)
+                    <li wire:key="span-{{ $span->id }}" class="flex flex-wrap items-baseline justify-between gap-2">
+                        <span>
+                            <span class="font-medium">{{ $span->assignee?->name ?? 'Unassigned' }}</span>
+                            @if ($span->isCurrent())<x-ui.badge variant="success" size="sm">current</x-ui.badge>@endif
+                            @if ($span->reason)<span class="text-(--content-muted)">— {{ $span->reason }}</span>@endif
+                        </span>
+                        <span class="text-xs text-(--content-muted)">
+                            {{ $span->assigned_at->format('d M Y') }}
+                            @if ($span->ended_at) → {{ $span->ended_at->format('d M Y') }} @endif
+                            · by {{ $span->assignedBy?->name ?? 'System' }}
+                        </span>
+                    </li>
+                @endforeach
+            </ol>
+        </x-ui.card>
+    @endif
+
     {{-- Assign drawer --}}
     @if ($showAssign)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4" wire:key="assign">
@@ -153,6 +221,29 @@
         </div>
     @endif
 
+    {{-- Channel partner attribution drawer (M14.2) --}}
+    @if ($showAttribute)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4" wire:key="attribute">
+            <div class="absolute inset-0 bg-slate-900/50" wire:click="closeAttribute"></div>
+            <div class="relative w-full max-w-md rounded-xl border border-(--border) bg-(--surface) shadow-xl">
+                <div class="border-b border-(--border) px-5 py-4"><h3 class="text-sm font-semibold">Attribute channel partner</h3></div>
+                <form wire:submit="attributePartner" class="space-y-4 px-5 py-4">
+                    <x-ui.select label="Channel partner" wire:model="attributePartnerId" placeholder="Direct — no partner"
+                        :error="$errors->first('attributePartnerId')">
+                        @foreach ($attributablePartners as $partner)
+                            <option value="{{ $partner->id }}">{{ $partner->displayName() }} ({{ $partner->partner_code }})</option>
+                        @endforeach
+                    </x-ui.select>
+                    <p class="text-xs text-(--content-muted)">Only active partners are listed. Changing this keeps the full attribution history.</p>
+                    <div class="flex justify-end gap-2">
+                        <x-ui.button type="button" variant="secondary" wire:click="closeAttribute">Cancel</x-ui.button>
+                        <x-ui.button type="submit">Save</x-ui.button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
     {{-- Follow-up drawer --}}
     @if ($showFollowUp)
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4" wire:key="fu-new">
@@ -160,7 +251,12 @@
             <div class="relative w-full max-w-md rounded-xl border border-(--border) bg-(--surface) shadow-xl">
                 <div class="border-b border-(--border) px-5 py-4"><h3 class="text-sm font-semibold">Schedule follow-up</h3></div>
                 <form wire:submit="scheduleFollowUp" class="space-y-4 px-5 py-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <x-ui.select label="Type" wire:model="followUpType" :options="$followUpTypes" :placeholder="null" />
+                        <x-ui.select label="Priority" wire:model="followUpPriority" :options="$followUpPriorities" :placeholder="null" />
+                    </div>
                     <x-ui.input type="datetime-local" label="Due at" wire:model="followUpDueAt" required :error="$errors->first('followUpDueAt')" />
+                    <x-ui.input label="Title (optional)" wire:model="followUpTitle" :error="$errors->first('followUpTitle')" />
                     <x-ui.textarea label="Note" wire:model="followUpNote" rows="3" :error="$errors->first('followUpNote')" />
                     <div class="flex justify-end gap-2">
                         <x-ui.button type="button" variant="secondary" wire:click="closeFollowUp">Cancel</x-ui.button>
@@ -178,7 +274,7 @@
             <div class="relative w-full max-w-md rounded-xl border border-(--border) bg-(--surface) shadow-xl">
                 <div class="border-b border-(--border) px-5 py-4"><h3 class="text-sm font-semibold">Complete follow-up</h3></div>
                 <form wire:submit="completeFollowUp" class="space-y-4 px-5 py-4">
-                    <x-ui.select label="Outcome" wire:model="completeOutcome" placeholder="Select…" :options="$outcomes" required :error="$errors->first('completeOutcome')" />
+                    <x-ui.select label="Outcome (optional)" wire:model="completeOutcome" placeholder="—" :options="$outcomes" :error="$errors->first('completeOutcome')" />
                     <x-ui.textarea label="Note" wire:model="completeNote" rows="3" :error="$errors->first('completeNote')" />
                     <div class="flex justify-end gap-2">
                         <x-ui.button type="button" variant="secondary" wire:click="closeComplete">Cancel</x-ui.button>

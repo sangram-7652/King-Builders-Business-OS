@@ -19,6 +19,8 @@ enum PermissionGroup: string
     case Collections = 'collections';
     case Operations = 'operations';
     case Associates = 'associates';
+    case Commission = 'commission';
+    case Communication = 'communication';
     case Reports = 'reports';
     case Administration = 'administration';
     case MasterData = 'master_data';
@@ -32,7 +34,9 @@ enum PermissionGroup: string
             self::Finance => 'Finance',
             self::Collections => 'Collections',
             self::Operations => 'Operations',
-            self::Associates => 'Associates',
+            self::Associates => 'Channel Partners',
+            self::Commission => 'Commission',
+            self::Communication => 'Communications',
             self::Reports => 'Reports',
             self::Administration => 'Administration',
             self::MasterData => 'Master Data',

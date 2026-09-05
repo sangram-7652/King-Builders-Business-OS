@@ -15,6 +15,7 @@ use App\Support\Concerns\RunsInTransaction;
 use App\Support\Money;
 use App\Support\Sequences\SequenceGenerator;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -46,6 +47,20 @@ class RecordPaymentAction
 
         if (! $amount->isPositive()) {
             throw new DomainException('A payment amount must be greater than zero.');
+        }
+
+        // A payment is recorded when it is received — never in the future, and
+        // not implausibly far in the past (guards data-entry typos that would
+        // silently skew every date-bucketed report).
+        if (isset($data['payment_date'])) {
+            $date = Carbon::parse((string) $data['payment_date'])->startOfDay();
+
+            if ($date->isFuture()) {
+                throw new DomainException('A payment date cannot be in the future.');
+            }
+            if ($date->lt(now()->subYears(10))) {
+                throw new DomainException('That payment date is too far in the past.');
+            }
         }
 
         /** @var PaymentMode $mode */

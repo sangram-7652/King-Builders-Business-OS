@@ -10,6 +10,7 @@ use App\Exceptions\DomainException;
 use App\Models\Booking;
 use App\Models\Plot;
 use App\Models\User;
+use App\Support\Bookings\BookingCancellationGuard;
 use App\Support\Concerns\RunsInTransaction;
 use Illuminate\Support\Facades\Log;
 
@@ -20,7 +21,9 @@ use Illuminate\Support\Facades\Log;
  *    `active_plot_id` generated column becomes NULL automatically).
  *  - CONFIRMED → CANCELLED: also returns the plot BOOKED → AVAILABLE, as a
  *    controlled operation inside this transaction (the generic PlotStatus map
- *    deliberately has no BOOKED → AVAILABLE edge).
+ *    deliberately has no BOOKED → AVAILABLE edge). Refused (F-M6-1) when
+ *    downstream financial / operational records still reference the booking —
+ *    see {@see BookingCancellationGuard}.
  *
  * This is the cancellation FOUNDATION only. There is NO refund, penalty,
  * payment reversal or installment adjustment here — those belong to later
@@ -29,6 +32,8 @@ use Illuminate\Support\Facades\Log;
 class CancelBookingAction
 {
     use RunsInTransaction;
+
+    public function __construct(private readonly BookingCancellationGuard $guard) {}
 
     public function handle(Booking $booking, User $actor, ?string $reason = null): Booking
     {
@@ -45,6 +50,17 @@ class CancelBookingAction
             }
 
             $wasConfirmed = $locked->status === BookingStatus::Confirmed;
+
+            // F-M6-1: a confirmed booking with live downstream state (payments,
+            // an active plan, a collection / registry / possession case, a
+            // transfer or a commission case) must be unwound before it can be
+            // cancelled — otherwise the plot is freed while those records dangle.
+            if ($wasConfirmed && ($blockers = $this->guard->blockers($locked)) !== []) {
+                throw new DomainException(
+                    'This confirmed booking cannot be cancelled while downstream records exist: '
+                    .implode('; ', $blockers).'.'
+                );
+            }
 
             $locked->forceFill([
                 'status' => BookingStatus::Cancelled,

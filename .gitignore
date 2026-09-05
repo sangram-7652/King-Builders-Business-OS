@@ -18,7 +18,13 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/backups
+/.deploy.env
+/docker/nginx/certs
 /vendor
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# stray local SQLite scratch DB (F-cleanup)
+/king_builders

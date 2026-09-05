@@ -82,6 +82,46 @@
         @endif
     </x-ui.card>
 
+    {{-- Customer portal access (M15) --}}
+    @php $portalStatus = $buyer->portal_status ?? App\Enums\CustomerPortalStatus::None; @endphp
+    @if ($canManagePortal)
+        <x-ui.card title="Customer portal">
+            <x-slot:actions>
+                <x-ui.badge :variant="$portalStatus->color()">{{ $portalStatus->label() }}</x-ui.badge>
+            </x-slot:actions>
+
+            <dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+                <div><dt class="text-(--content-muted)">Invited</dt><dd>{{ $buyer->portal_invited_at?->format('d M Y') ?? '—' }}</dd></div>
+                <div><dt class="text-(--content-muted)">Activated</dt><dd>{{ $buyer->portal_activated_at?->format('d M Y') ?? '—' }}</dd></div>
+                <div><dt class="text-(--content-muted)">Last sign-in</dt><dd>{{ $buyer->portal_last_login_at?->diffForHumans() ?? '—' }}</dd></div>
+            </dl>
+
+            @if ($portalLink)
+                <div class="mt-3 rounded-lg border border-(--border) bg-(--surface-muted) p-3">
+                    <p class="text-xs font-medium text-(--content-muted)">One-time link — share it securely with the customer:</p>
+                    <p class="mt-1 break-all font-mono text-xs">{{ $portalLink }}</p>
+                </div>
+            @endif
+
+            <div class="mt-4 flex flex-wrap gap-2">
+                @if (in_array($portalStatus, [App\Enums\CustomerPortalStatus::None, App\Enums\CustomerPortalStatus::Invited], true))
+                    <x-ui.button size="sm" wire:click="invitePortal">
+                        {{ $portalStatus === App\Enums\CustomerPortalStatus::Invited ? 'Re-send invitation' : 'Invite to portal' }}
+                    </x-ui.button>
+                @endif
+                @if ($portalStatus === App\Enums\CustomerPortalStatus::Active)
+                    <x-ui.button size="sm" variant="secondary" wire:click="resetPortalPassword">Reset password</x-ui.button>
+                @endif
+                @if (in_array($portalStatus, [App\Enums\CustomerPortalStatus::Active, App\Enums\CustomerPortalStatus::Invited], true))
+                    <x-ui.button size="sm" variant="ghost" class="text-red-600" wire:click="suspendPortal" wire:confirm="Suspend portal access for this customer?">Suspend access</x-ui.button>
+                @endif
+                @if ($portalStatus === App\Enums\CustomerPortalStatus::Suspended)
+                    <x-ui.button size="sm" variant="secondary" wire:click="restorePortal">Restore access</x-ui.button>
+                @endif
+            </div>
+        </x-ui.card>
+    @endif
+
     {{-- Collection profile (M8) --}}
     @if ($collectionProfile)
         <x-ui.card title="Collection profile" subtitle="Across all confirmed bookings where this buyer is primary. Figures from the M7 ledger.">

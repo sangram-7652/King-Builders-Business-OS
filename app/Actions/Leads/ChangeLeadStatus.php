@@ -41,6 +41,11 @@ class ChangeLeadStatus
             $locked->status = $target;
             $locked->save();
 
+            // Leaving NEW for the first time = first contact (response-time anchor).
+            if ($current === LeadStatus::New) {
+                $locked->markFirstContact();
+            }
+
             $locked->recordActivity(LeadActivityType::StatusChanged, "Status: {$current->label()} → {$target->label()}", [
                 'from' => $current->value,
                 'to' => $target->value,

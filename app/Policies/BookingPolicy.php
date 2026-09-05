@@ -65,4 +65,12 @@ class BookingPolicy
     {
         return $user->can(Permission::PricingOverride->value) && $booking->isEditable();
     }
+
+    /** Set / change the booking's channel-partner attribution (M14.2). */
+    public function attributePartners(User $user, Booking $booking): bool
+    {
+        return $user->can(Permission::PartnersAttribute->value)
+            && $user->can(Permission::BookingsView->value)
+            && ! $booking->isCancelled();
+    }
 }

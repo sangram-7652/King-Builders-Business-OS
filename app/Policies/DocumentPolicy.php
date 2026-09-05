@@ -8,6 +8,7 @@ use App\Enums\Permission;
 use App\Models\Booking;
 use App\Models\Buyer;
 use App\Models\Document;
+use App\Models\Partner;
 use App\Models\User;
 
 /**
@@ -67,7 +68,7 @@ class DocumentPolicy
         $d = $document->documentable;
 
         return match (true) {
-            $d instanceof Buyer, $d instanceof Booking => $user->can('view', $d),
+            $d instanceof Buyer, $d instanceof Booking, $d instanceof Partner => $user->can('view', $d),
             default => false,
         };
     }

@@ -5,16 +5,23 @@ declare(strict_types=1);
 namespace App\Livewire\Leads;
 
 use App\Actions\Leads\AssignLead;
+use App\Actions\Leads\CancelFollowUp;
 use App\Actions\Leads\ChangeLeadStatus;
 use App\Actions\Leads\CompleteFollowUp;
+use App\Actions\Leads\RescheduleFollowUp;
 use App\Actions\Leads\ScheduleFollowUp;
+use App\Actions\Partners\AttributeLeadToPartner;
 use App\Enums\FollowUpOutcome;
+use App\Enums\FollowUpPriority;
+use App\Enums\FollowUpType;
 use App\Enums\LeadStatus;
 use App\Exceptions\DomainException;
 use App\Models\Lead;
 use App\Models\LeadFollowUp;
+use App\Models\Partner;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -33,11 +40,25 @@ class LeadShow extends Component
 
     public string $followUpNote = '';
 
+    public string $followUpType = 'call';
+
+    public string $followUpPriority = 'normal';
+
+    public string $followUpTitle = '';
+
     public ?int $completingId = null;
 
     public string $completeOutcome = '';
 
     public string $completeNote = '';
+
+    public ?int $reschedulingId = null;
+
+    public string $rescheduleDueAt = '';
+
+    public bool $showAttribute = false;
+
+    public string $attributePartnerId = '';
 
     public function mount(Lead $lead): void
     {
@@ -114,7 +135,9 @@ class LeadShow extends Component
 
     public function closeFollowUp(): void
     {
-        $this->reset('showFollowUp', 'followUpDueAt', 'followUpNote');
+        $this->reset('showFollowUp', 'followUpDueAt', 'followUpNote', 'followUpTitle');
+        $this->followUpType = 'call';
+        $this->followUpPriority = 'normal';
         $this->resetValidation();
     }
 
@@ -124,17 +147,63 @@ class LeadShow extends Component
 
         $data = $this->validate([
             'followUpDueAt' => ['required', 'date'],
+            'followUpType' => ['required', Rule::enum(FollowUpType::class)],
+            'followUpPriority' => ['required', Rule::enum(FollowUpPriority::class)],
+            'followUpTitle' => ['nullable', 'string', 'max:120'],
             'followUpNote' => ['nullable', 'string', 'max:1000'],
         ]);
 
         app(ScheduleFollowUp::class)->handle($this->lead, [
             'due_at' => $data['followUpDueAt'],
+            'type' => $data['followUpType'],
+            'priority' => $data['followUpPriority'],
+            'title' => $data['followUpTitle'] ?: null,
             'note' => $data['followUpNote'] ?: null,
         ], auth()->user());
 
         $this->refreshLead();
         $this->dispatch('toast', message: 'Follow-up scheduled.', variant: 'success');
         $this->closeFollowUp();
+    }
+
+    public function startReschedule(int $followUpId): void
+    {
+        $this->authorize('followUp', $this->lead);
+        $this->reset('completingId', 'completeOutcome', 'completeNote');
+        $this->reschedulingId = $followUpId;
+        $this->rescheduleDueAt = now()->addDay()->setTime(10, 0)->format('Y-m-d\TH:i');
+    }
+
+    public function reschedule(): void
+    {
+        $this->authorize('followUp', $this->lead);
+        $data = $this->validate(['rescheduleDueAt' => ['required', 'date']]);
+
+        $followUp = LeadFollowUp::where('lead_id', $this->lead->id)->findOrFail($this->reschedulingId);
+
+        try {
+            app(RescheduleFollowUp::class)->handle($followUp, ['due_at' => $data['rescheduleDueAt']], auth()->user());
+            $this->refreshLead();
+            $this->dispatch('toast', message: 'Follow-up rescheduled.', variant: 'success');
+        } catch (DomainException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
+        }
+
+        $this->reset('reschedulingId', 'rescheduleDueAt');
+    }
+
+    public function cancelFollowUp(int $followUpId): void
+    {
+        $this->authorize('followUp', $this->lead);
+        $followUp = LeadFollowUp::where('lead_id', $this->lead->id)->findOrFail($followUpId);
+
+        try {
+            app(CancelFollowUp::class)->handle($followUp, auth()->user());
+            $this->refreshLead();
+            $this->dispatch('toast', message: 'Follow-up cancelled.', variant: 'success');
+        } catch (DomainException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
+        }
     }
 
     public function openComplete(int $followUpId): void
@@ -156,7 +225,7 @@ class LeadShow extends Component
         $this->authorize('followUp', $this->lead);
 
         $data = $this->validate([
-            'completeOutcome' => ['required', 'string'],
+            'completeOutcome' => ['nullable', 'string'],
             'completeNote' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -164,7 +233,7 @@ class LeadShow extends Component
 
         try {
             app(CompleteFollowUp::class)->handle($followUp, [
-                'outcome' => $data['completeOutcome'],
+                'outcome' => $data['completeOutcome'] ?: null,
                 'note' => $data['completeNote'] ?: null,
             ], auth()->user());
             $this->refreshLead();
@@ -176,11 +245,45 @@ class LeadShow extends Component
         $this->closeComplete();
     }
 
+    // --- Channel partner attribution (M14.2) -----------------------
+
+    public function openAttribute(): void
+    {
+        $this->authorize('attributePartner', $this->lead);
+        $this->attributePartnerId = (string) ($this->lead->partner_id ?? '');
+        $this->showAttribute = true;
+    }
+
+    public function closeAttribute(): void
+    {
+        $this->reset('showAttribute', 'attributePartnerId');
+        $this->resetValidation();
+    }
+
+    public function attributePartner(): void
+    {
+        $this->authorize('attributePartner', $this->lead);
+        $this->validate(['attributePartnerId' => ['nullable', 'integer', 'exists:partners,id']]);
+
+        try {
+            $partner = $this->attributePartnerId !== '' ? Partner::find((int) $this->attributePartnerId) : null;
+            app(AttributeLeadToPartner::class)->handle($this->lead, $partner, auth()->user());
+            $this->refreshLead();
+            $this->dispatch('toast', message: 'Lead attribution updated.', variant: 'success');
+        } catch (DomainException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
+        }
+
+        $this->closeAttribute();
+    }
+
     public function render(): View
     {
         $lead = $this->lead->load([
             'source', 'assignedTo', 'convertedBy', 'createdBy', 'buyer',
-            'followUps.createdBy', 'activities.causer',
+            'partner', 'partnerAttributions.partner', 'partnerAttributions.attributedBy',
+            'followUps.createdBy', 'followUps.assignee', 'activities.causer',
+            'assignments.assignee', 'assignments.assignedBy',
         ]);
 
         return view('livewire.leads.lead-show', [
@@ -190,7 +293,13 @@ class LeadShow extends Component
                 ? User::query()->where('status', 'active')->orderBy('name')->pluck('name', 'id')
                 : collect(),
             'outcomes' => FollowUpOutcome::options(),
+            'followUpTypes' => FollowUpType::options(),
+            'followUpPriorities' => FollowUpPriority::options(),
             'canConvert' => auth()->user()->can('convert', $lead),
+            'canAttributePartner' => auth()->user()->can('attributePartner', $lead),
+            'attributablePartners' => auth()->user()->can('attributePartner', $lead)
+                ? Partner::query()->active()->orderBy('name')->get(['id', 'name', 'company_name', 'partner_code'])
+                : collect(),
         ])->title($lead->name);
     }
 }

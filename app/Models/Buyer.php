@@ -5,12 +5,18 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\BuyerStatus;
+use App\Enums\CustomerActivityType;
+use App\Enums\CustomerPortalStatus;
 use App\Enums\Gender;
 use App\Models\Concerns\GuardsAgainstDestructiveDelete;
+use App\Models\Concerns\HasMarketingConsent;
 use App\Models\Masters\City;
 use App\Models\Masters\State;
 use Database\Factories\BuyerFactory;
+use Illuminate\Auth\Authenticatable as AuthenticatableTrait;
+use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,14 +27,22 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 /**
+ * The buyer is also the customer for the M15 self-service portal — it becomes
+ * authenticatable on the SEPARATE `customer` guard, so it can never hold a
+ * staff role/permission or reach an admin route. `password` stays null until
+ * the buyer activates; only `portal_status = active` may sign in.
+ *
  * @property BuyerStatus $status
+ * @property CustomerPortalStatus $portal_status
  * @property string|null $pan_number decrypted; never logged or serialised
  * @property string|null $aadhaar_number decrypted; never logged or serialised
  */
-class Buyer extends Model
+class Buyer extends Model implements AuthenticatableContract
 {
+    use AuthenticatableTrait;
+
     /** @use HasFactory<BuyerFactory> */
-    use GuardsAgainstDestructiveDelete, HasFactory, SoftDeletes;
+    use GuardsAgainstDestructiveDelete, HasFactory, HasMarketingConsent, SoftDeletes;
 
     public const SEQUENCE_KEY = 'buyer';
 
@@ -48,12 +62,13 @@ class Buyer extends Model
      *
      * @var list<string>
      */
-    protected $hidden = ['pan_number', 'aadhaar_number'];
+    protected $hidden = ['pan_number', 'aadhaar_number', 'password', 'remember_token'];
 
     protected function casts(): array
     {
         return [
             'status' => BuyerStatus::class,
+            'portal_status' => CustomerPortalStatus::class,
             'gender' => Gender::class,
             'date_of_birth' => 'date',
             'state_id' => 'integer',
@@ -61,7 +76,33 @@ class Buyer extends Model
             'created_by' => 'integer',
             'pan_number' => 'encrypted',
             'aadhaar_number' => 'encrypted',
+            'password' => 'hashed',
+            'portal_invited_at' => 'datetime',
+            'portal_activated_at' => 'datetime',
+            'portal_last_login_at' => 'datetime',
+            'marketing_consent_at' => 'datetime',
+            'marketing_opt_out_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Email is stored trimmed + lower-cased so it is a stable identity for
+     * portal login and the `email_canonical` unique index (F-M5-1). An empty
+     * string is normalised to NULL.
+     */
+    protected function email(): Attribute
+    {
+        return Attribute::make(
+            set: static fn (?string $value): ?string => self::normalizeEmail($value),
+        );
+    }
+
+    /** Canonicalise an email for storage / comparison. */
+    public static function normalizeEmail(?string $value): ?string
+    {
+        $value = mb_strtolower(trim((string) $value));
+
+        return $value === '' ? null : $value;
     }
 
     // --- Relationships -------------------------------------------------
@@ -88,6 +129,18 @@ class Buyer extends Model
     public function leads(): HasMany
     {
         return $this->hasMany(Lead::class);
+    }
+
+    /** Portal activation / reset tokens (M15). @return HasMany<CustomerInvitation, $this> */
+    public function portalInvitations(): HasMany
+    {
+        return $this->hasMany(CustomerInvitation::class)->latest('id');
+    }
+
+    /** Append-only portal audit trail (M15). @return HasMany<CustomerActivity, $this> */
+    public function portalActivities(): HasMany
+    {
+        return $this->hasMany(CustomerActivity::class)->latest('id');
     }
 
     /** Bookings this buyer co-owns (M6). @return BelongsToMany<Booking, $this> */
@@ -168,11 +221,48 @@ class Buyer extends Model
         });
     }
 
+    /** Buyers reachable in the customer portal — active portal access only. @param  Builder<Buyer>  $query */
+    public function scopePortalActive(Builder $query): void
+    {
+        $query->where('portal_status', CustomerPortalStatus::Active->value);
+    }
+
     // --- Helpers ---------------------------------------------------
 
     public function fullName(): string
     {
         return trim(implode(' ', array_filter([$this->first_name, $this->middle_name, $this->last_name])));
+    }
+
+    // --- Customer portal (M15) --------------------------------------
+
+    public function canAccessPortal(): bool
+    {
+        return $this->portal_status === CustomerPortalStatus::Active
+            && $this->status === BuyerStatus::Active
+            && $this->password !== null;
+    }
+
+    public function hasPortalInvite(): bool
+    {
+        return in_array($this->portal_status, [CustomerPortalStatus::Invited, CustomerPortalStatus::Active], true);
+    }
+
+    /**
+     * Append one row to the portal audit trail (M15). Never store PII / KYC /
+     * commission / internal notes in `$properties`.
+     *
+     * @param  array<string, scalar|null>  $properties
+     */
+    public function recordPortalActivity(CustomerActivityType $type, ?string $description = null, array $properties = [], ?string $ip = null): CustomerActivity
+    {
+        return $this->portalActivities()->create([
+            'type' => $type,
+            'description' => $description ?? $type->label(),
+            'properties' => $properties ?: null,
+            'ip_address' => $ip ?? request()?->ip(),
+            'created_at' => now(),
+        ]);
     }
 
     public static function formatCode(int $number): string

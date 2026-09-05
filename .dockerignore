@@ -16,6 +16,8 @@ yarn-error.log
 .env
 .env.*
 !.env.example
+!.env.production.example
+storage/backups
 Dockerfile
 docker-compose*.yml
 .dockerignore

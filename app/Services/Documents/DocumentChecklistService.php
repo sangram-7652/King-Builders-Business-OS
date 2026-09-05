@@ -11,6 +11,7 @@ use App\Models\Buyer;
 use App\Models\Document;
 use App\Models\DocumentRequirement;
 use App\Models\Masters\DocumentType;
+use App\Models\Partner;
 use App\Support\Documents\ChecklistResult;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -33,6 +34,11 @@ class DocumentChecklistService
     public function forBooking(Booking $booking): ChecklistResult
     {
         return $this->build($booking, DocumentScope::Booking, $booking->project_id);
+    }
+
+    public function forPartner(Partner $partner): ChecklistResult
+    {
+        return $this->build($partner, DocumentScope::Partner, null);
     }
 
     private function build(Model $documentable, DocumentScope $scope, ?int $projectId): ChecklistResult

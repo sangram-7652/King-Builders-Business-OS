@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Communication\CommunicationManager;
 use App\Enums\RoleName;
 use App\Masters\MasterRegistry;
+use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\User;
+use App\Observers\BookingCommissionObserver;
 use App\Observers\PaymentCollectionObserver;
 use App\Policies\MasterDataPolicy;
 use App\Support\Branding;
@@ -22,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(Branding::class, static fn (): Branding => Branding::fromConfig());
+        $this->app->singleton(CommunicationManager::class);
     }
 
     public function boot(): void
@@ -50,6 +54,9 @@ class AppServiceProvider extends ServiceProvider
 
         // M8: keep collection state in step with M7 payment state.
         Payment::observe(PaymentCollectionObserver::class);
+
+        // M14.4: keep commission cases in step with the M6 booking lifecycle.
+        Booking::observe(BookingCommissionObserver::class);
 
         // --- Branding available to every view as `$branding` --------------
         View::share('branding', $this->app->make(Branding::class));

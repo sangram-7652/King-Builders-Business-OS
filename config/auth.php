@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Buyer;
 use App\Models\User;
 
 return [
@@ -42,6 +43,14 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // M15 self-service customer portal. A customer is a Buyer authenticating
+        // here — a different model on a different guard from a staff `web` user,
+        // so it can never resolve a staff role/permission or reach an admin route.
+        'customer' => [
+            'driver' => 'session',
+            'provider' => 'customers',
+        ],
     ],
 
     /*
@@ -67,10 +76,10 @@ return [
             'model' => env('AUTH_MODEL', User::class),
         ],
 
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
+        'customers' => [
+            'driver' => 'eloquent',
+            'model' => Buyer::class,
+        ],
     ],
 
     /*

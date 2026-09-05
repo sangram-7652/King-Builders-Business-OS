@@ -13,7 +13,10 @@ cd /var/www/html
 
 BOOTSTRAP="${APP_BOOTSTRAP:-false}"
 
-if [ ! -f .env ] && [ -f .env.example ]; then
+# Dev convenience only: bootstrap a .env from the example on a clean checkout.
+# In production the real .env is bind-mounted read-only (docker-compose.prod.yml)
+# and APP_ENV is already "production" in the environment — never overwrite it.
+if [ ! -f .env ] && [ -f .env.example ] && [ "${APP_ENV:-local}" != "production" ]; then
     echo "[entrypoint] .env not found — copying from .env.example"
     cp .env.example .env
 fi
@@ -51,6 +54,16 @@ if [ "$BOOTSTRAP" = "true" ]; then
     if [ "${AUTO_SEED:-true}" = "true" ]; then
         echo "[entrypoint] seeding roles, permissions and the super admin"
         php artisan db:seed --force --no-interaction || true
+    fi
+
+    # F-M12-1: cache config / routes / events / views for production. Runs at
+    # startup (not build) so the REAL .env is baked in, not the image defaults.
+    # No runtime env() remains in app code (F-M12-3), so this is safe. `optimize`
+    # = config:cache + event:cache + route:cache + view:cache and clears stale
+    # caches first, so it is idempotent.
+    if [ "${APP_ENV:-local}" = "production" ] || [ "${APP_CACHE_ON_BOOT:-false}" = "true" ]; then
+        echo "[entrypoint] optimising (config/route/event/view cache)"
+        php artisan optimize --no-interaction || true
     fi
 else
     # queue / scheduler: don't start until the app has written an APP_KEY

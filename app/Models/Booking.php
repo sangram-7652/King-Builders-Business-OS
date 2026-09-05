@@ -141,6 +141,41 @@ class Booking extends Model
         return $this->hasMany(BookingPriceLine::class)->orderBy('sort_order')->orderBy('id');
     }
 
+    /** The current channel-partner split (M14.2) — shares total 100%. @return HasMany<BookingPartnerAttribution, $this> */
+    public function partnerAttributions(): HasMany
+    {
+        return $this->hasMany(BookingPartnerAttribution::class)->where('status', 'active')
+            ->orderByDesc('role')->orderByDesc('share_percentage')->orderBy('id');
+    }
+
+    /** Every attribution row ever written for this booking, newest first. @return HasMany<BookingPartnerAttribution, $this> */
+    public function partnerAttributionHistory(): HasMany
+    {
+        return $this->hasMany(BookingPartnerAttribution::class)->orderByDesc('revision')->orderBy('id');
+    }
+
+    /** The primary partner's current attribution row, if any. @return HasOne<BookingPartnerAttribution, $this> */
+    public function primaryPartnerAttribution(): HasOne
+    {
+        return $this->hasOne(BookingPartnerAttribution::class)
+            ->where('status', 'active')->where('role', 'primary');
+    }
+
+    /** Partners on the current split. @return BelongsToMany<Partner, $this> */
+    public function partners(): BelongsToMany
+    {
+        return $this->belongsToMany(Partner::class, 'booking_partner_attributions')
+            ->wherePivot('status', 'active')
+            ->withPivot(['share_percentage', 'role', 'revision'])
+            ->withTimestamps();
+    }
+
+    /** Commission cases for this booking (M14.4). @return HasMany<\App\Models\CommissionCase, $this> */
+    public function commissionCases(): HasMany
+    {
+        return $this->hasMany(CommissionCase::class)->latest('id');
+    }
+
     /** @return HasMany<PaymentPlan, $this> */
     public function paymentPlans(): HasMany
     {

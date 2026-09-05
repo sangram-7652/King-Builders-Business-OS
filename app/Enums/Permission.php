@@ -48,6 +48,13 @@ enum Permission: string
     case LeadsAssign = 'leads.assign';
     case LeadsConvert = 'leads.convert';
     case LeadsFollowUp = 'leads.follow_up';
+    case LeadsMerge = 'leads.merge';
+
+    // --- Follow-up engine (M13.1) --------------------------------------
+    case FollowUpsView = 'follow_ups.view';
+    case FollowUpsCreate = 'follow_ups.create';
+    case FollowUpsUpdate = 'follow_ups.update';
+    case FollowUpsComplete = 'follow_ups.complete';
 
     case BuyersView = 'buyers.view';
     case BuyersCreate = 'buyers.create';
@@ -55,6 +62,7 @@ enum Permission: string
     case BuyersDelete = 'buyers.delete';
     case BuyersArchive = 'buyers.archive';
     case BuyersDocuments = 'buyers.documents';
+    case BuyersPortal = 'buyers.portal';
 
     case BookingsView = 'bookings.view';
     case BookingsCreate = 'bookings.create';
@@ -147,13 +155,36 @@ enum Permission: string
 
     case OwnershipView = 'ownership.view';
 
-    // --- Associates (future modules) --------------------------------
-    case AssociatesView = 'associates.view';
-    case AssociatesCreate = 'associates.create';
-    case AssociatesUpdate = 'associates.update';
+    // --- Channel Partners / Brokers (M14) ---------------------------
+    case PartnersView = 'partners.view';
+    case PartnersCreate = 'partners.create';
+    case PartnersUpdate = 'partners.update';
+    case PartnersApprove = 'partners.approve';
+    case PartnersAuthorize = 'partners.authorize';
+    case PartnersAttribute = 'partners.attribute';
 
-    // --- Reports (future modules) -----------------------------------
+    // --- Commission schemes (M14.3) --------------------------------
+    case CommissionSchemesView = 'commission_schemes.view';
+    case CommissionSchemesManage = 'commission_schemes.manage';
+    case CommissionSchemesPublish = 'commission_schemes.publish';
+
+    // --- Commission cases (M14.4) ----------------------------------
+    case CommissionView = 'commission.view';
+    case CommissionGenerate = 'commission.generate';
+    case CommissionRecalculate = 'commission.recalculate';
+
+    // --- Commission workflow + payout (M14.5) ----------------------
+    case CommissionApprove = 'commission.approve';
+    case CommissionPayout = 'commission.payout';
+    case CommissionReverse = 'commission.reverse';
+
+    // --- Communications (M16) ------------------------------------
+    case CommunicationsView = 'communications.view';
+    case CommunicationsManage = 'communications.manage';
+
+    // --- Reports (M11) ---------------------------------------------
     case ReportsView = 'reports.view';
+    case ReportsExport = 'reports.export';
 
     // --- Administration (M1) ------------------------------------------
     case UsersView = 'users.view';
@@ -195,12 +226,14 @@ enum Permission: string
     {
         return match ($this->module()) {
             'projects', 'plots' => PermissionGroup::Inventory,
-            'leads', 'buyers', 'bookings' => PermissionGroup::Sales,
+            'leads', 'buyers', 'bookings', 'follow_ups' => PermissionGroup::Sales,
             'payments', 'pricing', 'payment_plans', 'receipts' => PermissionGroup::Finance,
             'collections', 'promises', 'cheques', 'penalties' => PermissionGroup::Collections,
             'documents', 'agreements', 'registry', 'registry_expenses', 'handover',
             'possession', 'transfer', 'ownership' => PermissionGroup::Operations,
-            'associates' => PermissionGroup::Associates,
+            'partners' => PermissionGroup::Associates,
+            'commission_schemes', 'commission' => PermissionGroup::Commission,
+            'communications' => PermissionGroup::Communication,
             'reports' => PermissionGroup::Reports,
             'users', 'roles' => PermissionGroup::Administration,
             'masters' => PermissionGroup::MasterData,

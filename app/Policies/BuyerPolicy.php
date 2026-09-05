@@ -44,6 +44,12 @@ class BuyerPolicy
         return $user->can(Permission::BuyersDocuments->value);
     }
 
+    /** Invite / reset / suspend the customer's self-service portal access (M15). */
+    public function managePortal(User $user, Buyer $buyer): bool
+    {
+        return $user->can(Permission::BuyersPortal->value);
+    }
+
     public function delete(User $user, Buyer $buyer): bool
     {
         return $user->can(Permission::BuyersDelete->value) && ! $buyer->hasBusinessDependents();

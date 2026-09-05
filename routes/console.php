@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Jobs\ExpireDocumentsJob;
 use App\Jobs\ExpirePlotHoldsJob;
+use App\Jobs\MarkMissedFollowUpsJob;
 use App\Jobs\RefreshCollectionQueueJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -22,6 +23,10 @@ Artisan::command('inspire', function () {
 | jobs are registered by their modules.
 */
 Schedule::command('queue:prune-batches --hours=48')->daily();
+
+// Housekeeping (M12): drop resolved failed-job rows after a week so the table
+// stays small. Operators still see a week of failures for triage.
+Schedule::command('queue:prune-failed --hours=168')->daily();
 
 Schedule::call(fn () => logger()->info('scheduler heartbeat'))
     ->everyFifteenMinutes()
@@ -46,4 +51,10 @@ Schedule::job(new RefreshCollectionQueueJob)
 Schedule::job(new ExpireDocumentsJob)
     ->dailyAt('02:00')
     ->name('expire-documents')
+    ->withoutOverlapping();
+
+// M13.1: flip overdue PENDING follow-ups to MISSED. Idempotent + unique.
+Schedule::job(new MarkMissedFollowUpsJob)
+    ->hourly()
+    ->name('mark-missed-follow-ups')
     ->withoutOverlapping();

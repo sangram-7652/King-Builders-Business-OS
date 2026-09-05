@@ -34,6 +34,18 @@ trait ManagesDocumentSlots
 
     abstract protected function documentable(): Model;
 
+    /**
+     * Hook for the concrete component to record its own domain audit event
+     * after a document slot changes. Default: no-op (the M9 pipeline already
+     * writes its own document_activities row + Log line).
+     *
+     * @param  'uploaded'|'verified'|'rejected'|'deleted'  $event
+     */
+    protected function afterDocumentMutation(string $event, ?Document $document = null): void
+    {
+        // Overridden by e.g. Partners\PartnerDocuments to append a partner_activity.
+    }
+
     protected function uploadRules(): array
     {
         return [
@@ -59,8 +71,9 @@ trait ManagesDocumentSlots
         $this->authorize('upload', $probe->exists ? $probe : $probe->fill(['status' => 'pending']));
 
         try {
-            app(UploadDocumentAction::class)->handle($documentable, $type, $file, auth()->user());
+            $document = app(UploadDocumentAction::class)->handle($documentable, $type, $file, auth()->user());
             unset($this->files[$documentTypeId]);
+            $this->afterDocumentMutation('uploaded', $document);
             $this->dispatch('toast', message: "{$type->name} uploaded.", variant: 'success');
         } catch (DomainException $e) {
             $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
@@ -87,6 +100,7 @@ trait ManagesDocumentSlots
 
         try {
             app(VerifyDocumentAction::class)->handle($document, auth()->user());
+            $this->afterDocumentMutation('verified', $document);
             $this->dispatch('toast', message: 'Document verified.', variant: 'success');
         } catch (DomainException $e) {
             $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
@@ -107,6 +121,7 @@ trait ManagesDocumentSlots
 
         try {
             app(RejectDocumentAction::class)->handle($document, $this->rejectReason, auth()->user());
+            $this->afterDocumentMutation('rejected', $document);
             $this->reset('rejectingId', 'rejectReason');
             $this->dispatch('toast', message: 'Document rejected.', variant: 'success');
         } catch (DomainException $e) {

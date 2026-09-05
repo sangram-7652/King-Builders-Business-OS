@@ -35,6 +35,13 @@ class DocumentTypeSeeder extends Seeder
             ['code' => 'TRANSFER_APPLICATION', 'name' => 'Transfer Application', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'TRANSFER_CONSENT', 'name' => 'Transfer Consent', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'TRANSFER_ID_PROOF', 'name' => 'Transfer ID Proof', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
+            // Channel partner KYC (M14)
+            ['code' => 'PARTNER_PAN', 'name' => 'Partner PAN Card', 'applies_to' => DocumentScope::Partner, 'default_required' => true, 'supports_expiry' => false],
+            ['code' => 'PARTNER_ADDRESS_PROOF', 'name' => 'Partner Address Proof', 'applies_to' => DocumentScope::Partner, 'default_required' => true, 'supports_expiry' => true],
+            ['code' => 'PARTNER_BANK_PROOF', 'name' => 'Partner Bank Proof / Cancelled Cheque', 'applies_to' => DocumentScope::Partner, 'default_required' => true, 'supports_expiry' => false],
+            ['code' => 'PARTNER_AGREEMENT', 'name' => 'Channel Partner Agreement', 'applies_to' => DocumentScope::Partner, 'default_required' => true, 'supports_expiry' => true],
+            ['code' => 'PARTNER_RERA_CERTIFICATE', 'name' => 'Partner RERA Certificate', 'applies_to' => DocumentScope::Partner, 'default_required' => false, 'supports_expiry' => true],
+            ['code' => 'PARTNER_GST_CERTIFICATE', 'name' => 'Partner Registration Certificate', 'applies_to' => DocumentScope::Partner, 'default_required' => false, 'supports_expiry' => false],
         ];
 
         foreach ($rows as $i => $row) {

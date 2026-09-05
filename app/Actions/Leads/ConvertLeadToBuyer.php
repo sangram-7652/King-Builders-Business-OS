@@ -46,8 +46,8 @@ class ConvertLeadToBuyer
                 return $locked->buyer()->firstOrFail();
             }
 
-            if ($locked->status !== LeadStatus::Qualified) {
-                throw new DomainException('Only a qualified lead can be converted.');
+            if (! $locked->status->canBeConverted()) {
+                throw new DomainException('Only a qualified or booking-pending lead can be converted.');
             }
 
             if ($existingBuyerId !== null) {

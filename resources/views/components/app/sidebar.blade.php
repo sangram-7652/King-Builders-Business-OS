@@ -9,6 +9,7 @@
     $primaryNav = array_values(array_filter([
         ['label' => 'Dashboard', 'route' => 'dashboard', 'params' => [], 'icon' => 'home', 'can' => true],
         ['label' => 'Leads', 'route' => 'leads.index', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::LeadsView->value)],
+        ['label' => 'Follow-ups', 'route' => 'follow-ups.index', 'params' => [], 'icon' => 'clock', 'can' => (bool) $user?->can(Permission::FollowUpsView->value)],
         ['label' => 'Buyers', 'route' => 'buyers.index', 'params' => [], 'icon' => 'user', 'can' => (bool) $user?->can(Permission::BuyersView->value)],
         ['label' => 'Bookings', 'route' => 'bookings.index', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::BookingsView->value)],
         ['label' => 'Finance', 'route' => 'finance.dashboard', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::PaymentsView->value)],
@@ -18,10 +19,24 @@
         ['label' => 'Possession', 'route' => 'possession.dashboard', 'params' => [], 'icon' => 'building', 'can' => (bool) $user?->can(Permission::PossessionView->value)],
         ['label' => 'Transfers', 'route' => 'transfers.dashboard', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::TransferView->value)],
         ['label' => 'Projects', 'route' => 'projects.index', 'params' => [], 'icon' => 'building', 'can' => (bool) $user?->can(Permission::ProjectsView->value)],
+        ['label' => 'Channel Partners', 'route' => 'partners.index', 'params' => [], 'icon' => 'user', 'can' => (bool) $user?->can(Permission::PartnersView->value)],
+        ['label' => 'Commissions', 'route' => 'commissions.index', 'params' => [], 'icon' => 'layers', 'can' => (bool) $user?->can(Permission::CommissionView->value)],
+        ['label' => 'Commission Schemes', 'route' => 'commission-schemes.index', 'params' => [], 'icon' => 'layers', 'can' => (bool) $user?->can(Permission::CommissionSchemesView->value)],
     ], fn ($item) => $item['can']));
 
+    // --- Reports (M11) --------------------------------------------------
+    $canReports = (bool) $user?->can(Permission::ReportsView->value);
+    $reportNav = $canReports ? [
+        ['label' => 'Overview', 'route' => 'reports.overview'],
+        ['label' => 'Sales', 'route' => 'reports.sales'],
+        ['label' => 'Inventory', 'route' => 'reports.inventory'],
+        ['label' => 'Collections', 'route' => 'reports.collections'],
+        ['label' => 'Leads', 'route' => 'reports.leads'],
+        ['label' => 'MIS', 'route' => 'reports.mis'],
+    ] : [];
+
     // Modules that are live now — excluded from the "coming soon" roadmap list.
-    $liveModules = ['projects', 'plots', 'leads', 'buyers', 'bookings', 'pricing', 'payments', 'payment_plans', 'receipts', 'collections', 'promises', 'cheques', 'penalties', 'documents', 'agreements', 'registry', 'registry_expenses', 'handover', 'possession', 'transfer', 'ownership'];
+    $liveModules = ['projects', 'plots', 'leads', 'follow_ups', 'buyers', 'bookings', 'pricing', 'payments', 'payment_plans', 'receipts', 'collections', 'promises', 'cheques', 'penalties', 'documents', 'agreements', 'registry', 'registry_expenses', 'handover', 'possession', 'transfer', 'ownership', 'reports', 'partners', 'commission_schemes', 'commission'];
 
     // --- Administration ---------------------------------------------------
     $adminNav = array_values(array_filter([
@@ -82,6 +97,27 @@
                 </li>
             @endforeach
         </ul>
+
+        @if ($reportNav !== [])
+            <div x-data="{ open: {{ request()->routeIs('reports.*') ? 'true' : 'false' }} }">
+                <p class="px-3 text-xs font-semibold uppercase tracking-wider text-(--content-muted)/70">Reports</p>
+                <button type="button" @click="open = ! open"
+                    class="{{ $linkClasses(false) }} mt-1 w-full">
+                    <x-app.icon name="layers" class="size-5" />
+                    <span class="flex-1 text-left">Reports</span>
+                    <x-app.icon name="chevron-down" class="size-4 transition" ::class="open && 'rotate-180'" />
+                </button>
+                <div x-show="open" x-collapse class="mt-1 space-y-0.5 pl-3">
+                    @foreach ($reportNav as $item)
+                        @php $active = request()->routeIs($item['route']); @endphp
+                        <a href="{{ route($item['route']) }}"
+                           class="block rounded-lg px-3 py-1.5 {{ $active ? 'bg-(--brand-primary)/10 font-medium text-(--brand-primary)' : 'text-(--content-muted) hover:bg-(--surface-muted) hover:text-(--content)' }}">
+                            {{ $item['label'] }}
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        @endif
 
         @if ($adminNav !== [])
             <div>
