@@ -28,6 +28,8 @@ legacy PHP real-estate CRM.
 > nominee foundation, and customer / plot 360 views (M10).
 >
 > Seeded super admin: `super@kingbuilders.test` / `password`.
+> New to the system? Start with [`docs/USER-GUIDE.md`](docs/USER-GUIDE.md) —
+> roles, workflows, and "how do I…" in plain language.
 > See [`docs/RBAC.md`](docs/RBAC.md), [`docs/MASTER-DATA.md`](docs/MASTER-DATA.md),
 > [`docs/PROJECTS.md`](docs/PROJECTS.md), [`docs/PLOTS.md`](docs/PLOTS.md),
 > [`docs/LEADS-BUYERS.md`](docs/LEADS-BUYERS.md),
