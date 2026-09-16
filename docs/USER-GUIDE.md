@@ -93,7 +93,51 @@ payment/document eligibility checks pass, and possession/handover checks
 outstanding dues and clearances first. The system enforces this instead of
 relying on someone remembering the checklist.
 
-## 5. Module-by-module walkthrough
+## 5. How to create a project
+
+A **Project** is a development/site (e.g. "Madhav Kunj") — the top of the
+`Project → Block → Plot` hierarchy. You need `projects.create` permission
+(Admin and Sales Manager have it by default).
+
+1. Go to **Projects** in the sidebar, then click **New Project**
+   (`/projects/create`).
+2. **Basics**
+   - **Name** — required, e.g. `Madhav Kunj`.
+   - **Code** — required, unique, letters/numbers/hyphens only (e.g. `MK`).
+     This is the short code used elsewhere in the system, so pick something
+     stable — it can be edited later but stays unique.
+   - **Description** — optional.
+   - **Launch date** — optional.
+3. **Location**
+   - **State** — required. Pick this first.
+   - **City** — optional, and its list only loads *after* a state is
+     selected (it's filtered to that state).
+   - **Address**, **Pincode**, **Latitude/Longitude** — all optional.
+   - States and cities come from **Master Data** — if the state/city you
+     need isn't in the dropdown, it has to be added there first
+     (Settings → Master Data → States/Cities).
+4. **Primary contact** — optional contact name/phone/email for the site.
+5. **Imagery** — optional logo/cover image path or URL (there's no file
+   uploader for this yet — paste a path/URL).
+6. Click **Create project**. A new project always starts in **Planning**
+   status — you can't set the initial status yourself.
+
+**Right after creating it**, from the project's page you'll typically:
+
+- **Add Blocks** — go to the project's **Blocks** tab and create at least
+  one block (name + unique code within the project, e.g. Block A). Plots
+  are always created under a block, so this is usually the next step.
+- **Move it to Active** — use **Change status** on the project page once
+  it's ready to sell from. The allowed moves are
+  `Planning → Active/OnHold`, `Active → OnHold/Completed`,
+  `OnHold → Active/Closed`, `Completed → Closed` — you can't skip a status
+  or reopen a Closed project from the UI.
+- **Add plot inventory** — once at least one block exists, create plots
+  under it (Plots is its own module, M4 — see [`docs/PLOTS.md`](PLOTS.md)).
+
+→ Full technical detail: [`docs/PROJECTS.md`](PROJECTS.md)
+
+## 6. Module-by-module walkthrough
 
 ### Dashboard (`/dashboard`)
 Landing page after login. Summarizes what's relevant to your role.
@@ -198,7 +242,7 @@ read-mostly view scoped to that one buyer's own records.
   master modules rather than a bespoke CRUD per list.
   → [`docs/MASTER-DATA.md`](MASTER-DATA.md)
 
-## 6. Quick reference — "how do I…"
+## 7. Quick reference — "how do I…"
 
 | Task | Where |
 |---|---|
@@ -217,7 +261,7 @@ read-mostly view scoped to that one buyer's own records.
 | Add/edit a dropdown list (states, charge types, …) | Settings → Master Data |
 | Give someone access to a screen | Administration → Users (assign role) or Roles & Permissions (edit what a role can do) |
 
-## 7. Where to go deeper
+## 8. Where to go deeper
 
 Every module above has a matching technical doc under `docs/` describing
 the actual data model, invariants, and Actions/state machines enforcing
