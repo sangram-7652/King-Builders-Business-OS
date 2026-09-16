@@ -95,6 +95,11 @@
                                                 :href="route('plots.edit', ['project' => $project->id, 'block' => $block->id, 'plot' => $plot->id])"
                                                 wire:navigate>Edit</x-ui.button>
                                         @endcan
+                                        @can('delete', $plot)
+                                            <x-ui.button variant="ghost" size="sm" class="text-red-600"
+                                                wire:click="delete({{ $plot->id }})"
+                                                wire:confirm="Delete plot {{ $plot->plot_number }}? An administrator can restore it.">Delete</x-ui.button>
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>

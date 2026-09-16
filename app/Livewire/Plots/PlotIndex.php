@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Plots;
 
+use App\Actions\Plots\DeletePlot;
 use App\Actions\Plots\HoldPlotAction;
 use App\Actions\Plots\ReleasePlotHoldAction;
 use App\Actions\Plots\TogglePlotActive;
@@ -170,6 +171,21 @@ class PlotIndex extends Component
         try {
             $updated = app(TogglePlotActive::class)->handle($model);
             $this->dispatch('toast', message: $updated->is_active ? 'Plot activated.' : 'Plot archived.', variant: 'success');
+        } catch (DomainException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
+        }
+
+        unset($this->counts);
+    }
+
+    public function delete(int $plot): void
+    {
+        $model = $this->plotOrFail($plot);
+        $this->authorize('delete', $model);
+
+        try {
+            app(DeletePlot::class)->handle($model);
+            $this->dispatch('toast', message: 'Plot deleted.', variant: 'success');
         } catch (DomainException $e) {
             $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
         }
