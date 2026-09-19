@@ -9,6 +9,7 @@ use App\Enums\CommissionCaseStatus;
 use App\Exceptions\DomainException;
 use App\Models\CommissionCase;
 use App\Models\User;
+use App\Services\Commission\PromoterLedgerService;
 use App\Support\Concerns\RunsInTransaction;
 use Illuminate\Support\Facades\Log;
 
@@ -20,11 +21,18 @@ use Illuminate\Support\Facades\Log;
  * `clawback_amount` is set to whatever was already paid out — the amount to be
  * recovered from the partner operationally. Recorded payouts are left as the
  * historical record (not voided); the partner statement (M14.6) nets the
- * clawback. This is NOT an accounting reversal.
+ * clawback. This is NOT an accounting reversal for the payout side.
+ *
+ * The promoter's advance IS restored, however: if this case had consumed part
+ * of the promoter's advance, that consumption is compensated through a
+ * dedicated reversal ledger entry (never silently) — see
+ * {@see PromoterLedgerService::reverseCaseAdjustment()}.
  */
 class ReverseCommissionCase
 {
     use RunsInTransaction;
+
+    public function __construct(private readonly PromoterLedgerService $ledger) {}
 
     public function handle(CommissionCase $case, User $actor, string $reason): CommissionCase
     {
@@ -46,6 +54,8 @@ class ReverseCommissionCase
             }
 
             $clawback = bcadd((string) $locked->paid_amount, '0', 2);
+
+            $this->ledger->reverseCaseAdjustment($locked, $actor, "Commission reversed — {$reason}");
 
             $locked->forceFill([
                 'status' => CommissionCaseStatus::Reversed,

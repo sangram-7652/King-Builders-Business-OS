@@ -11,6 +11,7 @@ use App\Enums\CommissionPayoutStatus;
 use App\Exceptions\DomainException;
 use App\Models\CommissionPayout;
 use App\Models\User;
+use App\Services\Commission\PromoterLedgerService;
 use App\Support\Concerns\RunsInTransaction;
 use Illuminate\Support\Facades\Log;
 
@@ -24,6 +25,8 @@ class VoidCommissionPayout
 {
     use RunsInTransaction;
     use SyncsCommissionPayment;
+
+    public function __construct(private readonly PromoterLedgerService $ledger) {}
 
     public function handle(CommissionPayout $payout, User $actor, string $reason): CommissionPayout
     {
@@ -54,6 +57,7 @@ class VoidCommissionPayout
             ])->save();
 
             $this->syncPaidAmount($case, $actor);
+            $this->ledger->mirrorPayoutVoided($case, $locked, $actor);
 
             $case->recordEvent(
                 CommissionCaseEventType::PayoutVoided,

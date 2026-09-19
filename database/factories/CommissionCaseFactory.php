@@ -30,6 +30,8 @@ class CommissionCaseFactory extends Factory
             'eligibility_reason' => 'Eligible.',
             'eligibility_checked_at' => now(),
             'commission_amount' => 0,
+            'advance_adjusted_amount' => 0,
+            'payable_amount' => 0,
             'paid_amount' => 0,
             'generated_at' => now(),
         ];

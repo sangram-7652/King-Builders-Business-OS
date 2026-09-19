@@ -140,33 +140,22 @@ class Booking extends Model
         return $this->hasMany(BookingPriceLine::class)->orderBy('sort_order')->orderBy('id');
     }
 
-    /** The current channel-partner split (M14.2) — shares total 100%. @return HasMany<BookingPartnerAttribution, $this> */
+    /** The booking's current active promoter attribution row, if any (one promoter maximum per booking). @return HasMany<BookingPartnerAttribution, $this> */
     public function partnerAttributions(): HasMany
     {
-        return $this->hasMany(BookingPartnerAttribution::class)->where('status', 'active')
-            ->orderByDesc('role')->orderByDesc('share_percentage')->orderBy('id');
+        return $this->hasMany(BookingPartnerAttribution::class)->where('status', 'active')->orderBy('id');
     }
 
-    /** Every attribution row ever written for this booking, newest first. @return HasMany<BookingPartnerAttribution, $this> */
+    /** Same as {@see partnerAttributions()} but as a single row — the natural accessor now that a booking has at most one promoter. @return HasOne<BookingPartnerAttribution, $this> */
+    public function promoterAttribution(): HasOne
+    {
+        return $this->hasOne(BookingPartnerAttribution::class)->where('status', 'active');
+    }
+
+    /** Every attribution row ever written for this booking (promoter history), newest first. @return HasMany<BookingPartnerAttribution, $this> */
     public function partnerAttributionHistory(): HasMany
     {
         return $this->hasMany(BookingPartnerAttribution::class)->orderByDesc('revision')->orderBy('id');
-    }
-
-    /** The primary partner's current attribution row, if any. @return HasOne<BookingPartnerAttribution, $this> */
-    public function primaryPartnerAttribution(): HasOne
-    {
-        return $this->hasOne(BookingPartnerAttribution::class)
-            ->where('status', 'active')->where('role', 'primary');
-    }
-
-    /** Partners on the current split. @return BelongsToMany<Partner, $this> */
-    public function partners(): BelongsToMany
-    {
-        return $this->belongsToMany(Partner::class, 'booking_partner_attributions')
-            ->wherePivot('status', 'active')
-            ->withPivot(['share_percentage', 'role', 'revision'])
-            ->withTimestamps();
     }
 
     /** Commission cases for this booking (M14.4). @return HasMany<\App\Models\CommissionCase, $this> */

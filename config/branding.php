@@ -23,6 +23,12 @@ return [
     // default — the receipt only prints the QR block when this is set.
     'qr_path' => env('BRAND_QR_PATH'),
 
+    // Authorised-signatory stamp + handwritten signature images printed on
+    // receipts, above the "(AUTHORISED SIGNATORY)" line. Relative to
+    // public/, same convention as logo_path. Left empty by default.
+    'stamp_path' => env('BRAND_STAMP_PATH'),
+    'signature_path' => env('BRAND_SIGNATURE_PATH'),
+
     // Any CSS colour value (hex, rgb, hsl, color-mix, ...).
     'colors' => [
         'primary' => env('BRAND_PRIMARY', '#2563eb'),

@@ -11,12 +11,12 @@ use App\Services\Payments\PaymentLedger;
 use App\Support\Money;
 
 /**
- * Decides whether a commission case may be generated for a (booking, partner)
+ * Decides whether a commission case may be generated for a (booking, promoter)
  * pair (M14.4). Read-only — consumes M6 / M7 truth, never mutates anything.
  *
  * Rules:
  *   - the booking must be CONFIRMED (M6 lifecycle)
- *   - a PUBLISHED commission scheme + rule must resolve for the partner
+ *   - the promoter must have a commission rate configured and be in an open status
  *   - config `commission.eligibility.min_collected_percent` — the booking must
  *     have collected at least this % of its value before commission is earned
  *     (default 0 = earned at confirmation)
@@ -25,10 +25,7 @@ use App\Support\Money;
  */
 class CommissionEligibilityService
 {
-    public function __construct(
-        private readonly CommissionSchemeResolver $schemes,
-        private readonly PaymentLedger $ledger,
-    ) {}
+    public function __construct(private readonly PaymentLedger $ledger) {}
 
     /**
      * @return array{eligible: bool, reason: string}
@@ -43,8 +40,8 @@ class CommissionEligibilityService
             return $this->fail("The partner is {$partner->status->label()}.");
         }
 
-        if ($this->schemes->resolveRule($partner, $booking->project_id) === null) {
-            return $this->fail('No published commission scheme resolves for this partner.');
+        if ($partner->commission_percentage === null || bccomp((string) $partner->commission_percentage, '0', 2) <= 0) {
+            return $this->fail('This promoter has no commission % configured.');
         }
 
         if (($shortfall = $this->collectionShortfallReason($booking)) !== null) {

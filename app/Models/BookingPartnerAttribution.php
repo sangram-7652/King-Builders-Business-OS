@@ -4,22 +4,20 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\BookingAttributionRole;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * One partner's share of a booking (M14.2). The `active` rows for a booking are
- * the current split (shares total 100.00, one primary); `superseded` rows are
- * previous splits kept for history and commission-snapshot reproducibility.
- *
- * @property BookingAttributionRole $role
+ * A booking's promoter attribution (one promoter maximum per booking). The
+ * `active` row (at most one per booking) is the current promoter; `superseded`
+ * rows are previous attributions kept for history and commission-snapshot
+ * reproducibility.
  */
 class BookingPartnerAttribution extends Model
 {
     protected $fillable = [
-        'booking_id', 'partner_id', 'share_percentage', 'role', 'status', 'revision',
+        'booking_id', 'partner_id', 'status', 'revision',
         'attributed_by', 'attributed_at', 'ended_at', 'reason', 'notes',
     ];
 
@@ -28,8 +26,6 @@ class BookingPartnerAttribution extends Model
         return [
             'booking_id' => 'integer',
             'partner_id' => 'integer',
-            'share_percentage' => 'decimal:2',
-            'role' => BookingAttributionRole::class,
             'revision' => 'integer',
             'attributed_by' => 'integer',
             'attributed_at' => 'datetime',
@@ -64,10 +60,5 @@ class BookingPartnerAttribution extends Model
     public function isActive(): bool
     {
         return $this->status === 'active';
-    }
-
-    public function isPrimary(): bool
-    {
-        return $this->role === BookingAttributionRole::Primary;
     }
 }

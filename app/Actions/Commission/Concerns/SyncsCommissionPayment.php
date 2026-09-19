@@ -13,6 +13,9 @@ use App\Models\User;
  * Recomputes a case's `paid_amount` from its non-voided payouts and moves the
  * status between APPROVED / PARTIALLY_PAID / PAID accordingly (M14.5). Never
  * touches a CANCELLED / REVERSED / ON_HOLD case's status.
+ *
+ * "Fully paid" is measured against the PAYABLE amount (gross minus whatever
+ * the promoter's advance already absorbed), never the gross commission.
  */
 trait SyncsCommissionPayment
 {
@@ -20,7 +23,7 @@ trait SyncsCommissionPayment
     {
         $paid = (string) $case->recordedPayouts()->sum('amount');
         $paid = bcadd($paid, '0', 2);
-        $total = bcadd((string) $case->commission_amount, '0', 2);
+        $total = bcadd((string) $case->payable_amount, '0', 2);
 
         $case->forceFill(['paid_amount' => $paid])->save();
 

@@ -57,6 +57,7 @@ class CalculateBookingPriceAction
                 'plc_type_id' => $line->plc_type_id,
                 'charge_type_id' => $line->charge_type_id,
                 'tax_rate_id' => $line->tax_rate_id,
+                'metadata' => $line->metadata ?? [],
             ])
             ->values()
             ->all();

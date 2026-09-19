@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace App\Livewire\Partners;
 
-use App\Actions\Commission\AssignCommissionSchemeToPartner;
 use App\Actions\Partners\AuthorizePartnerForProjectAction;
 use App\Actions\Partners\ChangePartnerStatusAction;
 use App\Actions\Partners\RevokePartnerProjectAuthorizationAction;
 use App\Enums\PartnerStatus;
+use App\Enums\PromoterLedgerEntryType;
 use App\Exceptions\DomainException;
-use App\Models\CommissionScheme;
 use App\Models\Partner;
 use App\Models\PartnerProjectAuthorization;
 use App\Models\Project;
+use App\Services\Commission\PromoterLedgerService;
 use App\Services\Documents\DocumentChecklistService;
+use App\Support\Money;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -26,15 +27,20 @@ class PartnerShow extends Component
 
     public string $authorizeProjectId = '';
 
-    public string $schemeCode = '';
-
     public bool $revealSensitive = false;
+
+    public string $advanceAmount = '';
+
+    public string $advanceNote = '';
+
+    public string $refundAmount = '';
+
+    public string $refundReason = '';
 
     public function mount(Partner $partner): void
     {
         $this->authorize('view', $partner);
         $this->partner = $partner;
-        $this->schemeCode = (string) ($partner->commission_scheme_code ?? '');
     }
 
     private function refresh(): void
@@ -106,17 +112,109 @@ class PartnerShow extends Component
         $this->revealSensitive = ! $this->revealSensitive;
     }
 
-    public function assignScheme(): void
+    /** "Add Advance" (§11) — a fresh ledger transaction; the original advance row is never edited. */
+    public function giveAdvance(): void
     {
-        $this->authorize('assignToPartner', CommissionScheme::class);
+        $this->authorize('update', $this->partner);
+        $this->validate([
+            'advanceAmount' => ['required', 'numeric', 'gt:0'],
+            'advanceNote' => ['nullable', 'string', 'max:500'],
+        ]);
 
         try {
-            app(AssignCommissionSchemeToPartner::class)->handle($this->partner, $this->schemeCode ?: null, auth()->user());
+            app(PromoterLedgerService::class)->giveAdvance(
+                $this->partner,
+                Money::of($this->advanceAmount),
+                $this->advanceNote !== '' ? $this->advanceNote : 'Advance given.',
+                auth()->user(),
+            );
+            $this->reset('advanceAmount', 'advanceNote');
             $this->refresh();
-            $this->dispatch('toast', message: 'Commission scheme updated.', variant: 'success');
+            $this->dispatch('toast', message: 'Advance recorded.', variant: 'success');
         } catch (DomainException $e) {
             $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
         }
+    }
+
+    /** A simple, controlled advance refund / adjustment (§12) — never exceeds the current balance. */
+    public function refundAdvance(): void
+    {
+        $this->authorize('update', $this->partner);
+        $this->validate([
+            'refundAmount' => ['required', 'numeric', 'gt:0'],
+            'refundReason' => ['required', 'string', 'max:500'],
+        ]);
+
+        try {
+            app(PromoterLedgerService::class)->refundAdvance(
+                $this->partner,
+                Money::of($this->refundAmount),
+                $this->refundReason,
+                auth()->user(),
+            );
+            $this->reset('refundAmount', 'refundReason');
+            $this->refresh();
+            $this->dispatch('toast', message: 'Advance adjustment recorded.', variant: 'success');
+        } catch (DomainException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
+        }
+    }
+
+    /**
+     * The Promoter detail dashboard figures (§6) — everything except the
+     * advance balance is a straightforward sum; the balance itself is always
+     * derived from the ledger (see {@see PromoterLedgerService::advanceBalance()}).
+     *
+     * @return array<string, Money>
+     */
+    private function promoterStats(Partner $partner): array
+    {
+        $openCases = $partner->commissionCases()->with('booking:id,final_amount')->get()
+            ->filter(fn ($c) => $c->status->isOpen());
+
+        $totalBookingValue = $openCases->reduce(
+            fn (Money $sum, $c) => $sum->plus(Money::of((string) ($c->booking->final_amount ?? '0'))),
+            Money::zero(),
+        );
+        $totalCommissionEarned = $openCases->reduce(
+            fn (Money $sum, $c) => $sum->plus(Money::of((string) $c->commission_amount)),
+            Money::zero(),
+        );
+        $totalCommissionPayable = $openCases->reduce(
+            fn (Money $sum, $c) => $sum->plus(Money::of($c->outstandingAmount())),
+            Money::zero(),
+        );
+        $totalCommissionPaid = Money::of((string) $partner->commissionCases()->sum('paid_amount'));
+
+        $advanceGiven = Money::zero();
+        $advanceRefunded = Money::zero();
+        $advanceAdjusted = Money::zero();
+        $advanceAdjustedReversed = Money::zero();
+
+        foreach ($partner->ledgerEntries as $entry) {
+            match ($entry->type) {
+                PromoterLedgerEntryType::AdvanceGiven
+                    => $advanceGiven = $advanceGiven->plus(Money::of((string) $entry->advance_amount)),
+                PromoterLedgerEntryType::AdvanceRefunded
+                    => $advanceRefunded = $advanceRefunded->plus(Money::of((string) $entry->advance_amount)),
+                PromoterLedgerEntryType::Commission
+                    => $advanceAdjusted = $advanceAdjusted->plus(Money::of((string) ($entry->adjustment_amount ?? '0'))),
+                PromoterLedgerEntryType::AdvanceAdjustmentReversed
+                    => $advanceAdjustedReversed = $advanceAdjustedReversed->plus(Money::of((string) $entry->advance_amount)),
+                default => null,
+            };
+        }
+
+        return [
+            'totalBookingValue' => $totalBookingValue,
+            'totalCommissionEarned' => $totalCommissionEarned,
+            'totalAdvanceGiven' => $advanceGiven,
+            'totalAdvanceRefunded' => $advanceRefunded,
+            'totalAdvanceAdjusted' => $advanceAdjusted->minus($advanceAdjustedReversed),
+            'advanceBalance' => app(PromoterLedgerService::class)->advanceBalance($partner),
+            'totalCommissionPayable' => $totalCommissionPayable,
+            'totalCommissionPaid' => $totalCommissionPaid,
+        ];
     }
 
     public function render(): View
@@ -125,6 +223,7 @@ class PartnerShow extends Component
             'state', 'city', 'createdBy', 'approvedBy',
             'projectAuthorizations.project', 'projectAuthorizations.authorizedBy', 'projectAuthorizations.revokedBy',
             'activities.causer',
+            'ledgerEntries.createdBy', 'ledgerEntries.booking:id,booking_number',
         ])->loadCount(['bookingAttributions']);
 
         $recentBookings = $partner->bookingAttributions()
@@ -136,6 +235,7 @@ class PartnerShow extends Component
 
         return view('livewire.partners.partner-show', [
             'partner' => $partner,
+            'stats' => $this->promoterStats($partner),
             'recentBookings' => $recentBookings,
             'kyc' => app(DocumentChecklistService::class)->forPartner($partner),
             'allowedTransitions' => $partner->status->allowedTransitions(),
@@ -143,10 +243,6 @@ class PartnerShow extends Component
                 ? Project::query()->whereNotIn('id', $authorizedProjectIds)->orderBy('name')->pluck('name', 'id')
                 : collect(),
             'canRevealSensitive' => auth()->user()->can('viewSensitive', $partner),
-            'canAssignScheme' => auth()->user()->can('assignToPartner', CommissionScheme::class),
-            'publishedSchemes' => auth()->user()->can('assignToPartner', CommissionScheme::class)
-                ? CommissionScheme::query()->published()->orderBy('name')->get(['code', 'name'])->unique('code')
-                : collect(),
         ])->title($partner->displayName());
     }
 }

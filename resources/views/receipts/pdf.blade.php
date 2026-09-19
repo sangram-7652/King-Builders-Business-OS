@@ -9,6 +9,8 @@ $primary = $brand->colors['primary'];
 $money = fn ($v) => '₹'.number_format((float) $v, 2);
 $logoFile = $brand->logoPath ? public_path($brand->logoPath) : null;
 $qrFile = $brand->qrPath ? public_path($brand->qrPath) : null;
+$signatureFile = $brand->signaturePath ? public_path($brand->signaturePath) : null;
+$stampFile = $brand->stampPath ? public_path($brand->stampPath) : null;
 ?>
 <!DOCTYPE html>
 <html>
@@ -53,7 +55,9 @@ $qrFile = $brand->qrPath ? public_path($brand->qrPath) : null;
         .notes ol { margin: 4px 0 0 16px; padding: 0; }
         .notes li { margin-bottom: 4px; font-size: 9px; color: #333; text-align: justify; }
 
-        .sign { margin-top: 34px; text-align: right; }
+        .sign { margin-top: 0; text-align: right; }
+        .sign .stamp-img { height: 20px; width: auto; }
+        .sign .signature-img { height: 36px; width: auto; margin-top: -10px; margin-bottom: -8px; margin-right: 6px; }
         .sign .line { display: inline-block; border-top: 1px solid #111; padding-top: 4px; font-size: 10px; font-weight: bold; }
 
         .footer { margin-top: 18px; border-top: 2px solid {{ $primary }}; padding-top: 10px; font-size: 9.5px; color: #333; text-align: center; }
@@ -166,7 +170,7 @@ $qrFile = $brand->qrPath ? public_path($brand->qrPath) : null;
             <td class="lbl">Balance Amount</td>
             <td class="val">{{ isset($extra['balanceAmount']) ? $money($extra['balanceAmount']) : '—' }}</td>
             <td class="lbl">Remark</td>
-            <td class="val">{{ $payment->notes ?: '—' }}</td>
+            <td class="val">{{ $extra['discountRemark'] ?: ($payment->notes ?: '—') }}</td>
         </tr>
         <tr>
             <td class="lbl">Payment Mode</td>
@@ -200,6 +204,12 @@ $qrFile = $brand->qrPath ? public_path($brand->qrPath) : null;
     </div>
 
     <div class="sign">
+        @if ($stampFile && file_exists($stampFile))
+            <img class="stamp-img" src="{{ $stampFile }}"><br>
+        @endif
+        @if ($signatureFile && file_exists($signatureFile))
+            <img class="signature-img" src="{{ $signatureFile }}"><br>
+        @endif
         <div class="line">(AUTHORISED SIGNATORY)</div>
     </div>
 

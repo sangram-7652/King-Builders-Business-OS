@@ -16,7 +16,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 #[Layout('components.layouts.app')]
-#[Title('Channel Partners')]
+#[Title('Promoters')]
 class PartnerIndex extends Component
 {
     use WithPagination;

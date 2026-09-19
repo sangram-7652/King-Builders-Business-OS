@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <x-ui.breadcrumb :items="[
-        ['label' => 'Channel Partners', 'url' => route('partners.index')],
+        ['label' => 'Promoters', 'url' => route('partners.index')],
         ['label' => $partner->displayName(), 'url' => route('partners.show', $partner)],
         ['label' => 'KYC'],
     ]" />

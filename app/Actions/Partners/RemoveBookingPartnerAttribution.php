@@ -8,9 +8,9 @@ use App\Models\Booking;
 use App\Models\User;
 
 /**
- * Clears a booking's channel-partner attribution (M14.2) — marks it a direct
- * sale. Thin wrapper over {@see SetBookingPartnerAttribution} with an empty
- * split so the supersede-not-mutate history rules stay in one place.
+ * Clears a booking's promoter attribution (M14.2) — marks it a direct sale.
+ * Thin wrapper over {@see SetBookingPartnerAttribution} with no promoter so
+ * the supersede-not-mutate history rules stay in one place.
  */
 class RemoveBookingPartnerAttribution
 {
@@ -18,6 +18,6 @@ class RemoveBookingPartnerAttribution
 
     public function handle(Booking $booking, User $actor, ?string $reason = null): Booking
     {
-        return $this->set->handle($booking, [], $actor, $reason);
+        return $this->set->handle($booking, null, $actor, $reason);
     }
 }

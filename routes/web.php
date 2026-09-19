@@ -28,9 +28,6 @@ use App\Livewire\Buyers\BuyerIndex;
 use App\Livewire\Buyers\BuyerShow;
 use App\Livewire\Commission\CommissionCaseShow;
 use App\Livewire\Commission\CommissionIndex;
-use App\Livewire\Commission\CommissionSchemeForm;
-use App\Livewire\Commission\CommissionSchemeIndex;
-use App\Livewire\Commission\CommissionSchemeShow;
 use App\Livewire\Dashboard;
 use App\Livewire\Documents\DocumentDashboard;
 use App\Livewire\Masters\MasterDashboard;
@@ -282,25 +279,11 @@ Route::middleware(['auth:web', 'active'])->group(function (): void {
         ->whereNumber('partner')
         ->name('partners.show');
 
-    // --- Commission cases + schemes (M14.3–M14.5) ------------------
+    // --- Commission cases (M14.4–M14.5) — flat Promoter model, no schemes ---
     Route::get('/commissions', CommissionIndex::class)
         ->middleware('permission:'.Permission::CommissionView->value)
         ->name('commissions.index');
 
-    Route::get('/commissions/schemes/create', CommissionSchemeForm::class)
-        ->middleware('permission:'.Permission::CommissionSchemesManage->value)
-        ->name('commission-schemes.create');
-    Route::get('/commissions/schemes/{scheme}/edit', CommissionSchemeForm::class)
-        ->middleware('permission:'.Permission::CommissionSchemesManage->value)
-        ->whereNumber('scheme')
-        ->name('commission-schemes.edit');
-    Route::get('/commissions/schemes', CommissionSchemeIndex::class)
-        ->middleware('permission:'.Permission::CommissionSchemesView->value)
-        ->name('commission-schemes.index');
-    Route::get('/commissions/schemes/{scheme}', CommissionSchemeShow::class)
-        ->middleware('permission:'.Permission::CommissionSchemesView->value)
-        ->whereNumber('scheme')
-        ->name('commission-schemes.show');
     Route::get('/commissions/cases/{case}', CommissionCaseShow::class)
         ->middleware('permission:'.Permission::CommissionView->value)
         ->whereNumber('case')

@@ -155,11 +155,11 @@ class CommissionCaseShow extends Component
     {
         $case = $this->case->load([
             'booking:id,booking_number,status,final_amount,project_id',
-            'partner:id,name,company_name,partner_code',
-            'scheme:id,code,version,name',
+            'partner:id,name,company_name,partner_code,commission_percentage',
             'currentCalculation.calculatedBy',
             'calculations.calculatedBy',
             'payouts.recordedBy',
+            'ledgerEntries.createdBy',
             'approvedBy',
             'events.causer',
         ]);

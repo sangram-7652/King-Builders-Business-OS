@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 /*
 | ---------------------------------------------------------------------------
-| Channel partners + attribution (M14)
+| Promoters + booking attribution (M14)
 | ---------------------------------------------------------------------------
-| Business-rule toggles for the partner attribution engine. Config, not
-| hard-coded. Commission-scheme / calculation settings land in config/commission.php
-| in a later M14 phase.
+| Business-rule toggles for the booking → promoter attribution (one promoter
+| maximum per booking). Config, not hard-coded. Commission calculation
+| settings live in config/commission.php.
 */
 
 return [

@@ -13,6 +13,7 @@ use App\Models\Masters\City;
 use App\Models\Masters\State;
 use App\Support\Buyers\DuplicateFinder;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -119,7 +120,15 @@ class BuyerForm extends Component
             'last_name' => ['nullable', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:20', 'regex:/^[0-9+()\-\s]{6,20}$/'],
             'alternate_phone' => ['nullable', 'string', 'max:20'],
-            'email' => ['nullable', 'email', 'max:255'],
+            'email' => [
+                'nullable', 'email', 'max:255',
+                // Create only (F-BUY-1) — matches the buyers_email_canonical_unique
+                // constraint exactly: soft-deleted buyers never block re-use, since
+                // email_canonical is generated as NULL for them. Editing keeps its
+                // existing behaviour unchanged; see BuyerForm::save() for the
+                // defensive catch that still protects both paths from a raw 500.
+                ...($this->editing ? [] : [Rule::unique('buyers', 'email_canonical')]),
+            ],
             'date_of_birth' => ['nullable', 'date', 'before:today'],
             'gender' => ['nullable', Rule::enum(Gender::class)],
             'occupation' => ['nullable', 'string', 'max:255'],
@@ -148,6 +157,11 @@ class BuyerForm extends Component
 
     public function save()
     {
+        // Canonicalise before validating — the same trim+lowercase logic the
+        // `email` column mutator applies on save, so the uniqueness check
+        // above compares like-for-like with what actually gets stored.
+        $this->email = Buyer::normalizeEmail($this->email) ?? '';
+
         $data = $this->validate();
 
         if (! $this->canEditDocuments) {
@@ -160,6 +174,20 @@ class BuyerForm extends Component
                 : app(CreateBuyer::class)->handle($data, auth()->user());
         } catch (DomainException $e) {
             $this->addError('city_id', $e->getMessage());
+
+            return;
+        } catch (UniqueConstraintViolationException $e) {
+            // Defensive: two concurrent requests can both pass the pre-insert
+            // uniqueness check above; the database constraint is the final
+            // authority. Never let the raw SQLSTATE/query reach the user.
+            // Match on the column name, not the MySQL constraint name — SQLite
+            // (used in tests) reports "UNIQUE constraint failed: buyers.email_canonical"
+            // rather than the named-key format MySQL uses.
+            if (! str_contains($e->getMessage(), 'email_canonical')) {
+                throw $e;
+            }
+
+            $this->addError('email', 'The email has already been taken.');
 
             return;
         }

@@ -2,7 +2,7 @@
 
 <div class="space-y-6">
     <x-ui.page-header title="Commissions"
-        description="Every channel-partner commission case. Review, approve, record payouts and reverse from here." />
+        description="Every promoter commission case. Review, approve, record payouts and reverse from here." />
 
     <div class="grid gap-3 sm:grid-cols-4">
         @foreach (['pending_review' => 'Pending review', 'approved' => 'Approved', 'partially_paid' => 'Partially paid', 'paid' => 'Paid'] as $key => $label)
@@ -10,7 +10,7 @@
             <x-ui.card>
                 <p class="text-xs text-(--content-muted)">{{ $label }}</p>
                 <p class="mt-1 text-xl font-semibold tabular-nums">{{ $row->n ?? 0 }}</p>
-                <p class="text-xs text-(--content-muted) tabular-nums">₹{{ number_format((float) ($row->amount ?? 0), 0) }}</p>
+                <p class="text-xs text-(--content-muted) tabular-nums">₹{{ number_format((float) ($row->payable ?? 0), 0) }} payable</p>
             </x-ui.card>
         @endforeach
     </div>
@@ -28,9 +28,10 @@
                 <table class="min-w-full divide-y divide-(--border) text-sm">
                     <thead class="bg-(--surface-muted) text-left text-xs font-semibold uppercase tracking-wider text-(--content-muted)">
                         <tr>
-                            <th class="px-4 py-3">Case</th><th class="px-4 py-3">Partner</th>
-                            <th class="px-4 py-3">Booking</th><th class="px-4 py-3">Scheme</th>
-                            <th class="px-4 py-3 text-right">Commission</th><th class="px-4 py-3 text-right">Paid</th>
+                            <th class="px-4 py-3">Case</th><th class="px-4 py-3">Promoter</th>
+                            <th class="px-4 py-3">Booking</th>
+                            <th class="px-4 py-3 text-right">Gross</th>
+                            <th class="px-4 py-3 text-right">Payable</th><th class="px-4 py-3 text-right">Paid</th>
                             <th class="px-4 py-3">Status</th>
                         </tr>
                     </thead>
@@ -42,8 +43,8 @@
                                 </td>
                                 <td class="px-4 py-3">{{ $case->partner?->displayName() }}</td>
                                 <td class="px-4 py-3 text-(--content-muted)">{{ $case->booking?->booking_number }}</td>
-                                <td class="px-4 py-3 text-(--content-muted)">@if ($case->scheme){{ $case->scheme->code }} v{{ $case->scheme->version }}@else — @endif</td>
                                 <td class="px-4 py-3 text-right tabular-nums">₹{{ number_format((float) $case->commission_amount, 2) }}</td>
+                                <td class="px-4 py-3 text-right tabular-nums">₹{{ number_format((float) $case->payable_amount, 2) }}</td>
                                 <td class="px-4 py-3 text-right tabular-nums">₹{{ number_format((float) $case->paid_amount, 2) }}</td>
                                 <td class="px-4 py-3"><x-ui.badge :variant="$case->status->color()">{{ $case->status->label() }}</x-ui.badge></td>
                             </tr>

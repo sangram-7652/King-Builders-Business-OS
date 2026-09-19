@@ -12,7 +12,6 @@ use App\Livewire\Bookings\BookingCommission;
 use App\Livewire\Commission\CommissionCaseShow;
 use App\Models\Booking;
 use App\Models\CommissionCase;
-use App\Models\CommissionScheme;
 use App\Models\Partner;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -27,12 +26,9 @@ function generatedCommission(): array
 {
     $s = confirmedBookingScenario('5000000');
     $actor = User::factory()->create();
-    CommissionScheme::factory()->default()->published('2')->create();
-    $partner = Partner::factory()->active()->create();
+    $partner = Partner::factory()->active()->commission('2')->create();
     app(AuthorizePartnerForProjectAction::class)->handle($partner, $s['booking']->project, $actor);
-    app(SetBookingPartnerAttribution::class)->handle($s['booking'], [
-        ['partner_id' => $partner->id, 'share_percentage' => '100', 'role' => 'primary'],
-    ], $actor);
+    app(SetBookingPartnerAttribution::class)->handle($s['booking'], $partner->id, $actor);
     $case = app(GenerateCommissionCases::class)->handle($s['booking']->fresh(), $actor)->first();
 
     return ['booking' => $s['booking']->fresh(), 'case' => $case];

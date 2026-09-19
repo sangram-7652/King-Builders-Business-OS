@@ -1,7 +1,7 @@
 @php
     use App\Enums\CommissionCaseStatus;
     use App\Enums\CommissionPayoutStatus;
-    $calc = $case->currentCalculation; $snap = $calc?->snapshot ?? [];
+    $calc = $case->currentCalculation;
 @endphp
 
 <div class="space-y-6">
@@ -16,7 +16,7 @@
             <div class="flex flex-wrap items-center gap-2">
                 <x-ui.badge :variant="$case->status->color()">{{ $case->status->label() }}</x-ui.badge>
                 @can('recalculate', $case)
-                    <x-ui.button variant="secondary" size="sm" wire:click="recalculate" wire:confirm="Recalculate against the current scheme and figures?">Recalculate</x-ui.button>
+                    <x-ui.button variant="secondary" size="sm" wire:click="recalculate" wire:confirm="Recalculate against the current booking figures?">Recalculate</x-ui.button>
                 @endcan
                 @can('approve', $case)
                     <x-ui.button size="sm" wire:click="approve" wire:confirm="Approve this commission?">Approve</x-ui.button>
@@ -65,31 +65,15 @@
         <x-ui.card title="Commission" class="lg:col-span-2">
             @if ($calc)
                 <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-                    <div><dt class="text-(--content-muted)">Scheme</dt><dd>{{ $calc->scheme_code }} v{{ $calc->scheme_version }}</dd></div>
-                    <div><dt class="text-(--content-muted)">Basis</dt><dd>{{ $calc->basis->label() }} — ₹{{ number_format((float) $calc->basis_amount, 2) }}</dd></div>
-                    <div><dt class="text-(--content-muted)">Basis source</dt><dd class="text-xs">{{ data_get($snap, 'basis.source') }}</dd></div>
-                    <div><dt class="text-(--content-muted)">Rule</dt><dd>{{ $calc->calc_type->label() }}</dd></div>
-                    <div><dt class="text-(--content-muted)">Gross (scheme)</dt><dd class="tabular-nums">₹{{ number_format((float) $calc->gross_amount, 2) }}</dd></div>
-                    <div><dt class="text-(--content-muted)">Share</dt><dd class="tabular-nums">{{ rtrim(rtrim(number_format((float) $calc->share_percentage, 2), '0'), '.') }}%</dd></div>
+                    <div><dt class="text-(--content-muted)">Booking value</dt><dd>₹{{ number_format((float) $calc->basis_amount, 2) }}</dd></div>
+                    <div><dt class="text-(--content-muted)">Commission %</dt><dd>{{ $case->partner?->commissionRateLabel() ?? '—' }}</dd></div>
+                    <div><dt class="text-(--content-muted)">Gross commission</dt><dd class="tabular-nums">₹{{ number_format((float) $calc->commission_amount, 2) }}</dd></div>
+                    <div><dt class="text-(--content-muted)">Advance adjusted</dt><dd class="tabular-nums">₹{{ number_format((float) $calc->advance_adjusted_amount, 2) }}</dd></div>
                     <div class="sm:col-span-2 border-t border-(--border) pt-2">
-                        <dt class="text-(--content-muted)">Partner commission</dt>
-                        <dd class="text-lg font-semibold tabular-nums">₹{{ number_format((float) $calc->commission_amount, 2) }}</dd>
+                        <dt class="text-(--content-muted)">Net payable commission</dt>
+                        <dd class="text-lg font-semibold tabular-nums">₹{{ number_format((float) $calc->payable_amount, 2) }}</dd>
                     </div>
                 </dl>
-
-                @if (! empty(data_get($snap, 'computation.breakdown')))
-                    <table class="mt-4 min-w-full text-sm">
-                        <tbody>
-                            @foreach (data_get($snap, 'computation.breakdown') as $line)
-                                <tr>
-                                    <td class="py-1 pr-4">{{ $line['label'] }}</td>
-                                    <td class="py-1 pr-4 text-(--content-muted)">{{ $line['detail'] }}</td>
-                                    <td class="py-1 text-right tabular-nums">₹{{ number_format((float) $line['amount'], 2) }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                @endif
             @else
                 <x-ui.empty-state icon="layers" title="No calculation" description="{{ $case->eligibility_reason }}" />
             @endif
@@ -102,7 +86,9 @@
                 <div><dt class="text-(--content-muted)">Partner</dt>
                     <dd><a href="{{ route('partners.show', $case->partner_id) }}" wire:navigate class="text-(--brand-primary) hover:underline">{{ $case->partner?->displayName() }}</a></dd></div>
                 <div><dt class="text-(--content-muted)">Approved by</dt><dd>{{ $case->approvedBy?->name ?? '—' }} {{ $case->approved_at ? '· '.$case->approved_at->format('d M Y') : '' }}</dd></div>
-                <div><dt class="text-(--content-muted)">Commission</dt><dd class="tabular-nums">₹{{ number_format((float) $case->commission_amount, 2) }}</dd></div>
+                <div><dt class="text-(--content-muted)">Gross commission</dt><dd class="tabular-nums">₹{{ number_format((float) $case->commission_amount, 2) }}</dd></div>
+                <div><dt class="text-(--content-muted)">Advance adjusted</dt><dd class="tabular-nums">₹{{ number_format((float) $case->advance_adjusted_amount, 2) }}</dd></div>
+                <div><dt class="text-(--content-muted)">Payable</dt><dd class="tabular-nums">₹{{ number_format((float) $case->payable_amount, 2) }}</dd></div>
                 <div><dt class="text-(--content-muted)">Paid</dt><dd class="tabular-nums">₹{{ number_format((float) $case->paid_amount, 2) }}</dd></div>
                 <div><dt class="text-(--content-muted)">Outstanding</dt><dd class="tabular-nums font-medium">₹{{ number_format((float) $case->outstandingAmount(), 2) }}</dd></div>
             </dl>
@@ -168,16 +154,40 @@
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-(--border) text-sm">
                     <thead class="text-left text-xs font-semibold uppercase tracking-wider text-(--content-muted)">
-                        <tr><th class="py-2 pr-4">#</th><th class="py-2 pr-4">Scheme</th><th class="py-2 pr-4 text-right">Basis</th><th class="py-2 pr-4 text-right">Commission</th><th class="py-2 pr-4">When</th></tr>
+                        <tr><th class="py-2 pr-4">#</th><th class="py-2 pr-4 text-right">Booking value</th><th class="py-2 pr-4 text-right">Gross</th><th class="py-2 pr-4 text-right">Adjusted</th><th class="py-2 pr-4 text-right">Payable</th><th class="py-2 pr-4">When</th></tr>
                     </thead>
                     <tbody class="divide-y divide-(--border)">
                         @foreach ($case->calculations as $c)
                             <tr @class(['font-medium' => $c->id === $case->current_calculation_id])>
                                 <td class="py-2 pr-4 tabular-nums">{{ $c->sequence }}</td>
-                                <td class="py-2 pr-4">{{ $c->scheme_code }} v{{ $c->scheme_version }}</td>
                                 <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) $c->basis_amount, 2) }}</td>
                                 <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) $c->commission_amount, 2) }}</td>
+                                <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) $c->advance_adjusted_amount, 2) }}</td>
+                                <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) $c->payable_amount, 2) }}</td>
                                 <td class="py-2 pr-4">{{ $c->calculated_at->format('d M Y H:i') }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </x-ui.card>
+    @endif
+
+    @if ($case->ledgerEntries->isNotEmpty())
+        <x-ui.card title="Promoter Advance ledger footprint" subtitle="This case's advance movement history — never edited, only compensated.">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-(--border) text-sm">
+                    <thead class="text-left text-xs font-semibold uppercase tracking-wider text-(--content-muted)">
+                        <tr><th class="py-2 pr-4">Date</th><th class="py-2 pr-4">Type</th><th class="py-2 pr-4 text-right">Amount</th><th class="py-2 pr-4">Remark</th><th class="py-2 pr-4">By</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-(--border)">
+                        @foreach ($case->ledgerEntries as $entry)
+                            <tr wire:key="cle-{{ $entry->id }}" @class(['text-(--content-muted)' => $entry->reversed_at !== null])>
+                                <td class="py-2 pr-4">{{ $entry->created_at?->format('d M Y') }}</td>
+                                <td class="py-2 pr-4">{{ $entry->type->label() }} @if ($entry->reversed_at) <x-ui.badge variant="muted" size="sm">reversed</x-ui.badge> @endif</td>
+                                <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) ($entry->adjustment_amount ?? $entry->advance_amount ?? 0), 2) }}</td>
+                                <td class="py-2 pr-4">{{ $entry->description ?: '—' }}</td>
+                                <td class="py-2 pr-4">{{ $entry->createdBy?->name ?? 'System' }}</td>
                             </tr>
                         @endforeach
                     </tbody>

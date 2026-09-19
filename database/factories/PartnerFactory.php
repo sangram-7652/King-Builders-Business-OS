@@ -38,6 +38,7 @@ class PartnerFactory extends Factory
             'pincode' => fake()->optional()->numerify('######'),
             'pan_number' => null,
             'rera_number' => fake()->optional()->bothify('RERA/??/####/######'),
+            'commission_percentage' => null,
             'bank_account_name' => null,
             'bank_account_number' => null,
             'bank_ifsc' => null,
@@ -82,5 +83,10 @@ class PartnerFactory extends Factory
     public function withPan(): static
     {
         return $this->state(fn () => ['pan_number' => 'ABCDE'.fake()->numerify('####').'F']);
+    }
+
+    public function commission(string $percentage): static
+    {
+        return $this->state(fn () => ['commission_percentage' => $percentage]);
     }
 }

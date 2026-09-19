@@ -51,7 +51,7 @@ class ApproveCommissionCase
 
             $locked->recordEvent(
                 CommissionCaseEventType::Approved,
-                "Approved — ₹{$locked->commission_amount} payable to {$locked->partner?->displayName()}.",
+                "Approved — ₹{$locked->payable_amount} payable to {$locked->partner?->displayName()} (gross ₹{$locked->commission_amount}, advance-adjusted ₹{$locked->advance_adjusted_amount}).",
                 [],
                 $actor,
             );

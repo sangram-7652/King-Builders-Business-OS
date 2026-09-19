@@ -47,7 +47,7 @@ class CommissionIndex extends Component
     protected function query(): Builder
     {
         return CommissionCase::query()
-            ->with(['partner:id,name,company_name,partner_code', 'booking:id,booking_number', 'scheme:id,code,version'])
+            ->with(['partner:id,name,company_name,partner_code', 'booking:id,booking_number'])
             ->when($this->status !== '', fn (Builder $q) => $q->where('status', $this->status))
             ->when($this->partner !== '', fn (Builder $q) => $q->where('partner_id', (int) $this->partner))
             ->orderByDesc('id');
@@ -56,7 +56,7 @@ class CommissionIndex extends Component
     public function render(): View
     {
         $summary = CommissionCase::query()
-            ->selectRaw('status, count(*) as n, coalesce(sum(commission_amount),0) as amount, coalesce(sum(paid_amount),0) as paid')
+            ->selectRaw('status, count(*) as n, coalesce(sum(commission_amount),0) as amount, coalesce(sum(payable_amount),0) as payable, coalesce(sum(paid_amount),0) as paid')
             ->groupBy('status')
             ->get()
             ->keyBy('status');

@@ -58,7 +58,7 @@ class BookingCommission extends Component
     public function render(): View
     {
         $cases = $this->booking->commissionCases()
-            ->with(['partner:id,name,company_name,partner_code', 'currentCalculation', 'scheme:id,code,version'])
+            ->with(['partner:id,name,company_name,partner_code,commission_percentage', 'currentCalculation'])
             ->get();
 
         return view('livewire.bookings.booking-commission', [

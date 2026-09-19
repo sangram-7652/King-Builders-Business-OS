@@ -41,7 +41,7 @@ class Partner extends Model
         'name', 'company_name', 'contact_person',
         'phone', 'alternate_phone', 'email',
         'address', 'state_id', 'city_id', 'pincode',
-        'pan_number', 'rera_number', 'commission_scheme_code',
+        'pan_number', 'rera_number', 'commission_percentage',
         'bank_account_name', 'bank_account_number', 'bank_ifsc', 'bank_name',
         'notes',
         'onboarded_at', 'approved_at', 'approved_by',
@@ -61,6 +61,7 @@ class Partner extends Model
         return [
             'type' => PartnerType::class,
             'status' => PartnerStatus::class,
+            'commission_percentage' => 'decimal:2',
             'state_id' => 'integer',
             'city_id' => 'integer',
             'approved_by' => 'integer',
@@ -132,12 +133,12 @@ class Partner extends Model
         return $this->hasMany(BookingPartnerAttribution::class)->where('status', 'active')->latest('attributed_at');
     }
 
-    /** Bookings this partner currently shares. @return BelongsToMany<Booking, $this> */
+    /** Bookings this partner (promoter) is currently attributed to. @return BelongsToMany<Booking, $this> */
     public function bookings(): BelongsToMany
     {
         return $this->belongsToMany(Booking::class, 'booking_partner_attributions')
             ->wherePivot('status', 'active')
-            ->withPivot(['share_percentage', 'role', 'revision'])
+            ->withPivot(['revision'])
             ->withTimestamps();
     }
 
@@ -156,6 +157,12 @@ class Partner extends Model
         return $this->hasMany(CommissionCase::class)->latest('id');
     }
 
+    /** This promoter's full financial ledger (advance + commission history), oldest first. @return HasMany<PromoterLedgerEntry, $this> */
+    public function ledgerEntries(): HasMany
+    {
+        return $this->hasMany(PromoterLedgerEntry::class)->orderBy('id');
+    }
+
     /**
      * @return array<string, \Illuminate\Database\Eloquent\Relations\Relation<*, *, *>>
      */
@@ -164,6 +171,7 @@ class Partner extends Model
         return [
             'bookingAttributions' => $this->hasMany(BookingPartnerAttribution::class),
             'commissionCases' => $this->commissionCases(),
+            'ledgerEntries' => $this->hasMany(PromoterLedgerEntry::class),
         ];
     }
 
@@ -253,6 +261,12 @@ class Partner extends Model
         $acct = preg_replace('/\s+/', '', (string) $this->bank_account_number);
 
         return $acct === null || $acct === '' ? null : Str::mask($acct, '•', 0, max(0, strlen($acct) - 4));
+    }
+
+    /** The flat commission rate this promoter earns, e.g. "10%" (— when unset). */
+    public function commissionRateLabel(): string
+    {
+        return $this->commission_percentage === null ? '—' : rtrim(rtrim((string) $this->commission_percentage, '0'), '.').'%';
     }
 
     public function locationLabel(): string

@@ -119,11 +119,6 @@ enum Permission: string
     case PartnersAuthorize = 'partners.authorize';
     case PartnersAttribute = 'partners.attribute';
 
-    // --- Commission schemes (M14.3) --------------------------------
-    case CommissionSchemesView = 'commission_schemes.view';
-    case CommissionSchemesManage = 'commission_schemes.manage';
-    case CommissionSchemesPublish = 'commission_schemes.publish';
-
     // --- Commission cases (M14.4) ----------------------------------
     case CommissionView = 'commission.view';
     case CommissionGenerate = 'commission.generate';
@@ -187,7 +182,7 @@ enum Permission: string
             'documents', 'agreements', 'registry', 'registry_expenses', 'handover',
             'possession', 'transfer', 'ownership' => PermissionGroup::Operations,
             'partners' => PermissionGroup::Associates,
-            'commission_schemes', 'commission' => PermissionGroup::Commission,
+            'commission' => PermissionGroup::Commission,
             'communications' => PermissionGroup::Communication,
             'reports' => PermissionGroup::Reports,
             'users', 'roles' => PermissionGroup::Administration,

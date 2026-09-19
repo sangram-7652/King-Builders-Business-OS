@@ -51,6 +51,9 @@ class UpdatePartnerAction
                 'pincode' => $data['pincode'] ?: null,
                 'pan_number' => $data['pan_number'] ? strtoupper(trim($data['pan_number'])) : null,
                 'rera_number' => $data['rera_number'] ?: null,
+                'commission_percentage' => array_key_exists('commission_percentage', $data) && $data['commission_percentage'] !== ''
+                    ? $data['commission_percentage']
+                    : null,
                 'bank_account_name' => $data['bank_account_name'] ?: null,
                 'bank_account_number' => $data['bank_account_number'] ? preg_replace('/\s+/', '', $data['bank_account_number']) : null,
                 'bank_ifsc' => $data['bank_ifsc'] ? strtoupper(trim($data['bank_ifsc'])) : null,

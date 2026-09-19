@@ -86,6 +86,7 @@
                         <div class="sm:col-span-3"><x-ui.select label="Calc" wire:model.live="discountLines.{{ $i }}.calculation_type" :options="$calcTypes" /></div>
                         <div class="sm:col-span-3"><x-ui.input type="number" step="0.0001" label="Rate / %" wire:model.live.debounce.400ms="discountLines.{{ $i }}.rate" /></div>
                         <div class="sm:col-span-1"><x-ui.button type="button" variant="ghost" size="sm" class="text-red-600" wire:click="removeDiscount({{ $i }})">✕</x-ui.button></div>
+                        <div class="sm:col-span-12"><x-ui.input label="Remark (printed on the receipt)" wire:model.live.debounce.400ms="discountLines.{{ $i }}.remark" /></div>
                     </div>
                 @endforeach
             </div>
@@ -130,20 +131,12 @@
         </x-ui.card>
 
         {{-- Buyers --}}
-        <x-ui.card title="Buyers" subtitle="At least one buyer; exactly one primary; shares must total 100%.">
+        <x-ui.card title="Buyers" subtitle="Select the buyer(s) for this booking.">
             @error('buyers') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
             @foreach ($buyers as $i => $row)
                 <div wire:key="buyer-{{ $i }}" class="mt-2 grid items-end gap-2 sm:grid-cols-12">
-                    <div class="sm:col-span-6"><x-ui.select label="Buyer" wire:model="buyers.{{ $i }}.buyer_id" placeholder="Select…" :options="$buyerOptions->toArray()"
+                    <div class="sm:col-span-11"><x-ui.select label="Buyer" wire:model="buyers.{{ $i }}.buyer_id" placeholder="Select…" :options="$buyerOptions->toArray()"
                         :error="$errors->first('buyers.'.$i.'.buyer_id')" /></div>
-                    <div class="sm:col-span-3"><x-ui.input type="number" step="0.01" label="Ownership %" wire:model="buyers.{{ $i }}.ownership_percentage"
-                        :error="$errors->first('buyers.'.$i.'.ownership_percentage')" /></div>
-                    <div class="sm:col-span-2">
-                        <label class="flex items-center gap-2 text-sm">
-                            <input type="radio" wire:click="setPrimary({{ $i }})" @checked($row['is_primary'] ?? false) name="primary_buyer" />
-                            Primary
-                        </label>
-                    </div>
                     <div class="sm:col-span-1"><x-ui.button type="button" variant="ghost" size="sm" class="text-red-600" wire:click="removeBuyer({{ $i }})">✕</x-ui.button></div>
                 </div>
             @endforeach

@@ -28,7 +28,6 @@ use App\Models\Booking;
 use App\Models\BookingBuyer;
 use App\Models\Buyer;
 use App\Models\CommissionCase;
-use App\Models\CommissionScheme;
 use App\Models\Document;
 use App\Models\Masters\DocumentType;
 use App\Models\Masters\PaymentMode;
@@ -641,8 +640,9 @@ function portalBooking(): array
 
 /**
  * A generated PENDING_REVIEW commission case worth ₹100,000 (2% of a ₹50L
- * booking), attributed 100% to one active, project-authorised partner. Shared
- * by the commission workflow / payout / reversal / access tests.
+ * booking, flat — no advance), attributed to one active, project-authorised
+ * promoter. Shared by the commission workflow / payout / reversal / access
+ * tests.
  *
  * @return array{actor: User, booking: Booking, case: CommissionCase, partner: Partner}
  */
@@ -650,12 +650,9 @@ function pendingCase(): array
 {
     $s = confirmedBookingScenario('5000000');
     $actor = User::factory()->create();
-    CommissionScheme::factory()->default()->published('2')->create();
-    $partner = Partner::factory()->active()->create();
+    $partner = Partner::factory()->active()->commission('2')->create();
     app(AuthorizePartnerForProjectAction::class)->handle($partner, $s['booking']->project, $actor);
-    app(SetBookingPartnerAttribution::class)->handle($s['booking'], [
-        ['partner_id' => $partner->id, 'share_percentage' => '100', 'role' => 'primary'],
-    ], $actor);
+    app(SetBookingPartnerAttribution::class)->handle($s['booking'], $partner->id, $actor);
     $case = app(GenerateCommissionCases::class)->handle($s['booking']->fresh(), $actor)->first();
 
     return ['actor' => $actor, 'booking' => $s['booking']->fresh(), 'case' => $case, 'partner' => $partner];

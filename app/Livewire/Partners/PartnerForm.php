@@ -19,12 +19,17 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 #[Layout('components.layouts.app')]
-#[Title('Channel Partner')]
+#[Title('Promoter')]
 class PartnerForm extends Component
 {
     public ?Partner $partner = null;
 
     public string $type = 'individual';
+
+    public string $commission_percentage = '';
+
+    /** Create-only — see PartnerShow's "Add Advance" for later advances. */
+    public string $initial_advance = '';
 
     public string $name = '';
 
@@ -78,6 +83,7 @@ class PartnerForm extends Component
             $this->pincode = (string) $partner->pincode;
             $this->pan_number = (string) $partner->pan_number;
             $this->rera_number = (string) $partner->rera_number;
+            $this->commission_percentage = $partner->commission_percentage !== null ? (string) $partner->commission_percentage : '';
             $this->bank_account_name = (string) $partner->bank_account_name;
             $this->bank_account_number = (string) $partner->bank_account_number;
             $this->bank_ifsc = (string) $partner->bank_ifsc;
@@ -111,6 +117,8 @@ class PartnerForm extends Component
             'pincode' => ['nullable', 'string', 'max:12'],
             'pan_number' => ['nullable', 'string', 'regex:/^[A-Za-z]{5}[0-9]{4}[A-Za-z]$/'],
             'rera_number' => ['nullable', 'string', 'max:120'],
+            'commission_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            ...($this->editing ? [] : ['initial_advance' => ['nullable', 'numeric', 'min:0']]),
             'bank_account_name' => ['nullable', 'string', 'max:255'],
             'bank_account_number' => ['nullable', 'string', 'max:40', 'regex:/^[0-9\s]{6,40}$/'],
             'bank_ifsc' => ['nullable', 'string', 'regex:/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/'],
@@ -133,7 +141,7 @@ class PartnerForm extends Component
             return;
         }
 
-        $this->dispatch('toast', message: $this->editing ? 'Partner updated.' : 'Partner created.', variant: 'success');
+        $this->dispatch('toast', message: $this->editing ? 'Promoter updated.' : 'Promoter created.', variant: 'success');
         $this->redirectRoute('partners.show', ['partner' => $partner->id], navigate: true);
     }
 

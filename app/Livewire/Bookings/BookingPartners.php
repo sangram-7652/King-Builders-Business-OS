@@ -6,7 +6,6 @@ namespace App\Livewire\Bookings;
 
 use App\Actions\Partners\RemoveBookingPartnerAttribution;
 use App\Actions\Partners\SetBookingPartnerAttribution;
-use App\Enums\BookingAttributionRole;
 use App\Exceptions\DomainException;
 use App\Models\Booking;
 use App\Models\Partner;
@@ -15,73 +14,29 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 /**
- * Manage a booking's channel-partner split (M14.2) — `/bookings/{booking}/partners`.
- *
- * Rows carry partner + share %; exactly one is the primary; the live total must
- * reach 100% before saving. Saving supersedes the previous split rather than
- * editing it, so history (and any commission snapshot) is preserved.
+ * Manage a booking's promoter (M14.2) — `/bookings/{booking}/partners`. One
+ * promoter maximum per booking. Saving supersedes the previous attribution
+ * rather than editing it, so history (and any commission snapshot) is
+ * preserved.
  */
 #[Layout('components.layouts.app')]
 class BookingPartners extends Component
 {
     public Booking $booking;
 
-    /** @var list<array{partner_id: string, share_percentage: string, role: string}> */
-    public array $rows = [];
+    public string $partnerId = '';
 
     public function mount(Booking $booking): void
     {
         $this->authorize('view', $booking);
         $this->authorize('attributePartners', $booking);
         $this->booking = $booking;
-        $this->loadRows();
+        $this->loadPartnerId();
     }
 
-    private function loadRows(): void
+    private function loadPartnerId(): void
     {
-        $this->rows = $this->booking->partnerAttributions()->get()
-            ->map(fn ($a) => [
-                'partner_id' => (string) $a->partner_id,
-                'share_percentage' => rtrim(rtrim(number_format((float) $a->share_percentage, 2), '0'), '.'),
-                'role' => $a->role->value,
-            ])->values()->all();
-    }
-
-    public function addRow(): void
-    {
-        $this->rows[] = [
-            'partner_id' => '',
-            'share_percentage' => '',
-            'role' => $this->rows === [] ? BookingAttributionRole::Primary->value : BookingAttributionRole::CoBroker->value,
-        ];
-    }
-
-    public function removeRow(int $index): void
-    {
-        unset($this->rows[$index]);
-        $this->rows = array_values($this->rows);
-    }
-
-    public function setPrimary(int $index): void
-    {
-        foreach ($this->rows as $i => $row) {
-            $this->rows[$i]['role'] = $i === $index
-                ? BookingAttributionRole::Primary->value
-                : BookingAttributionRole::CoBroker->value;
-        }
-    }
-
-    public function getTotalProperty(): string
-    {
-        $total = '0.00';
-        foreach ($this->rows as $row) {
-            $share = $row['share_percentage'];
-            if (is_numeric($share)) {
-                $total = bcadd($total, number_format((float) $share, 2, '.', ''), 2);
-            }
-        }
-
-        return $total;
+        $this->partnerId = (string) ($this->booking->partnerAttributions()->value('partner_id') ?? '');
     }
 
     public function save(): void
@@ -89,10 +44,14 @@ class BookingPartners extends Component
         $this->authorize('attributePartners', $this->booking);
 
         try {
-            app(SetBookingPartnerAttribution::class)->handle($this->booking, $this->rows, auth()->user());
+            app(SetBookingPartnerAttribution::class)->handle(
+                $this->booking,
+                $this->partnerId !== '' ? (int) $this->partnerId : null,
+                auth()->user(),
+            );
             $this->booking = $this->booking->fresh();
-            $this->loadRows();
-            $this->dispatch('toast', message: 'Partner attribution saved.', variant: 'success');
+            $this->loadPartnerId();
+            $this->dispatch('toast', message: 'Promoter saved.', variant: 'success');
         } catch (DomainException $e) {
             $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
         }
@@ -105,7 +64,7 @@ class BookingPartners extends Component
         try {
             app(RemoveBookingPartnerAttribution::class)->handle($this->booking, auth()->user());
             $this->booking = $this->booking->fresh();
-            $this->rows = [];
+            $this->partnerId = '';
             $this->dispatch('toast', message: 'Booking marked as a direct sale.', variant: 'success');
         } catch (DomainException $e) {
             $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
@@ -116,8 +75,7 @@ class BookingPartners extends Component
     {
         return view('livewire.bookings.booking-partners', [
             'booking' => $this->booking->load('partnerAttributions.partner', 'partnerAttributionHistory.partner', 'partnerAttributionHistory.attributedBy'),
-            'partners' => Partner::query()->active()->orderBy('name')->get(['id', 'name', 'company_name', 'partner_code']),
-            'roles' => BookingAttributionRole::options(),
-        ])->title("Partners · {$this->booking->booking_number}");
+            'partners' => Partner::query()->active()->orderBy('name')->get(['id', 'name', 'company_name', 'partner_code', 'commission_percentage']),
+        ])->title("Promoter · {$this->booking->booking_number}");
     }
 }

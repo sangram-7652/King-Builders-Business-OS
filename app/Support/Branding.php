@@ -28,6 +28,8 @@ final class Branding implements Htmlable
         public readonly array $contact = ['email' => null, 'phone' => null, 'website' => null, 'head_office_address' => null],
         public readonly array $bank = ['name' => null, 'account_name' => null, 'account_number' => null, 'ifsc' => null, 'branch' => null],
         public readonly ?string $qrPath = null,
+        public readonly ?string $signaturePath = null,
+        public readonly ?string $stampPath = null,
     ) {}
 
     public static function fromConfig(): self
@@ -39,6 +41,8 @@ final class Branding implements Htmlable
             name: (string) ($config['name'] ?? 'King Builders'),
             logoPath: $config['logo_path'] ?? null,
             qrPath: $config['qr_path'] ?? null,
+            signaturePath: $config['signature_path'] ?? null,
+            stampPath: $config['stamp_path'] ?? null,
             colors: [
                 'primary' => (string) data_get($config, 'colors.primary', '#2563eb'),
                 'primary_fg' => (string) data_get($config, 'colors.primary_fg', '#ffffff'),

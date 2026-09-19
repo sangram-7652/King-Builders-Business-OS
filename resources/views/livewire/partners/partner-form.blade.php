@@ -1,16 +1,16 @@
 <div class="space-y-6">
     @php
-        $crumbs = [['label' => 'Channel Partners', 'url' => route('partners.index')]];
+        $crumbs = [['label' => 'Promoters', 'url' => route('partners.index')]];
         $crumbs[] = $this->editing
             ? ['label' => $partner->displayName(), 'url' => route('partners.show', $partner)]
-            : ['label' => 'New partner'];
+            : ['label' => 'New promoter'];
         if ($this->editing) $crumbs[] = ['label' => 'Edit'];
     @endphp
     <x-ui.breadcrumb :items="$crumbs" />
 
     <x-ui.page-header
-        :title="$this->editing ? 'Edit partner' : 'New channel partner'"
-        :description="$this->editing ? $partner->partner_code : 'The partner code is generated automatically. The partner starts as a draft.'" />
+        :title="$this->editing ? 'Edit promoter' : 'New promoter'"
+        :description="$this->editing ? $partner->partner_code : 'The promoter code is generated automatically. The promoter starts as a draft.'" />
 
     <form wire:submit="save" class="space-y-6">
         <x-ui.card title="Identity">
@@ -42,6 +42,15 @@
             </div>
         </x-ui.card>
 
+        <x-ui.card title="Commission" :subtitle="$this->editing ? 'Flat commission % applied to a booking\'s final amount.' : 'Flat commission % applied to a booking\'s final amount. An optional initial advance is recorded as a real ledger transaction.'">
+            <div class="grid gap-5 sm:grid-cols-2">
+                <x-ui.input type="number" step="0.01" label="Commission %" wire:model="commission_percentage" :error="$errors->first('commission_percentage')" />
+                @unless ($this->editing)
+                    <x-ui.input type="number" step="0.01" label="Initial advance (₹)" wire:model="initial_advance" :error="$errors->first('initial_advance')" hint="Leave blank for ₹0." />
+                @endunless
+            </div>
+        </x-ui.card>
+
         <x-ui.card title="Payout bank details" subtitle="Operational reference for commission payouts only — this is not an accounting ledger. Stored encrypted at rest.">
             <div class="grid gap-5 sm:grid-cols-2">
                 <x-ui.input label="Account holder name" wire:model="bank_account_name" :error="$errors->first('bank_account_name')" />
@@ -56,7 +65,7 @@
         </x-ui.card>
 
         <div class="flex items-center gap-3">
-            <x-ui.button type="submit">{{ $this->editing ? 'Save changes' : 'Create partner' }}</x-ui.button>
+            <x-ui.button type="submit">{{ $this->editing ? 'Save changes' : 'Create promoter' }}</x-ui.button>
             <x-ui.button variant="ghost" :href="$this->editing ? route('partners.show', $partner) : route('partners.index')" wire:navigate>Cancel</x-ui.button>
         </div>
     </form>

@@ -236,9 +236,11 @@ it('shows the official-bank-account note once a bank account is configured', fun
         ->toContain('KKBK0005225');
 });
 
-it('embeds the configured logo and payment QR code as real images, not text placeholders', function () {
+it('embeds the configured logo, QR code, stamp and signature as real images, not text placeholders', function () {
     config()->set('branding.logo_path', 'branding/logo.png');
     config()->set('branding.qr_path', 'branding/qr.jpeg');
+    config()->set('branding.stamp_path', 'branding/stamp.png');
+    config()->set('branding.signature_path', 'branding/signature.png');
 
     $s = confirmedBookingScenario('1000000');
     $payment = verifiedPayment($s);
@@ -254,15 +256,34 @@ it('embeds the configured logo and payment QR code as real images, not text plac
         ->toContain(public_path('branding/logo.png'))
         ->toContain('class="qr"')
         ->toContain(public_path('branding/qr.jpeg'))
-        ->toContain('KINDLY MAKE THE PLOT PAYMENT BY SCANNING THIS QR CODE');
+        ->toContain('KINDLY MAKE THE PLOT PAYMENT BY SCANNING THIS QR CODE')
+        ->toContain('class="stamp-img"')
+        ->toContain(public_path('branding/stamp.png'))
+        ->toContain('class="signature-img"')
+        ->toContain(public_path('branding/signature.png'));
+
+    // Stamp, then signature, then "(AUTHORISED SIGNATORY)" — in that order,
+    // and none of it after the footer address.
+    $stampPos = strpos($html, 'class="stamp-img"');
+    $signaturePos = strpos($html, 'class="signature-img"');
+    $signatoryPos = strpos($html, '(AUTHORISED SIGNATORY)');
+    $headOfficePos = strpos($html, 'Head Office');
+
+    expect($stampPos)->toBeLessThan($signaturePos)
+        ->and($signaturePos)->toBeLessThan($signatoryPos)
+        ->and($signatoryPos)->toBeLessThan($headOfficePos);
 
     expect(file_exists(public_path('branding/logo.png')))->toBeTrue()
-        ->and(file_exists(public_path('branding/qr.jpeg')))->toBeTrue();
+        ->and(file_exists(public_path('branding/qr.jpeg')))->toBeTrue()
+        ->and(file_exists(public_path('branding/stamp.png')))->toBeTrue()
+        ->and(file_exists(public_path('branding/signature.png')))->toBeTrue();
 });
 
-it('omits the logo and QR images gracefully when not configured, without broken tags', function () {
+it('omits the logo, QR, stamp and signature images gracefully when not configured, without broken tags', function () {
     config()->set('branding.logo_path', null);
     config()->set('branding.qr_path', null);
+    config()->set('branding.stamp_path', null);
+    config()->set('branding.signature_path', null);
 
     $s = confirmedBookingScenario('1000000');
     $payment = verifiedPayment($s);
@@ -276,5 +297,8 @@ it('omits the logo and QR images gracefully when not configured, without broken 
 
     expect($html)->not->toContain('class="logo"')
         ->not->toContain('class="qr"')
-        ->not->toContain('KINDLY MAKE THE PLOT PAYMENT BY SCANNING THIS QR CODE');
+        ->not->toContain('KINDLY MAKE THE PLOT PAYMENT BY SCANNING THIS QR CODE')
+        ->not->toContain('class="stamp-img"')
+        ->not->toContain('class="signature-img"')
+        ->toContain('(AUTHORISED SIGNATORY)');
 });

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support\Payments;
 
+use App\Enums\PriceComponentType;
+use App\Models\Booking;
 use App\Models\Receipt;
 use App\Services\Payments\PaymentLedger;
 use App\Support\AmountInWords;
@@ -29,6 +31,7 @@ final class ReceiptPdfData
             'booking.project.city',
             'booking.block',
             'booking.plot.dimension',
+            'booking.priceLines',
             'buyer.city',
         ]);
 
@@ -52,6 +55,7 @@ final class ReceiptPdfData
             'totalPaidAmount' => $booking !== null ? $ledger->bookingPaid($booking)->store() : null,
             'balanceAmount' => $booking !== null ? $ledger->bookingOutstanding($booking)->store() : null,
             'paidAmountInWords' => AmountInWords::rupees((string) $receipt->amount),
+            'discountRemark' => $booking !== null ? self::discountRemark($booking) : null,
         ];
     }
 
@@ -59,5 +63,22 @@ final class ReceiptPdfData
     private static function trimDecimal(string $value): string
     {
         return rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
+    }
+
+    /**
+     * The discount remark(s) entered on the booking's discount line(s), as
+     * saved via the booking form — the receipt's "Remark" field prefers this
+     * over the payment's own note when present (see resources/views/receipts/pdf.blade.php).
+     */
+    private static function discountRemark(Booking $booking): ?string
+    {
+        $remarks = $booking->priceLines
+            ->filter(fn ($line) => $line->type === PriceComponentType::Discount)
+            ->map(fn ($line) => trim((string) data_get($line->metadata, 'remark', '')))
+            ->filter(fn (string $remark) => $remark !== '')
+            ->unique()
+            ->values();
+
+        return $remarks->isEmpty() ? null : $remarks->implode('; ');
     }
 }

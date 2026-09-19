@@ -14,50 +14,41 @@ use App\Models\Partner;
 use App\Models\PartnerProjectAuthorization;
 use App\Models\User;
 use App\Support\Concerns\RunsInTransaction;
-use App\Support\Partners\AttributionSplit;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Sets the channel-partner split for a booking (M14.2).
+ * Sets the booking's promoter (M14.2) — one promoter maximum per booking.
  *
- * The passed split replaces the current active set. Rather than editing rows,
- * the whole active set is SUPERSEDED (status → superseded, `ended_at` stamped)
- * and a fresh set is written with the next `revision`, so historical attribution
- * — and any commission snapshot taken from it — is never mutated.
+ * Rather than editing the row, the current active attribution (if any) is
+ * SUPERSEDED (status → superseded, `ended_at` stamped) and a fresh row is
+ * written with the next `revision`, so historical attribution — and any
+ * commission snapshot taken from it — is never mutated.
  *
- *   - shares must total exactly 100.00 with exactly one primary (or be empty)
- *   - an empty split marks the booking a direct sale
- *   - every partner must be ACTIVE and (by default) authorised for the project
+ *   - `partnerId === null` clears the promoter, marking the booking a direct sale
+ *   - the promoter must be ACTIVE and (by default) authorised for the project
  *   - a CANCELLED booking is rejected; the M6 lifecycle is respected
- *
- * @phpstan-import-type RawShare from AttributionSplit
  */
 class SetBookingPartnerAttribution
 {
     use RunsInTransaction;
 
-    /**
-     * @param  iterable<RawShare>  $shares
-     */
-    public function handle(Booking $booking, iterable $shares, User $actor, ?string $reason = null): Booking
+    public function handle(Booking $booking, ?int $partnerId, User $actor, ?string $reason = null): Booking
     {
         if ($booking->isCancelled()) {
-            throw new DomainException('A cancelled booking cannot be attributed to a partner.');
+            throw new DomainException('A cancelled booking cannot be attributed to a promoter.');
         }
 
         if ($booking->isConfirmed() && ! config('partners.attribution.allow_edit_after_confirmation')) {
-            throw new DomainException('Partner attribution is locked once the booking is confirmed.');
+            throw new DomainException('Promoter attribution is locked once the booking is confirmed.');
         }
 
-        $split = AttributionSplit::fromRows($shares);
-
-        return $this->transaction(function () use ($booking, $split, $actor, $reason): Booking {
+        return $this->transaction(function () use ($booking, $partnerId, $actor, $reason): Booking {
             /** @var Booking $locked */
             $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
 
-            // A committed commission (approved / paid) locks the split — that
-            // partner's money is already an obligation. Pending cases are fine;
-            // GenerateCommissionCases re-derives them from the new split.
+            // A committed commission (approved / paid) locks the attribution —
+            // that promoter's money is already an obligation. A pending case is
+            // fine; GenerateCommissionCases re-derives it from the new promoter.
             $committed = CommissionCase::query()
                 ->where('booking_id', $locked->id)
                 ->whereIn('status', [
@@ -68,37 +59,35 @@ class SetBookingPartnerAttribution
                 ->exists();
 
             if ($committed) {
-                throw new DomainException('This booking has an approved commission — its partner split can no longer be changed.');
+                throw new DomainException('This booking has an approved commission — its promoter can no longer be changed.');
             }
 
-            $partners = $this->resolvePartners($locked, $split);
+            $partner = $partnerId !== null ? $this->resolvePartner($locked, $partnerId) : null;
 
-            $previousRows = BookingPartnerAttribution::query()
+            $previous = BookingPartnerAttribution::query()
                 ->where('booking_id', $locked->id)
                 ->where('status', 'active')
-                ->get();
-            $previousPartnerIds = $previousRows->pluck('partner_id')->all();
+                ->first();
 
-            // Clearing an already-direct booking is a no-op.
-            if ($split->isEmpty() && $previousRows->isEmpty()) {
+            // Clearing an already-direct booking, or re-setting the same promoter, is a no-op.
+            if ($partner === null && $previous === null) {
+                return $locked->load('partnerAttributions.partner');
+            }
+            if ($partner !== null && $previous !== null && $previous->partner_id === $partner->id) {
                 return $locked->load('partnerAttributions.partner');
             }
 
-            if ($previousRows->isNotEmpty()) {
-                BookingPartnerAttribution::query()
-                    ->whereKey($previousRows->modelKeys())
-                    ->update(['status' => 'superseded', 'ended_at' => now()]);
+            if ($previous !== null) {
+                $previous->forceFill(['status' => 'superseded', 'ended_at' => now()])->save();
             }
 
             $revision = ((int) BookingPartnerAttribution::query()
                 ->where('booking_id', $locked->id)->max('revision')) + 1;
 
-            foreach ($split->shares as $share) {
+            if ($partner !== null) {
                 BookingPartnerAttribution::create([
                     'booking_id' => $locked->id,
-                    'partner_id' => $share['partner_id'],
-                    'share_percentage' => $share['share_percentage'],
-                    'role' => $share['role'],
+                    'partner_id' => $partner->id,
                     'status' => 'active',
                     'revision' => $revision,
                     'attributed_by' => $actor->id,
@@ -107,12 +96,12 @@ class SetBookingPartnerAttribution
                 ]);
             }
 
-            $this->recordActivities($locked, $partners, $split, $previousPartnerIds, $previousRows->isNotEmpty(), $actor);
+            $this->recordActivities($locked, $partner, $previous?->partner_id, $actor);
 
-            Log::info('booking.partner_attribution_set', [
+            Log::info('booking.promoter_attribution_set', [
                 'booking_id' => $locked->id,
                 'revision' => $revision,
-                'partner_ids' => $split->partnerIds(),
+                'partner_id' => $partner?->id,
                 'by' => $actor->id,
             ]);
 
@@ -120,32 +109,21 @@ class SetBookingPartnerAttribution
         });
     }
 
-    /**
-     * @return array<int, Partner> keyed by partner id
-     */
-    private function resolvePartners(Booking $booking, AttributionSplit $split): array
+    private function resolvePartner(Booking $booking, int $partnerId): Partner
     {
-        if ($split->isEmpty()) {
-            return [];
+        $partner = Partner::find($partnerId);
+
+        if ($partner === null) {
+            throw new DomainException('The selected promoter no longer exists.');
+        }
+        if (! $partner->canReceiveAttribution()) {
+            throw new DomainException("{$partner->displayName()} is {$partner->status->label()} and cannot be attributed.");
+        }
+        if (config('partners.attribution.require_project_authorization') && ! $this->isAuthorised($partner, $booking)) {
+            throw new DomainException("{$partner->displayName()} is not authorised for this project.");
         }
 
-        /** @var array<int, Partner> $partners */
-        $partners = Partner::query()->whereKey($split->partnerIds())->get()->keyBy('id')->all();
-
-        foreach ($split->partnerIds() as $partnerId) {
-            $partner = $partners[$partnerId] ?? null;
-            if ($partner === null) {
-                throw new DomainException('One of the selected partners no longer exists.');
-            }
-            if (! $partner->canReceiveAttribution()) {
-                throw new DomainException("{$partner->displayName()} is {$partner->status->label()} and cannot be attributed.");
-            }
-            if (config('partners.attribution.require_project_authorization') && ! $this->isAuthorised($partner, $booking)) {
-                throw new DomainException("{$partner->displayName()} is not authorised for this project.");
-            }
-        }
-
-        return $partners;
+        return $partner;
     }
 
     private function isAuthorised(Partner $partner, Booking $booking): bool
@@ -157,29 +135,20 @@ class SetBookingPartnerAttribution
             ->exists();
     }
 
-    /**
-     * @param  array<int, Partner>  $partners
-     * @param  list<int>  $previousPartnerIds
-     */
-    private function recordActivities(Booking $booking, array $partners, AttributionSplit $split, array $previousPartnerIds, bool $hadPrevious, User $actor): void
+    private function recordActivities(Booking $booking, ?Partner $partner, ?int $previousPartnerId, User $actor): void
     {
-        $newIds = $split->partnerIds();
-
-        foreach ($split->shares as $share) {
-            $partner = $partners[$share['partner_id']];
-            $type = in_array($partner->id, $previousPartnerIds, true)
+        if ($partner !== null) {
+            $type = $previousPartnerId !== null
                 ? PartnerActivityType::BookingAttributionUpdated
                 : PartnerActivityType::BookingAttributed;
 
-            $partner->recordActivity($type, "Booking {$booking->booking_number}: {$share['share_percentage']}% ({$share['role']->label()}).", [
+            $partner->recordActivity($type, "Booking {$booking->booking_number} attributed.", [
                 'booking_id' => $booking->id,
-                'share_percentage' => $share['share_percentage'],
-                'role' => $share['role']->value,
             ], $actor);
         }
 
-        foreach (array_diff($previousPartnerIds, $newIds) as $droppedId) {
-            Partner::find($droppedId)?->recordActivity(
+        if ($previousPartnerId !== null && $previousPartnerId !== $partner?->id) {
+            Partner::find($previousPartnerId)?->recordActivity(
                 PartnerActivityType::BookingAttributionRemoved,
                 "Booking {$booking->booking_number} attribution removed.",
                 ['booking_id' => $booking->id],

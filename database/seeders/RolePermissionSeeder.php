@@ -92,7 +92,6 @@ class RolePermissionSeeder extends Seeder
                 'documents.view', 'documents.download',
                 'registry_expenses.view', 'registry_expenses.create', 'registry_expenses.approve',
                 'pricing.view', 'pricing.manage',
-                'commission_schemes.view',
                 'commission.view', 'commission.generate', 'commission.recalculate',
                 'commission.approve', 'commission.payout', 'commission.reverse',
                 'reports.view', 'reports.export',
@@ -129,7 +128,6 @@ class RolePermissionSeeder extends Seeder
             RoleName::AssociateManager => [
                 'partners.view', 'partners.create', 'partners.update', 'partners.approve',
                 'partners.authorize', 'partners.attribute',
-                'commission_schemes.view', 'commission_schemes.manage', 'commission_schemes.publish',
                 'commission.view', 'commission.generate', 'commission.recalculate',
                 'commission.approve', 'commission.reverse',
                 'projects.view', 'buyers.view', 'bookings.view',

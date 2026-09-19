@@ -1,10 +1,10 @@
 <div class="space-y-6">
-    <x-ui.page-header title="Channel Partners"
-        description="Brokers and channel partners who source bookings. Attribution and commission build on this master.">
+    <x-ui.page-header title="Promoters"
+        description="Promoters who source bookings and earn a flat commission %. Booking attribution builds on this master.">
         <x-slot:actions>
             @can('create', App\Models\Partner::class)
                 <x-ui.button :href="route('partners.create')" wire:navigate>
-                    <x-app.icon name="plus" class="size-4" /> New partner
+                    <x-app.icon name="plus" class="size-4" /> New promoter
                 </x-ui.button>
             @endcan
         </x-slot:actions>

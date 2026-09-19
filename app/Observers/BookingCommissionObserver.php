@@ -10,6 +10,7 @@ use App\Enums\CommissionCaseStatus;
 use App\Models\Booking;
 use App\Models\CommissionCase;
 use App\Models\User;
+use App\Services\Commission\PromoterLedgerService;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -34,7 +35,12 @@ class BookingCommissionObserver
             ->whereIn('status', [CommissionCaseStatus::PendingReview->value, CommissionCaseStatus::OnHold->value])
             ->get();
 
+        $ledger = app(PromoterLedgerService::class);
+        $causer = $booking->cancelled_by ? User::find($booking->cancelled_by) : null;
+
         foreach ($cases as $case) {
+            $ledger->reverseCaseAdjustment($case, $causer, 'Booking cancelled — commission cancelled.');
+
             $case->forceFill([
                 'status' => CommissionCaseStatus::Cancelled,
                 'cancelled_at' => now(),
@@ -45,11 +51,9 @@ class BookingCommissionObserver
                 CommissionCaseEventType::Cancelled,
                 'Booking cancelled — commission case cancelled.',
                 [],
-                $booking->cancelled_by ? User::find($booking->cancelled_by) : null,
+                $causer,
             );
         }
-
-        $causer = $booking->cancelled_by ? User::find($booking->cancelled_by) : null;
 
         // Approved but nothing paid out → safe to auto-reverse (clawback 0).
         $approvedUnpaid = CommissionCase::query()
@@ -59,6 +63,8 @@ class BookingCommissionObserver
             ->get();
 
         foreach ($approvedUnpaid as $case) {
+            $ledger->reverseCaseAdjustment($case, $causer, 'Booking cancelled — commission reversed.');
+
             $case->forceFill([
                 'status' => CommissionCaseStatus::Reversed->value,
                 'reversed_at' => now(),

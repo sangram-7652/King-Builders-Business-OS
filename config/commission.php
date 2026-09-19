@@ -4,23 +4,16 @@ declare(strict_types=1);
 
 /*
 | ---------------------------------------------------------------------------
-| Commission schemes + calculation (M14.3+)
+| Commission (M14.4+)
 | ---------------------------------------------------------------------------
-| Config, not hard-coded. M14.3 covers scheme definition; the eligibility /
-| calculation / payout settings (M14.4–M14.5) are added here as those phases
-| land. Commission is operational tracking only — never an accounting ledger,
-| and never GST / TDS.
+| Config, not hard-coded. Commission is a flat Booking final_amount ×
+| Partner.commission_percentage — no schemes / rules / slabs. Payouts are
+| operational tracking only — never an accounting ledger, and never GST / TDS.
+| The promoter's advance ledger (Promoter Advance) is the one place real
+| financial history is kept — see App\Services\Commission\PromoterLedgerService.
 */
 
 return [
-    'schemes' => [
-        // The default basis for a new scheme when the form leaves it unset.
-        'default_basis' => 'booking_value', // App\Enums\CommissionBasis
-
-        // Default slab interpretation for a new slab rule.
-        'default_slab_mode' => 'whole', // App\Enums\SlabMode
-    ],
-
     'eligibility' => [
         // The booking must have collected at least this percentage of its value
         // before a partner's commission is treated as earned. 0 = earned at

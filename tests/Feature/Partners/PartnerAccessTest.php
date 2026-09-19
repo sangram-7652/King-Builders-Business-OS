@@ -62,9 +62,9 @@ it('renders every partner screen for a partner manager (full HTTP stack)', funct
 
     $this->actingAs($user);
     $this->get('/partners')->assertOk();
-    $this->get('/partners/create')->assertOk()->assertSee('New channel partner');
+    $this->get('/partners/create')->assertOk()->assertSee('New promoter');
     $this->get(route('partners.show', $partner))->assertOk()->assertSee($partner->partner_code);
-    $this->get(route('partners.edit', $partner))->assertOk()->assertSee('Edit partner');
+    $this->get(route('partners.edit', $partner))->assertOk()->assertSee('Edit promoter');
     $this->get(route('partners.documents', $partner))->assertOk()->assertSee('KYC');
 });
 

@@ -2,7 +2,7 @@
 
 <div class="space-y-6">
     <x-ui.breadcrumb :items="[
-        ['label' => 'Channel Partners', 'url' => route('partners.index')],
+        ['label' => 'Promoters', 'url' => route('partners.index')],
         ['label' => $partner->displayName()],
     ]" />
 
@@ -32,6 +32,7 @@
                     <div><dt class="text-(--content-muted)">Phone</dt><dd>{{ $partner->phone }}{{ $partner->alternate_phone ? ' / '.$partner->alternate_phone : '' }}</dd></div>
                     <div><dt class="text-(--content-muted)">Email</dt><dd>{{ $partner->email ?: '—' }}</dd></div>
                     <div><dt class="text-(--content-muted)">RERA no.</dt><dd>{{ $partner->rera_number ?: '—' }}</dd></div>
+                    <div><dt class="text-(--content-muted)">Commission %</dt><dd>{{ $partner->commissionRateLabel() }}</dd></div>
                     <div><dt class="text-(--content-muted)">Location</dt><dd>{{ $partner->locationLabel() }}</dd></div>
                     <div><dt class="text-(--content-muted)">Address</dt><dd>{{ $partner->address ?: '—' }} {{ $partner->pincode }}</dd></div>
                     <div><dt class="text-(--content-muted)">PAN</dt><dd>{{ $revealSensitive && $canRevealSensitive ? ($partner->pan_number ?: '—') : ($partner->maskedPan() ?? '—') }}</dd></div>
@@ -57,6 +58,49 @@
                     <div><dt class="text-(--content-muted)">IFSC</dt><dd>{{ $partner->bank_ifsc ?: '—' }}</dd></div>
                     <div><dt class="text-(--content-muted)">Bank</dt><dd>{{ $partner->bank_name ?: '—' }}</dd></div>
                 </dl>
+            </x-ui.card>
+
+            {{-- Promoter Advance ledger (§7) --}}
+            <x-ui.card title="Promoter Advance ledger" subtitle="Every advance / commission movement, oldest first. Balance is always derived from this history.">
+                @if ($partner->ledgerEntries->isEmpty())
+                    <x-ui.empty-state icon="wallet" title="No ledger activity yet" />
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-(--border) text-left text-xs uppercase tracking-wider text-(--content-muted)">
+                                    <th class="py-2 pr-3">Date</th>
+                                    <th class="py-2 pr-3">Type</th>
+                                    <th class="py-2 pr-3">Reference</th>
+                                    <th class="py-2 pr-3 text-right">Commission</th>
+                                    <th class="py-2 pr-3 text-right">Advance</th>
+                                    <th class="py-2 pr-3 text-right">Adjustment</th>
+                                    <th class="py-2 pr-3 text-right">Payable</th>
+                                    <th class="py-2 pr-3 text-right">Balance</th>
+                                    <th class="py-2">Remark</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-(--border)">
+                                @foreach ($partner->ledgerEntries->reverse() as $entry)
+                                    <tr wire:key="ledger-{{ $entry->id }}" class="{{ $entry->reversed_at ? 'opacity-60' : '' }}">
+                                        <td class="py-2 pr-3 whitespace-nowrap">{{ $entry->created_at?->format('d M Y') }}</td>
+                                        <td class="py-2 pr-3 whitespace-nowrap">
+                                            {{ $entry->type->label() }}
+                                            @if ($entry->reversed_at) <x-ui.badge variant="muted" size="sm">reversed</x-ui.badge> @endif
+                                        </td>
+                                        <td class="py-2 pr-3 whitespace-nowrap">{{ $entry->booking?->booking_number ?? $entry->reference ?? '—' }}</td>
+                                        <td class="py-2 pr-3 text-right tabular-nums">{{ $entry->gross_commission_amount !== null ? '₹'.number_format((float) $entry->gross_commission_amount, 2) : '—' }}</td>
+                                        <td class="py-2 pr-3 text-right tabular-nums">{{ $entry->advance_amount !== null ? '₹'.number_format((float) $entry->advance_amount, 2) : '—' }}</td>
+                                        <td class="py-2 pr-3 text-right tabular-nums">{{ $entry->adjustment_amount !== null ? '₹'.number_format((float) $entry->adjustment_amount, 2) : '—' }}</td>
+                                        <td class="py-2 pr-3 text-right tabular-nums">{{ $entry->payable_amount !== null ? '₹'.number_format((float) $entry->payable_amount, 2) : '—' }}</td>
+                                        <td class="py-2 pr-3 text-right font-medium tabular-nums">₹{{ number_format((float) $entry->balance_after, 2) }}</td>
+                                        <td class="py-2 text-(--content-muted)">{{ $entry->description ?: '—' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
             </x-ui.card>
 
             {{-- Project authorizations --}}
@@ -146,25 +190,36 @@
                 @endcan
             </x-ui.card>
 
-            {{-- Commission scheme (M14.3) --}}
-            <x-ui.card title="Commission scheme">
-                <p class="text-sm">
-                    @if ($partner->commission_scheme_code)
-                        <span class="font-medium">{{ $partner->commission_scheme_code }}</span>
-                    @else
-                        <span class="text-(--content-muted)">Auto-matched by partner type / default</span>
-                    @endif
-                </p>
-                @if ($canAssignScheme)
-                    <form wire:submit="assignScheme" class="mt-3 space-y-2">
-                        <x-ui.select label="Assign scheme" wire:model="schemeCode" placeholder="— auto-match —">
-                            @foreach ($publishedSchemes as $s)
-                                <option value="{{ $s->code }}">{{ $s->name }} ({{ $s->code }})</option>
-                            @endforeach
-                        </x-ui.select>
-                        <x-ui.button type="submit" size="sm">Save</x-ui.button>
-                    </form>
-                @endif
+            {{-- Promoter Advance dashboard (§6) --}}
+            <x-ui.card title="Promoter Advance">
+                <dl class="space-y-2 text-sm">
+                    <div class="flex justify-between"><dt class="text-(--content-muted)">Commission rate</dt><dd class="font-medium">{{ $partner->commissionRateLabel() }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-(--content-muted)">Total booking value</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['totalBookingValue']->store(), 2) }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-(--content-muted)">Total commission earned</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['totalCommissionEarned']->store(), 2) }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-(--content-muted)">Total advance given</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['totalAdvanceGiven']->store(), 2) }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-(--content-muted)">Advance adjusted</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['totalAdvanceAdjusted']->store(), 2) }}</dd></div>
+                    <div class="flex justify-between border-t border-(--border) pt-2 font-semibold"><dt>Advance balance</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['advanceBalance']->store(), 2) }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-(--content-muted)">Commission payable</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['totalCommissionPayable']->store(), 2) }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-(--content-muted)">Commission paid</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['totalCommissionPaid']->store(), 2) }}</dd></div>
+                </dl>
+
+                @can('update', $partner)
+                    <div class="mt-4 space-y-3 border-t border-(--border) pt-4">
+                        <form wire:submit="giveAdvance" class="space-y-2">
+                            <p class="text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Add advance</p>
+                            <x-ui.input type="number" step="0.01" label="Amount (₹)" wire:model="advanceAmount" :error="$errors->first('advanceAmount')" />
+                            <x-ui.input label="Note (optional)" wire:model="advanceNote" :error="$errors->first('advanceNote')" />
+                            <x-ui.button type="submit" size="sm">Add advance</x-ui.button>
+                        </form>
+
+                        <form wire:submit="refundAdvance" class="space-y-2">
+                            <p class="text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Advance adjustment / refund</p>
+                            <x-ui.input type="number" step="0.01" label="Amount (₹)" wire:model="refundAmount" :error="$errors->first('refundAmount')" />
+                            <x-ui.input label="Reason" wire:model="refundReason" :error="$errors->first('refundReason')" />
+                            <x-ui.button type="submit" variant="secondary" size="sm">Record adjustment</x-ui.button>
+                        </form>
+                    </div>
+                @endcan
             </x-ui.card>
 
             {{-- KYC summary --}}
@@ -199,7 +254,7 @@
                                 @else
                                     <span>{{ $att->booking?->booking_number }}</span>
                                 @endcan
-                                <span class="text-xs text-(--content-muted)">{{ rtrim(rtrim(number_format((float) $att->share_percentage, 2), '0'), '.') }}% · {{ $att->role->label() }}</span>
+                                <span class="text-xs text-(--content-muted)">{{ $att->booking?->status?->label() }}</span>
                             </li>
                         @endforeach
                     </ul>

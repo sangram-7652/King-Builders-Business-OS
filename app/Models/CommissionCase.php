@@ -14,9 +14,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * A partner's commission obligation on one booking (M14.4). CMN-000001.
- * One per (booking, partner). The authoritative figure is the immutable
+ * A promoter's commission obligation on one booking (M14.4). CMN-000001.
+ * One per (booking, partner) — at most one per booking, since a booking has at
+ * most one promoter. The authoritative figure is the immutable
  * {@see CommissionCalculation} snapshot `current_calculation_id` points at.
+ *
+ * `commission_amount` is the GROSS commission earned; `advance_adjusted_amount`
+ * is how much of it was automatically consumed against the promoter's
+ * outstanding advance (see {@see \App\Services\Commission\PromoterLedgerService});
+ * `payable_amount` = commission_amount − advance_adjusted_amount is what a
+ * payout may actually pay out. Never conflate gross with payable.
  *
  * @property CommissionCaseStatus $status
  */
@@ -29,9 +36,9 @@ class CommissionCase extends Model
 
     protected $fillable = [
         'case_number', 'booking_id', 'partner_id', 'booking_partner_attribution_id',
-        'commission_scheme_id', 'commission_rule_id', 'current_calculation_id', 'status',
+        'current_calculation_id', 'status',
         'is_eligible', 'eligibility_reason', 'eligibility_checked_at',
-        'commission_amount', 'paid_amount', 'clawback_amount',
+        'commission_amount', 'advance_adjusted_amount', 'payable_amount', 'paid_amount', 'clawback_amount',
         'generated_at', 'generated_by', 'approved_at', 'approved_by',
         'held_at', 'hold_reason',
         'cancelled_at', 'cancellation_reason',
@@ -44,13 +51,13 @@ class CommissionCase extends Model
             'booking_id' => 'integer',
             'partner_id' => 'integer',
             'booking_partner_attribution_id' => 'integer',
-            'commission_scheme_id' => 'integer',
-            'commission_rule_id' => 'integer',
             'current_calculation_id' => 'integer',
             'status' => CommissionCaseStatus::class,
             'is_eligible' => 'boolean',
             'eligibility_checked_at' => 'datetime',
             'commission_amount' => 'decimal:2',
+            'advance_adjusted_amount' => 'decimal:2',
+            'payable_amount' => 'decimal:2',
             'paid_amount' => 'decimal:2',
             'clawback_amount' => 'decimal:2',
             'generated_at' => 'datetime',
@@ -88,12 +95,6 @@ class CommissionCase extends Model
         return $this->belongsTo(BookingPartnerAttribution::class, 'booking_partner_attribution_id');
     }
 
-    /** @return BelongsTo<CommissionScheme, $this> */
-    public function scheme(): BelongsTo
-    {
-        return $this->belongsTo(CommissionScheme::class, 'commission_scheme_id');
-    }
-
     /** @return BelongsTo<CommissionCalculation, $this> */
     public function currentCalculation(): BelongsTo
     {
@@ -116,6 +117,12 @@ class CommissionCase extends Model
     public function payouts(): HasMany
     {
         return $this->hasMany(CommissionPayout::class)->latest('id');
+    }
+
+    /** This case's ledger footprint (its `commission` row + any reversal of it). @return HasMany<PromoterLedgerEntry, $this> */
+    public function ledgerEntries(): HasMany
+    {
+        return $this->hasMany(PromoterLedgerEntry::class)->orderBy('id');
     }
 
     /** Payouts that count toward `paid_amount` (not voided). @return HasMany<CommissionPayout, $this> */
@@ -164,10 +171,10 @@ class CommissionCase extends Model
         return $this->status->isRecalculable();
     }
 
-    /** The outstanding commission still to be paid (0 once fully paid). */
+    /** The outstanding PAYABLE commission still to be paid out (0 once fully paid; never the gross figure). */
     public function outstandingAmount(): string
     {
-        return bcsub((string) $this->commission_amount, (string) $this->paid_amount, 2);
+        return bcsub((string) $this->payable_amount, (string) $this->paid_amount, 2);
     }
 
     /**

@@ -16,9 +16,8 @@
         ['label' => 'Possession', 'route' => 'possession.dashboard', 'params' => [], 'icon' => 'building', 'can' => (bool) $user?->can(Permission::PossessionView->value)],
         ['label' => 'Transfers', 'route' => 'transfers.dashboard', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::TransferView->value)],
         ['label' => 'Projects', 'route' => 'projects.index', 'params' => [], 'icon' => 'building', 'can' => (bool) $user?->can(Permission::ProjectsView->value)],
-        ['label' => 'Channel Partners', 'route' => 'partners.index', 'params' => [], 'icon' => 'user', 'can' => (bool) $user?->can(Permission::PartnersView->value)],
+        ['label' => 'Promoters', 'route' => 'partners.index', 'params' => [], 'icon' => 'user', 'can' => (bool) $user?->can(Permission::PartnersView->value)],
         ['label' => 'Commissions', 'route' => 'commissions.index', 'params' => [], 'icon' => 'layers', 'can' => (bool) $user?->can(Permission::CommissionView->value)],
-        ['label' => 'Commission Schemes', 'route' => 'commission-schemes.index', 'params' => [], 'icon' => 'layers', 'can' => (bool) $user?->can(Permission::CommissionSchemesView->value)],
     ], fn ($item) => $item['can']));
 
     // --- Reports (M11) --------------------------------------------------
@@ -31,7 +30,7 @@
     ] : [];
 
     // Modules that are live now — excluded from the "coming soon" roadmap list.
-    $liveModules = ['projects', 'plots', 'buyers', 'bookings', 'pricing', 'payments', 'receipts', 'documents', 'agreements', 'registry', 'registry_expenses', 'handover', 'possession', 'transfer', 'ownership', 'reports', 'partners', 'commission_schemes', 'commission'];
+    $liveModules = ['projects', 'plots', 'buyers', 'bookings', 'pricing', 'payments', 'receipts', 'documents', 'agreements', 'registry', 'registry_expenses', 'handover', 'possession', 'transfer', 'ownership', 'reports', 'partners', 'commission'];
 
     // --- Administration ---------------------------------------------------
     $adminNav = array_values(array_filter([

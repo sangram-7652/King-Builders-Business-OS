@@ -10,22 +10,22 @@ use App\Models\CommissionCase;
 use App\Models\User;
 use App\Services\Commission\CommissionCaseWriter;
 use App\Services\Commission\CommissionEligibilityService;
-use App\Services\Commission\CommissionSchemeResolver;
 use App\Support\Concerns\RunsInTransaction;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Recomputes a single commission case against the CURRENTLY published scheme +
- * live M6/M7 figures (M14.4). Only a PENDING_REVIEW / ON_HOLD case can be
- * recalculated — once approved or paid the snapshot is locked. A new immutable
- * calculation row is appended; the previous ones stay untouched.
+ * Recomputes a single commission case against live M6/M7 figures (M14.4).
+ * Only a PENDING_REVIEW / ON_HOLD case can be recalculated — once approved or
+ * paid the snapshot is locked. A new immutable calculation row is appended;
+ * the previous ones stay untouched. The promoter's advance adjustment is
+ * reversed and reapplied against the fresh gross figure (never double-consumed
+ * — see {@see \App\Services\Commission\PromoterLedgerService::applyCommission()}).
  */
 class RecalculateCommissionCase
 {
     use RunsInTransaction;
 
     public function __construct(
-        private readonly CommissionSchemeResolver $schemes,
         private readonly CommissionEligibilityService $eligibility,
         private readonly CommissionCaseWriter $writer,
     ) {}
@@ -59,12 +59,11 @@ class RecalculateCommissionCase
                 throw new DomainException("Not eligible — {$eval['reason']}");
             }
 
-            $resolved = $this->schemes->resolveRule($locked->partner, $locked->booking->project_id);
-            $calc = $this->writer->write($locked, $resolved['scheme'], $resolved['rule'], $attribution, $actor);
+            $calc = $this->writer->write($locked, $locked->partner, $locked->booking, $actor);
 
             $locked->recordEvent(
                 CommissionCaseEventType::Recalculated,
-                "Recalculated — {$resolved['scheme']->code} v{$resolved['scheme']->version}, ₹{$calc->commission_amount}.",
+                "Recalculated — gross ₹{$calc->commission_amount}, payable ₹{$calc->payable_amount}.",
                 ['calculation_id' => $calc->id, 'sequence' => $calc->sequence],
                 $actor,
             );

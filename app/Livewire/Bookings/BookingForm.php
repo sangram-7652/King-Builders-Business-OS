@@ -104,7 +104,7 @@ class BookingForm extends Component
             match ($line->type) {
                 PriceComponentType::Plc => $this->plcLines[] = $row + ['plc_type_id' => (string) ($line->plc_type_id ?? '')],
                 PriceComponentType::Charge => $this->chargeLines[] = $row + ['charge_type_id' => (string) ($line->charge_type_id ?? '')],
-                PriceComponentType::Discount => $this->discountLines[] = $row,
+                PriceComponentType::Discount => $this->discountLines[] = $row + ['remark' => (string) data_get($line->metadata, 'remark', '')],
                 PriceComponentType::Tax => $this->taxLines[] = $row + ['tax_rate_id' => (string) ($line->tax_rate_id ?? '')],
                 default => null,
             };
@@ -142,7 +142,7 @@ class BookingForm extends Component
 
     public function addDiscount(): void
     {
-        $this->discountLines[] = ['name' => 'Discount', 'calculation_type' => PriceCalculationType::Fixed->value, 'rate' => '', 'override' => false];
+        $this->discountLines[] = ['name' => 'Discount', 'calculation_type' => PriceCalculationType::Fixed->value, 'rate' => '', 'override' => false, 'remark' => ''];
     }
 
     public function addTax(): void
@@ -239,7 +239,10 @@ class BookingForm extends Component
             $components[] = $this->componentRow(PriceComponentType::Charge, $row, ['charge_type_id' => $row['charge_type_id'] ?: null]);
         }
         foreach ($this->discountLines as $row) {
-            $components[] = $this->componentRow(PriceComponentType::Discount, $row, []);
+            $remark = trim((string) ($row['remark'] ?? ''));
+            $components[] = $this->componentRow(PriceComponentType::Discount, $row, [
+                'metadata' => $remark !== '' ? ['remark' => $remark] : [],
+            ]);
         }
         foreach ($this->taxLines as $row) {
             $components[] = $this->componentRow(PriceComponentType::Tax, $row, ['tax_rate_id' => $row['tax_rate_id'] ?: null]);
@@ -287,18 +290,49 @@ class BookingForm extends Component
     public function addBuyer(): void
     {
         $this->buyers[] = ['buyer_id' => '', 'ownership_percentage' => '0', 'is_primary' => false];
+        $this->redistributeOwnership();
     }
 
     public function removeBuyer(int $i): void
     {
         unset($this->buyers[$i]);
         $this->buyers = array_values($this->buyers);
+        $this->redistributeOwnership();
     }
 
-    public function setPrimary(int $i): void
+    /**
+     * The Buyers section no longer exposes ownership % / primary controls —
+     * co-ownership is still fully supported internally (booking_buyers,
+     * BookingBuyerValidator, primary-buyer lookups elsewhere), so whenever the
+     * buyer list itself changes shape we split the share evenly and default
+     * the first buyer to primary, invisibly, satisfying the backend's "exactly
+     * one primary / shares total exactly 100%" rule without a visible control.
+     * An existing booking's already-stored shares are left untouched unless
+     * the buyer list is actually edited (see hydrateFromBooking()).
+     */
+    private function redistributeOwnership(): void
     {
-        foreach (array_keys($this->buyers) as $k) {
-            $this->buyers[$k]['is_primary'] = $k === $i;
+        $count = count($this->buyers);
+
+        if ($count === 0) {
+            return;
+        }
+
+        // Hundredths of a percent so the shares always sum to exactly 100.00
+        // regardless of how many buyers there are.
+        $share = intdiv(10000, $count);
+        $remainder = 10000 - $share * $count;
+
+        $hasPrimary = collect($this->buyers)->contains(fn ($row) => ($row['is_primary'] ?? false) === true);
+
+        foreach (array_keys($this->buyers) as $position => $key) {
+            $hundredths = $share + ($position === $count - 1 ? $remainder : 0);
+            $this->buyers[$key]['ownership_percentage'] = number_format($hundredths / 100, 2, '.', '');
+        }
+
+        if (! $hasPrimary) {
+            $firstKey = array_key_first($this->buyers);
+            $this->buyers[$firstKey]['is_primary'] = true;
         }
     }
 

@@ -134,3 +134,87 @@ it('a soft-deleted buyer does not block re-registering the same email', function
     expect($new->exists)->toBeTrue()
         ->and(Buyer::where('email', 'reuse@example.com')->count())->toBe(1);
 });
+
+// ---------------------------------------------------------------------------
+// F-BUY-1 — the create form validates email uniqueness before insert instead
+// of letting the buyers_email_canonical_unique constraint 500 the request.
+// ---------------------------------------------------------------------------
+
+it('creates a buyer with a unique email successfully', function () {
+    Livewire::actingAs(buyerManager())
+        ->test(BuyerForm::class)
+        ->set('first_name', 'Priya')
+        ->set('phone', '9876500001')
+        ->set('email', 'priya@example.com')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $buyer = Buyer::firstWhere('first_name', 'Priya');
+    expect($buyer)->not->toBeNull()
+        ->and($buyer->email)->toBe('priya@example.com');
+});
+
+it('rejects creating a buyer with a duplicate email — a form error, never a 500', function () {
+    Buyer::factory()->create(['email' => 'sangramsingh.dev@gmail.com']);
+
+    $component = Livewire::actingAs(buyerManager())
+        ->test(BuyerForm::class)
+        ->set('first_name', 'Duplicate')
+        ->set('phone', '9876500002')
+        ->set('email', 'sangramsingh.dev@gmail.com')
+        ->call('save');
+
+    $component->assertHasErrors(['email' => 'unique']);
+    expect($component->errors()->first('email'))->toBe('The email has already been taken.');
+
+    expect(Buyer::where('email', 'sangramsingh.dev@gmail.com')->count())->toBe(1);
+});
+
+it('rejects a duplicate email on create case-insensitively and after trimming', function () {
+    Buyer::factory()->create(['email' => 'family@example.com']);
+
+    Livewire::actingAs(buyerManager())
+        ->test(BuyerForm::class)
+        ->set('first_name', 'Case')
+        ->set('phone', '9876500003')
+        ->set('email', '  FAMILY@Example.com  ')
+        ->call('save')
+        ->assertHasErrors(['email' => 'unique']);
+
+    expect(Buyer::where('email', 'family@example.com')->count())->toBe(1);
+});
+
+it('does not block creating a buyer whose email belonged to a soft-deleted buyer', function () {
+    $old = Buyer::factory()->create(['email' => 'freed@example.com']);
+    $old->delete();
+
+    Livewire::actingAs(buyerManager())
+        ->test(BuyerForm::class)
+        ->set('first_name', 'Fresh')
+        ->set('phone', '9876500004')
+        ->set('email', 'freed@example.com')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(Buyer::where('email', 'freed@example.com')->count())->toBe(1);
+});
+
+it('converts a duplicate-email database race into the same friendly form error instead of a 500', function () {
+    // Editing intentionally skips the pre-insert uniqueness check (F-BUY-1
+    // only guards create — see BuyerForm::rules()), so saving an edit whose
+    // email now collides with another buyer reaches the database constraint
+    // directly. This is exactly the defensive path a genuine concurrent
+    // create-create race would also hit — same exception, same catch block.
+    Buyer::factory()->create(['email' => 'taken@example.com']);
+    $editing = Buyer::factory()->create(['email' => 'mine@example.com']);
+
+    $component = Livewire::actingAs(buyerManager())
+        ->test(BuyerForm::class, ['buyer' => $editing])
+        ->set('email', 'taken@example.com')
+        ->call('save');
+
+    $component->assertHasErrors('email');
+    expect($component->errors()->first('email'))->toBe('The email has already been taken.');
+
+    expect($editing->fresh()->email)->toBe('mine@example.com'); // unchanged
+});
