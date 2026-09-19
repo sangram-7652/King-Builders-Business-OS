@@ -1,83 +1,216 @@
-@php
-    /** @var \App\Models\Receipt $receipt */
-    $payment = $receipt->payment;
-    $booking = $receipt->booking;
-    $primary = $brand['primary'] ?? '#2563eb';
-@endphp
+<?php
+/** @var \App\Models\Receipt $receipt */
+/** @var \App\Support\Branding $brand */
+/** @var array<string, mixed> $extra */
+$payment = $receipt->payment;
+$booking = $receipt->booking;
+$plot = $booking?->plot;
+$primary = $brand->colors['primary'];
+$money = fn ($v) => '₹'.number_format((float) $v, 2);
+$logoFile = $brand->logoPath ? public_path($brand->logoPath) : null;
+$qrFile = $brand->qrPath ? public_path($brand->qrPath) : null;
+?>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <style>
         * { font-family: DejaVu Sans, sans-serif; }
-        body { margin: 0; color: #1f2933; font-size: 12px; }
-        .wrap { padding: 32px 40px; }
-        .head { border-bottom: 3px solid {{ $primary }}; padding-bottom: 12px; margin-bottom: 20px; }
-        .company { font-size: 20px; font-weight: bold; color: {{ $primary }}; }
-        .doc-title { float: right; text-align: right; }
-        .doc-title h1 { margin: 0; font-size: 18px; letter-spacing: 1px; }
-        .doc-title .num { color: #52606d; font-size: 13px; }
-        table.kv { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
-        table.kv td { padding: 5px 8px; vertical-align: top; }
-        table.kv td.label { color: #7b8794; width: 32%; }
-        .amount-box { border: 2px solid {{ $primary }}; border-radius: 6px; padding: 14px 18px; margin: 16px 0; }
-        .amount-box .lbl { color: #7b8794; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-        .amount-box .val { font-size: 24px; font-weight: bold; color: {{ $primary }}; }
-        .void { color: #b91c1c; font-weight: bold; border: 2px dashed #b91c1c; padding: 6px 12px; display: inline-block; margin-bottom: 12px; }
-        .foot { margin-top: 40px; border-top: 1px solid #cbd2d9; padding-top: 12px; color: #7b8794; font-size: 11px; }
-        .sign { margin-top: 48px; }
-        .sign .line { border-top: 1px solid #1f2933; width: 200px; padding-top: 4px; }
+        body { margin: 0; color: #1a1a1a; font-size: 11px; }
+        .wrap { padding: 26px 34px; }
+        .void { color: #b91c1c; font-weight: bold; border: 2px dashed #b91c1c; padding: 6px 12px; display: inline-block; margin-bottom: 14px; }
+
+        table.head { width: 100%; border-collapse: collapse; }
+        table.head td { vertical-align: top; }
+        .qr { width: 72px; height: auto; display: block; }
+        .qr-caption { width: 108px; font-size: 7px; color: #444; text-align: left; margin-top: 3px; line-height: 1.25; }
+        .logo { height: 72px; margin-bottom: 4px; }
+        .company-name { font-size: 17px; font-weight: bold; color: #111; letter-spacing: .3px; white-space: nowrap; }
+        .company-contact { font-size: 9.5px; color: #444; margin-top: 3px; }
+        .company-contact .nowrap { white-space: nowrap; }
+        table.meta { width: 100%; border-collapse: collapse; }
+        table.meta td { padding: 1px 0; font-size: 10px; }
+        table.meta td.lbl { font-weight: bold; padding-right: 4px; white-space: nowrap; }
+        table.meta td.val { font-weight: bold; text-align: right; }
+        .rule { border-bottom: 2px solid {{ $primary }}; margin: 10px 0 16px; }
+        .rule-lt { border-bottom: 1px solid #333; margin: 10px 0; }
+
+        .customer-id { font-size: 10px; font-weight: bold; }
+        .customer-name { font-size: 15px; font-weight: bold; margin-top: 2px; }
+        .customer-line { font-size: 10.5px; color: #333; margin-top: 1px; }
+
+        .section-title { font-size: 11.5px; font-weight: bold; text-transform: uppercase; letter-spacing: .5px;
+            color: #111; border-bottom: 1px solid #111; padding-bottom: 4px; margin: 16px 0 8px; }
+
+        table.grid { width: 100%; border-collapse: collapse; }
+        table.grid td { padding: 3px 6px 3px 0; font-size: 10.5px; vertical-align: top; }
+        table.grid td.lbl { color: #444; width: 22%; white-space: nowrap; }
+        table.grid td.val { width: 28%; font-weight: bold; color: #111; }
+
+        .welcome { margin-top: 16px; font-size: 11px; font-weight: bold; color: #111; }
+        .notes { margin-top: 6px; }
+        .notes .heading { font-size: 10.5px; font-weight: bold; }
+        .notes ol { margin: 4px 0 0 16px; padding: 0; }
+        .notes li { margin-bottom: 4px; font-size: 9px; color: #333; text-align: justify; }
+
+        .sign { margin-top: 34px; text-align: right; }
+        .sign .line { display: inline-block; border-top: 1px solid #111; padding-top: 4px; font-size: 10px; font-weight: bold; }
+
+        .footer { margin-top: 18px; border-top: 2px solid {{ $primary }}; padding-top: 10px; font-size: 9.5px; color: #333; text-align: center; }
     </style>
 </head>
 <body>
 <div class="wrap">
-    <div class="head">
-        <div class="doc-title">
-            <h1>PAYMENT RECEIPT</h1>
-            <div class="num">{{ $receipt->receipt_number }}</div>
-        </div>
-        <div class="company">{{ $brand['name'] }}</div>
-        <div style="color:#7b8794">{{ $brand['name'] }} Business OS</div>
-    </div>
 
     @if ($receipt->isVoided())
         <div class="void">VOID — {{ $receipt->void_reason }}</div>
     @endif
 
-    <table class="kv">
-        <tr><td class="label">Receipt no.</td><td>{{ $receipt->receipt_number }}</td>
-            <td class="label">Date</td><td>{{ $receipt->payment_date?->format('d M Y') }}</td></tr>
-        <tr><td class="label">Project</td><td>{{ $booking->project?->name ?? '—' }}</td>
-            <td class="label">Booking</td><td>{{ $booking->booking_number }}</td></tr>
-        <tr><td class="label">Plot</td><td>{{ $booking->plot?->plot_number ?? '—' }}</td>
-            <td class="label">Payment no.</td><td>{{ $payment->payment_number }}</td></tr>
-        <tr><td class="label">Received from</td><td>{{ $receipt->buyer_name_snapshot }}</td>
-            <td class="label">Payment mode</td><td>{{ $receipt->payment_mode_label }}</td></tr>
-        <tr><td class="label">Reference</td><td>{{ $receipt->reference_number ?: '—' }}</td>
-            <td class="label">Status</td><td>{{ $payment->status->label() }}</td></tr>
+    {{-- HEADER: letterhead centred, receipt meta right-aligned --}}
+    <table class="head">
+        <tr>
+            <td style="width: 16%;">
+                @if ($qrFile && file_exists($qrFile))
+                    <img class="qr" src="{{ $qrFile }}">
+                    <div class="qr-caption">IF YOU ARE PAYING VIA UPI (GOOGLE PAY / PHONEPE), KINDLY MAKE THE PLOT PAYMENT BY SCANNING THIS QR CODE.</div>
+                @endif
+            </td>
+            <td style="width: 48%; text-align: center;">
+                @if ($logoFile && file_exists($logoFile))
+                    <img class="logo" src="{{ $logoFile }}"><br>
+                @endif
+                <div class="company-name">{{ strtoupper($brand->name) }}</div>
+                @if ($brand->contact['email'] || $brand->contact['phone'])
+                    <div class="company-contact">
+                        @if ($brand->contact['email'])<span class="nowrap">Email:- {{ $brand->contact['email'] }}</span> @endif
+                        @if ($brand->contact['phone'])<span class="nowrap">{{ $brand->contact['phone'] }}</span> @endif
+                    </div>
+                @endif
+            </td>
+            <td style="width: 36%;">
+                <table class="meta">
+                    <tr><td class="lbl">Receipt No:</td><td class="val">{{ $receipt->receipt_number }}</td></tr>
+                    <tr><td class="lbl">Receipt Date:</td><td class="val">{{ $receipt->payment_date?->format('d/m/Y') }}</td></tr>
+                    <tr><td class="lbl">Project:</td><td class="val">{{ $booking?->project?->name ?? '—' }}</td></tr>
+                    <tr><td class="lbl">Booked Branch:</td><td class="val">{{ $extra['bookedBranch'] ?? '—' }}</td></tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+    <div class="rule"></div>
+
+    {{-- CUSTOMER INFORMATION --}}
+    <div class="customer-id">CUSTOMER ID: {{ $extra['customerCode'] ?? '—' }}</div>
+    <div class="customer-name">{{ strtoupper($receipt->buyer_name_snapshot) }}</div>
+    @if ($extra['customerCity'] ?? null)
+        <div class="customer-line">{{ $extra['customerCity'] }}</div>
+    @endif
+    <div class="customer-line">MOBILE NO: {{ $extra['customerMobile'] ?? '—' }}</div>
+    <div class="rule-lt"></div>
+
+    {{-- PROPERTY INFORMATION --}}
+    <table class="grid">
+        <tr>
+            <td class="lbl">Plot No. / Project</td>
+            <td class="val">{{ $plot?->plot_number ?? '—' }} ({{ $booking?->project?->name ?? '—' }})</td>
+            <td class="lbl">Payment Type</td>
+            <td class="val">Payment</td>
+        </tr>
+        <tr>
+            <td class="lbl">Area</td>
+            <td class="val">{{ $extra['plotArea'] ?? '—' }}</td>
+            <td class="lbl">Plot Status</td>
+            <td class="val">{{ $plot?->status?->label() ?? '—' }}</td>
+        </tr>
+        <tr>
+            <td class="lbl">Dimension</td>
+            <td class="val">{{ $extra['plotDimension'] ?? '—' }}</td>
+            <td class="lbl">Phase</td>
+            <td class="val">{{ $extra['phase'] ?? '—' }}</td>
+        </tr>
+        <tr>
+            <td class="lbl">Plot Facing</td>
+            <td class="val">{{ $extra['plotFacing'] ?? '—' }}</td>
+            <td class="lbl">Additional Charges</td>
+            <td class="val">{{ ($extra['additionalCharges'] ?? 0) > 0 ? $money($extra['additionalCharges']) : '—' }}</td>
+        </tr>
     </table>
 
-    <div class="amount-box">
-        <div class="lbl">Amount received</div>
-        <div class="val">&#8377; {{ number_format((float) $receipt->amount, 2) }}</div>
-    </div>
+    <div class="section-title">Payment Details</div>
+    <table class="grid">
+        <tr>
+            <td class="lbl">Rate</td>
+            <td class="val">{{ $booking?->base_rate !== null ? number_format((float) $booking->base_rate, 2) : '—' }}</td>
+            <td class="lbl">Chq / NEFT / RTGS No.</td>
+            <td class="val">{{ $payment->reference_number ?: '—' }}</td>
+        </tr>
+        <tr>
+            <td class="lbl">Total Plot Amount</td>
+            <td class="val">{{ $booking !== null ? $money($booking->final_amount) : '—' }}</td>
+            <td class="lbl">Payee Name</td>
+            <td class="val">{{ $brand->name }}</td>
+        </tr>
+        <tr>
+            <td class="lbl">Paid Amount</td>
+            <td class="val">{{ $money($receipt->amount) }} ({{ $extra['paidAmountInWords'] ?? '—' }})</td>
+            <td class="lbl">Chq / NEFT / RTGS Date</td>
+            <td class="val">{{ $receipt->payment_date?->format('d/m/Y') }}</td>
+        </tr>
+        <tr>
+            <td class="lbl">Total Paid Amount</td>
+            <td class="val">{{ isset($extra['totalPaidAmount']) ? $money($extra['totalPaidAmount']) : '—' }}</td>
+            <td class="lbl">Bank Name</td>
+            <td class="val">{{ $payment->cheque_bank_name ?: '—' }}</td>
+        </tr>
+        <tr>
+            <td class="lbl">Balance Amount</td>
+            <td class="val">{{ isset($extra['balanceAmount']) ? $money($extra['balanceAmount']) : '—' }}</td>
+            <td class="lbl">Remark</td>
+            <td class="val">{{ $payment->notes ?: '—' }}</td>
+        </tr>
+        <tr>
+            <td class="lbl">Payment Mode</td>
+            <td class="val" colspan="3">{{ $receipt->payment_mode_label }}</td>
+        </tr>
+    </table>
 
-    @if ($payment->cheque_number)
-        <table class="kv">
-            <tr><td class="label">Cheque no.</td><td>{{ $payment->cheque_number }}</td>
-                <td class="label">Cheque bank</td><td>{{ $payment->cheque_bank_name ?: '—' }}</td></tr>
-            <tr><td class="label">Cheque date</td><td>{{ $payment->cheque_date?->format('d M Y') }}</td>
-                <td class="label">Cheque status</td><td>{{ $payment->cheque_status?->label() ?? '—' }}</td></tr>
-        </table>
-    @endif
+    <div class="welcome">Welcome to {{ $brand->name }} &amp; thank you for associating with us.</div>
+
+    <div class="notes">
+        <div class="heading">Note —</div>
+        <ol>
+            <li>The receipt is subject to realisation of cash, cheque and DD.</li>
+            <li>This is merely a receipt against the cheque / draft / pay order received by the company based on information furnished by the applicant in the application, and the allotment pursuant thereto is purely provisional and does not entitle the applicant to claim any right, title or interest of any nature whatsoever over the land / property.</li>
+            <li>In case the cheque comprising the booking amount is dishonoured for any reason whatsoever, the applicant shall be deemed to be null and void and the allotment, if any, shall stand automatically cancelled / revoked / withdrawn without any notice to the applicant.</li>
+            <li>This is a computer-generated receipt. No stamp required.</li>
+            <li>Payment will be accepted only from the account of the client in whose name the registration / registry is done.</li>
+            @if ($brand->hasBankAccount())
+                <li>
+                    Kindly deposit all payments only into the company's official bank account. The account details are provided below:
+                    Account Name: {{ $brand->bank['account_name'] ?: $brand->name }};
+                    Account Number: {{ $brand->bank['account_number'] }};
+                    @if ($brand->bank['ifsc']) IFSC Code: {{ $brand->bank['ifsc'] }}; @endif
+                    @if ($brand->bank['name']) Bank Name: {{ $brand->bank['name'] }}; @endif
+                    @if ($brand->bank['branch']) Branch: {{ $brand->bank['branch'] }}. @endif
+                    Payments made to any account other than the one mentioned above will not be accepted, and the company will not be responsible for any amount paid to an unauthorised account.
+                </li>
+            @endif
+        </ol>
+    </div>
 
     <div class="sign">
-        <div class="line">Received by — {{ $receipt->issuedBy?->name ?? 'Authorised signatory' }}</div>
+        <div class="line">(AUTHORISED SIGNATORY)</div>
     </div>
 
-    <div class="foot">
-        Issued {{ $receipt->issued_at?->format('d M Y H:i') }}. This is a computer-generated receipt.
-        Financial truth is maintained against the booking's payment ledger.
+    <div class="footer">
+        @if ($brand->contact['head_office_address'])
+            Head Office:- {{ $brand->contact['head_office_address'] }}<br>
+        @endif
+        @if ($brand->contact['email'] || $brand->contact['website'])
+            @if ($brand->contact['email']) Email:- {{ $brand->contact['email'] }} @endif
+            @if ($brand->contact['email'] && $brand->contact['website']) , @endif
+            @if ($brand->contact['website']) Website:- {{ $brand->contact['website'] }} @endif
+        @endif
     </div>
 </div>
 </body>

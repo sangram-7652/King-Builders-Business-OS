@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Buyer;
 use App\Models\Receipt;
 use App\Support\Branding;
+use App\Support\Payments\ReceiptPdfData;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
@@ -34,15 +35,14 @@ class ReceiptDownloadController extends Controller
             404,
         );
 
-        $receipt->load(['payment.paymentMode', 'booking.project', 'booking.plot', 'issuedBy']);
-
         $customer->recordPortalActivity(CustomerActivityType::ReceiptDownloaded, "Downloaded receipt {$receipt->receipt_number}.", [
             'receipt_id' => $receipt->id,
         ]);
 
         $pdf = Pdf::loadView('receipts.pdf', [
             'receipt' => $receipt,
-            'brand' => ['name' => $branding->name, 'primary' => $branding->colors['primary']],
+            'brand' => $branding,
+            'extra' => ReceiptPdfData::build($receipt),
         ])->setPaper('a4');
 
         return $pdf->stream("{$receipt->receipt_number}.pdf");

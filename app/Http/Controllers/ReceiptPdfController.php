@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Receipt;
 use App\Support\Branding;
+use App\Support\Payments\ReceiptPdfData;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
@@ -20,16 +21,10 @@ class ReceiptPdfController extends Controller
     {
         Gate::authorize('generate', $receipt);
 
-        $receipt->load([
-            'payment.paymentMode', 'booking.project', 'booking.plot', 'issuedBy',
-        ]);
-
         $pdf = Pdf::loadView('receipts.pdf', [
             'receipt' => $receipt,
-            'brand' => [
-                'name' => $branding->name,
-                'primary' => $branding->colors['primary'],
-            ],
+            'brand' => $branding,
+            'extra' => ReceiptPdfData::build($receipt),
         ])->setPaper('a4');
 
         return $pdf->stream("{$receipt->receipt_number}.pdf");
