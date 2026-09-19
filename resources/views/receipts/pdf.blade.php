@@ -179,22 +179,23 @@ $qrFile = $brand->qrPath ? public_path($brand->qrPath) : null;
     <div class="notes">
         <div class="heading">Note —</div>
         <ol>
-            <li>The receipt is subject to realisation of cash, cheque and DD.</li>
-            <li>This is merely a receipt against the cheque / draft / pay order received by the company based on information furnished by the applicant in the application, and the allotment pursuant thereto is purely provisional and does not entitle the applicant to claim any right, title or interest of any nature whatsoever over the land / property.</li>
-            <li>In case the cheque comprising the booking amount is dishonoured for any reason whatsoever, the applicant shall be deemed to be null and void and the allotment, if any, shall stand automatically cancelled / revoked / withdrawn without any notice to the applicant.</li>
-            <li>This is a computer-generated receipt. No stamp required.</li>
-            <li>Payment will be accepted only from the account of the client in whose name the registration / registry is done.</li>
+            <li>The receipt is subject to realization of cash,cheque and DD.</li>
+            <li>This is merely a receipt against the cheque/draft/pay order recieved by the company based on information furnished by the applicant in the application and the allotment pursuant thereto is purely provisional and does not entitile the applicant to claim any right, title or interest of any nature whosoever over the land/Property.</li>
+            <li>In case the cheque comprising booking amount is dishonored due to any reason whatsoever the applicant shall be deemed to be null and void and the allotment, if any, shall stand automatically cancelled/revoked/withdrawn without any notice to the applicant.</li>
+            <li>This is computer generated receipt.No stamp required.</li>
+            <li>Payment will be accept from the account of the client in whose name the registry is done.</li>
             @if ($brand->hasBankAccount())
                 <li>
                     Kindly deposit all payments only into the company's official bank account. The account details are provided below:
-                    Account Name: {{ $brand->bank['account_name'] ?: $brand->name }};
-                    Account Number: {{ $brand->bank['account_number'] }};
-                    @if ($brand->bank['ifsc']) IFSC Code: {{ $brand->bank['ifsc'] }}; @endif
-                    @if ($brand->bank['name']) Bank Name: {{ $brand->bank['name'] }}; @endif
-                    @if ($brand->bank['branch']) Branch: {{ $brand->bank['branch'] }}. @endif
-                    Payments made to any account other than the one mentioned above will not be accepted, and the company will not be responsible for any amount paid to an unauthorised account.
+                    Company Name: {{ $brand->bank['account_name'] ?: $brand->name }}
+                    Account Number: {{ $brand->bank['account_number'] }}
+                    @if ($brand->bank['ifsc']) IFSC Code: {{ $brand->bank['ifsc'] }} @endif
+                    @if ($brand->bank['name']) Bank Name: {{ $brand->bank['name'] }} @endif
+                    @if ($brand->bank['branch']) Branch: {{ $brand->bank['branch'] }} @endif
+                    Payments made to any account other than the one mentioned above will not be accepted. The company will not be responsible for any amount paid to an unauthorized account. Thank you for your cooperation. Sincerely, {{ rtrim($brand->bank['account_name'] ?: $brand->name, '.') }}.
                 </li>
             @endif
+            <li>If the booking amount paid is less than 25% of the total plot value, the customer must clear the balance amount within 30 days from the booking date. If the customer fails to complete the plot registration within 40 days from the booking date, the booking will be automatically cancelled without any prior notice.</li>
         </ol>
     </div>
 
