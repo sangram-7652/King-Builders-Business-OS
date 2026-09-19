@@ -21,22 +21,6 @@
                     <div><dt class="text-(--content-muted)">Reference</dt><dd>{{ $payment->reference_number }}</dd></div>
                 @endif
             </dl>
-
-            @if ($payment->allocations->isNotEmpty())
-                <div class="mt-4 border-t border-(--border) pt-3">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Applied to</p>
-                    <table class="mt-1 min-w-full text-sm">
-                        <tbody class="divide-y divide-(--border)">
-                            @foreach ($payment->allocations as $alloc)
-                                <tr>
-                                    <td class="py-1 pr-4">Installment {{ $alloc->installment?->installment_number }} @if ($alloc->installment?->name) — {{ $alloc->installment->name }} @endif</td>
-                                    <td class="py-1 text-right tabular-nums">₹{{ number_format((float) $alloc->amount, 2) }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
         </x-ui.card>
 
         <x-ui.card title="Receipt">

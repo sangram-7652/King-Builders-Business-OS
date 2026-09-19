@@ -7,7 +7,6 @@ namespace App\Services\Communication;
 use App\Enums\CommunicationCategory;
 use App\Enums\CommunicationChannel;
 use App\Models\Buyer;
-use App\Models\Lead;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
@@ -30,7 +29,6 @@ final class CommunicationRequest
         public readonly ?string $eventKey = null,
         public readonly ?Model $subjectModel = null,
         public readonly ?Buyer $buyer = null,
-        public readonly ?Lead $lead = null,
         public readonly ?string $idempotencyKey = null,
         public readonly ?array $context = null,
         public readonly ?User $actor = null,

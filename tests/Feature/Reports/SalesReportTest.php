@@ -7,7 +7,6 @@ use App\Enums\DatePreset;
 use App\Enums\PlotStatus;
 use App\Models\Block;
 use App\Models\Booking;
-use App\Models\Lead;
 use App\Models\Plot;
 use App\Models\Project;
 use App\Models\User;
@@ -62,10 +61,6 @@ function salesWorld(): array
     $mk($pA, $bA1, 'confirmed', '2026-05-20', '4000000', $asha);   // previous period
     $mk($pA, $bA1, 'cancelled', '2026-06-06', '9000000', $asha);   // excluded
     $mk($pA, $bA1, 'draft', '2026-06-09', '7000000', $asha);       // excluded
-
-    Lead::factory()->count(4)->create(['assigned_to' => $asha->id, 'created_at' => '2026-06-03']);
-    Lead::factory()->count(2)->create(['assigned_to' => $ravi->id, 'created_at' => '2026-06-04']);
-    Lead::factory()->create(['assigned_to' => $asha->id, 'created_at' => '2026-05-01']); // previous period
 
     return compact('asha', 'ravi', 'pA', 'pB', 'bA1', 'bA2', 'bB1');
 }
@@ -153,7 +148,7 @@ it('filters by salesperson', function () {
 
 it('computes booking growth vs the previous equivalent period', function () {
     salesWorld();
-    $sales = app(SalesReportService::class)->build(ReportFilterData::default(), makeUser(permissions: ['reports.view', 'leads.view_all']));
+    $sales = app(SalesReportService::class)->build(ReportFilterData::default(), makeUser(permissions: ['reports.view']));
 
     // June 4 bookings vs May 1 → +300%
     expect($sales->kpi('total_bookings')->previous)->toBe(1)
@@ -168,7 +163,7 @@ it('handles a zero previous period without Infinity/NaN', function () {
         to: CarbonImmutable::parse('2026-02-28')->endOfDay(),
         preset: DatePreset::Custom,
     );
-    $sales = app(SalesReportService::class)->build($early, makeUser(permissions: ['reports.view', 'leads.view_all']));
+    $sales = app(SalesReportService::class)->build($early, makeUser(permissions: ['reports.view']));
 
     expect($sales->kpi('total_bookings')->value)->toBe(0)
         ->and($sales->kpi('total_bookings')->delta())->toBeNull()
@@ -232,19 +227,14 @@ it('builds block-wise sales with inventory split', function () {
         ->and($a1['project'])->toBe('Green Meadows');
 });
 
-it('builds salesperson performance with leads and conversion, sortable', function () {
+it('builds salesperson performance with bookings and value, sortable', function () {
     salesWorld();
 
     $byValue = salesA()->salespersonPerformance(juneWindow(), null, 'value');
     expect($byValue[0]['name'])->toBe('Ravi Kumar')      // 3.5M > Asha 3M
         ->and(collect($byValue)->firstWhere('name', 'Asha Rao'))->toMatchArray([
-            'leads' => 4, 'bookings' => 2, 'value' => 3_000_000.0, 'conversion' => 50.0,
+            'bookings' => 2, 'value' => 3_000_000.0,
         ]);
-
-    // Ravi: 2 bookings / 2 leads = 100% conversion; Asha 50% → conversion sort puts Ravi first
-    $byConversion = salesA()->salespersonPerformance(juneWindow(), null, 'conversion');
-    expect($byConversion[0]['name'])->toBe('Ravi Kumar')
-        ->and($byConversion[0]['conversion'])->toBe(100.0);
 });
 
 it('scopes salesperson performance to one user', function () {
@@ -261,7 +251,7 @@ it('scopes salesperson performance to one user', function () {
 
 it('renders the sales report with its sections and status badge', function () {
     salesWorld();
-    $this->actingAs(makeUser(permissions: ['reports.view', 'leads.view_all', 'projects.view', 'plots.view']))
+    $this->actingAs(makeUser(permissions: ['reports.view', 'projects.view', 'plots.view']))
         ->get(route('reports.sales'))
         ->assertOk()
         ->assertSee('Sales report')
@@ -286,23 +276,14 @@ it('rejects foreign filter ids on the sales report', function () {
     $this->actingAs($me)->getJson(route('reports.sales', ['project_id' => $pA->id, 'block_id' => $foreignBlock->id]))
         ->assertStatus(422)->assertJsonValidationErrors('block_id');
 
-    $this->actingAs(makeUser(permissions: ['reports.view', 'leads.view']))
-        ->getJson(route('reports.sales', ['salesperson_id' => User::factory()->create()->id]))
+    $this->actingAs($me)
+        ->getJson(route('reports.sales', ['salesperson_id' => 999999]))
         ->assertStatus(422)->assertJsonValidationErrors('salesperson_id');
-});
-
-it('hides other salespeople from a scoped user on the sales report', function () {
-    $w = salesWorld();
-    $this->actingAs(makeUser(permissions: ['reports.view', 'leads.view'], attributes: ['name' => 'Only Me']))
-        ->get(route('reports.sales'))
-        ->assertOk()
-        ->assertSee('you can only see your own')
-        ->assertDontSee('Asha Rao');
 });
 
 it('links sales rows to the project 360 and block plots list', function () {
     $w = salesWorld();
-    $html = $this->actingAs(makeUser(permissions: ['reports.view', 'leads.view_all', 'projects.view', 'plots.view']))
+    $html = $this->actingAs(makeUser(permissions: ['reports.view', 'projects.view', 'plots.view']))
         ->get(route('reports.sales'))
         ->assertOk()
         ->getContent();

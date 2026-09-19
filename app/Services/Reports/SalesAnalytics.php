@@ -390,11 +390,11 @@ class SalesAnalytics
     }
 
     /**
-     * Salesperson performance: leads (assigned in window), bookings, value and
-     * conversion. `$onlyId` restricts the result to one user (a viewer without
-     * `leads.view_all` only ever sees their own row).
+     * Salesperson performance: bookings and value, by the salesperson who
+     * created each confirmed booking. `$onlyId` restricts the result to one
+     * user.
      *
-     * @return list<array{user_id:int, name:string, leads:int, bookings:int, value:float, conversion:float|null}>
+     * @return list<array{user_id:int, name:string, bookings:int, value:float}>
      */
     public function salespersonPerformance(ReportFilterData $filters, ?int $onlyId = null, string $sort = 'value'): array
     {
@@ -409,42 +409,23 @@ class SalesAnalytics
             ->selectRaw('created_by as uid, count(*) as bookings, coalesce(sum(final_amount), 0) as value')
             ->get()->keyBy('uid');
 
-        $leadQuery = ReportFilterScope::leadSource(
-            ReportFilterScope::salesperson(
-                ReportFilterScope::dateRange(DB::table('leads')->whereNull('deleted_at'), $filters, 'created_at'),
-                $filters,
-                'assigned_to',
-            ),
-            $filters,
-        )
-            ->when($onlyId !== null, fn ($q) => $q->where('assigned_to', $onlyId))
-            ->whereNotNull('assigned_to')
-            ->groupBy('assigned_to')
-            ->selectRaw('assigned_to as uid, count(*) as leads')
-            ->get()->keyBy('uid');
-
-        $ids = $bookingRows->keys()->merge($leadQuery->keys())->unique()->values();
+        $ids = $bookingRows->keys()->values();
         if ($ids->isEmpty()) {
             return [];
         }
 
         $names = User::query()->whereIn('id', $ids)->pluck('name', 'id');
 
-        $rows = $ids->map(function ($uid) use ($bookingRows, $leadQuery, $names) {
-            $bookings = (int) ($bookingRows[$uid]->bookings ?? 0);
-            $leads = (int) ($leadQuery[$uid]->leads ?? 0);
-
+        $rows = $ids->map(function ($uid) use ($bookingRows, $names) {
             return [
                 'user_id' => (int) $uid,
                 'name' => (string) ($names[$uid] ?? 'Unknown'),
-                'leads' => $leads,
-                'bookings' => $bookings,
+                'bookings' => (int) ($bookingRows[$uid]->bookings ?? 0),
                 'value' => (float) ($bookingRows[$uid]->value ?? 0),
-                'conversion' => $leads > 0 ? round($bookings / $leads * 100, 1) : null,
             ];
         })->all();
 
-        $key = in_array($sort, ['bookings', 'conversion', 'value'], true) ? $sort : 'value';
+        $key = in_array($sort, ['bookings', 'value'], true) ? $sort : 'value';
         usort($rows, fn ($a, $b) => ($b[$key] ?? -1) <=> ($a[$key] ?? -1));
 
         return $rows;

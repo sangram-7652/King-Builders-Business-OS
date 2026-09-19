@@ -12,7 +12,7 @@ use App\Services\Reports\MisReportService;
  *
  * Each section is isolated — a failing query records an error string and that
  * section renders "unavailable", never a fake zero. Every financial figure is
- * M7/M8 truth applied as a SQL aggregate (no separate engine).
+ * M7 truth applied as a SQL aggregate (no separate engine).
  */
 final readonly class MisReportData
 {
@@ -22,7 +22,6 @@ final readonly class MisReportData
      * @param  list<array<string, int|float|string|null>>  $monthly
      * @param  list<array<string, int|float|string|null>>  $projects
      * @param  list<array<string, int|float|string|null>>  $salespeople
-     * @param  array<string, int|float|null>  $collectionSummary
      * @param  array<string, string>  $errors  section => message
      */
     public function __construct(
@@ -32,8 +31,6 @@ final readonly class MisReportData
         public array $monthly,
         public array $projects,
         public array $salespeople,
-        public bool $salespeopleScoped,
-        public array $collectionSummary,
         public ReportFilterData $filters,
         public string $generatedAt,
         public array $errors = [],

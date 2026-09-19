@@ -11,22 +11,23 @@ uses(RefreshDatabase::class);
 
 beforeEach(fn () => seedRbac());
 
-it('renders the finance dashboard, payments list and booking payments page', function () {
+it('renders the finance dashboard, payments list and booking payments page with no plan/installment UI', function () {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor']);
 
     $this->actingAs(financeManager());
 
     $this->get(route('finance.dashboard'))->assertOk()->assertSee('Finance');
     $this->get(route('payments.index'))->assertOk()->assertSee('Payments');
     $this->get(route('payments.booking', $s['booking']))->assertOk()
-        ->assertSee('Payment plan')
-        ->assertSee('Outstanding');
+        ->assertSee('Outstanding')
+        ->assertSee('Record payment')
+        ->assertDontSee('Payment plan')
+        ->assertDontSee('New plan')
+        ->assertDontSee('Installment');
 });
 
 it('renders payment + receipt detail screens', function () {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor']);
     $payment = app(VerifyPaymentAction::class)->handle(
         app(RecordPaymentAction::class)->handle(['booking_id' => $s['booking']->id, 'payment_mode_id' => cashMode()->id, 'amount' => '250000'], $s['actor']),
         PaymentStatus::Success,
@@ -40,7 +41,7 @@ it('renders payment + receipt detail screens', function () {
 
 it('shows a Financials card on a confirmed booking detail', function () {
     $s = confirmedBookingScenario('1000000');
-    $viewer = makeUser(permissions: ['bookings.view', 'payment_plans.view', 'pricing.view']);
+    $viewer = makeUser(permissions: ['bookings.view', 'payments.view', 'pricing.view']);
 
     $this->actingAs($viewer)->get(route('bookings.show', $s['booking']))
         ->assertOk()

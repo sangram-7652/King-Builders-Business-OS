@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Reports;
 
-use App\Enums\AgingBucket;
 use App\Enums\BookingStatus;
 use App\Enums\DatePreset;
 use App\Enums\PaymentStatus;
 use App\Enums\PlotStatus;
 use App\Models\User;
-use App\Support\Reports\CollectionFilters;
 use App\Support\Reports\InventoryFilters;
 use App\Support\Reports\ReportFilterData;
 use Carbon\CarbonImmutable;
@@ -26,9 +24,8 @@ use Illuminate\Validation\ValidationException;
  * Guarantees:
  *  - the date window is day-aligned in `config('app.timezone')` (inclusive)
  *  - `from` never comes after `to`
- *  - every id (`project_id`, `block_id`, `salesperson_id`, `lead_source`)
- *    references a row that exists; a block must belong to the given project
- *  - a user without `leads.view_all` cannot filter by another salesperson
+ *  - every id (`project_id`, `block_id`, `salesperson_id`) references a row
+ *    that exists; a block must belong to the given project
  *
  * @phpstan-type RawInput array<string, mixed>
  */
@@ -51,7 +48,6 @@ class ReportFilterResolver
             'booking_status' => ['nullable', Rule::enum(BookingStatus::class)],
             'payment_status' => ['nullable', Rule::enum(PaymentStatus::class)],
             'plot_status' => ['nullable', Rule::enum(PlotStatus::class)],
-            'lead_source' => ['nullable', 'integer', 'min:1', Rule::exists('lead_sources', 'id')],
         ], [
             'exists' => 'The selected :attribute is not valid.',
         ])->validate();
@@ -72,14 +68,6 @@ class ReportFilterResolver
 
         $salespersonId = $this->intOrNull($data['salesperson_id'] ?? null);
 
-        if ($salespersonId !== null
-            && ! $user->can('leads.view_all')
-            && $salespersonId !== $user->getKey()) {
-            throw ValidationException::withMessages([
-                'salesperson_id' => 'You may only report on your own performance.',
-            ]);
-        }
-
         [$preset, $from, $to] = $this->resolveWindow($data);
 
         return new ReportFilterData(
@@ -92,7 +80,6 @@ class ReportFilterResolver
             bookingStatus: isset($data['booking_status']) ? BookingStatus::from($data['booking_status']) : null,
             paymentStatus: isset($data['payment_status']) ? PaymentStatus::from($data['payment_status']) : null,
             plotStatus: isset($data['plot_status']) ? PlotStatus::from($data['plot_status']) : null,
-            leadSourceId: $this->intOrNull($data['lead_source'] ?? null),
         );
     }
 
@@ -121,28 +108,6 @@ class ReportFilterResolver
             priceMax: $num($data['price_max'] ?? null),
             sizeMin: $num($data['size_min'] ?? null),
             sizeMax: $num($data['size_max'] ?? null),
-        );
-    }
-
-    /**
-     * The collection-report-only ageing-bucket + payment-method filters (M11.4).
-     *
-     * @param  array<string, mixed>  $input  typically `$request->query()`
-     *
-     * @throws ValidationException
-     */
-    public function resolveCollectionExtras(array $input): CollectionFilters
-    {
-        $data = Validator::make($input, [
-            'ageing_bucket' => ['nullable', Rule::enum(AgingBucket::class)],
-            'payment_method' => ['nullable', 'integer', 'min:1', Rule::exists('payment_modes', 'id')],
-        ], [
-            'exists' => 'The selected payment method is not valid.',
-        ])->validate();
-
-        return new CollectionFilters(
-            bucket: isset($data['ageing_bucket']) ? AgingBucket::from($data['ageing_bucket']) : null,
-            paymentModeId: $this->intOrNull($data['payment_method'] ?? null),
         );
     }
 

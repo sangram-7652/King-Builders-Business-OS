@@ -95,7 +95,7 @@ enum PartnerStatus: string
         return $this === self::Active;
     }
 
-    /** Only an active partner may be the target of a NEW lead / booking attribution. */
+    /** Only an active partner may be the target of a NEW booking attribution. */
     public function canReceiveAttribution(): bool
     {
         return $this === self::Active;

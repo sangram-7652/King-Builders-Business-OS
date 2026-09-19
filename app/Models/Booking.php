@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\BookingStatus;
-use App\Enums\PaymentPlanStatus;
 use App\Models\Concerns\GuardsAgainstDestructiveDelete;
 use Database\Factories\BookingFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -176,36 +175,10 @@ class Booking extends Model
         return $this->hasMany(CommissionCase::class)->latest('id');
     }
 
-    /** @return HasMany<PaymentPlan, $this> */
-    public function paymentPlans(): HasMany
-    {
-        return $this->hasMany(PaymentPlan::class);
-    }
-
-    /** The single live (draft/active) payment plan, if any. @return HasOne<PaymentPlan, $this> */
-    public function activePaymentPlan(): HasOne
-    {
-        return $this->hasOne(PaymentPlan::class)
-            ->whereIn('status', [PaymentPlanStatus::Draft->value, PaymentPlanStatus::Active->value])
-            ->latestOfMany();
-    }
-
     /** @return HasMany<Payment, $this> */
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
-    }
-
-    /** Collection case for this booking (M8). @return HasOne<\App\Models\CollectionCase, $this> */
-    public function collectionCase(): HasOne
-    {
-        return $this->hasOne(CollectionCase::class);
-    }
-
-    /** @return HasMany<PaymentPromise, $this> */
-    public function paymentPromises(): HasMany
-    {
-        return $this->hasMany(PaymentPromise::class);
     }
 
     /** Booking-level documents (M9). @return \Illuminate\Database\Eloquent\Relations\MorphMany<Document, $this> */
@@ -261,7 +234,7 @@ class Booking extends Model
      */
     protected function businessDependents(): array
     {
-        return ['payments' => $this->payments(), 'paymentPlans' => $this->paymentPlans()];
+        return ['payments' => $this->payments()];
     }
 
     // --- Scopes ------------------------------------------------------

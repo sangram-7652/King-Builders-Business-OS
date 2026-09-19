@@ -122,23 +122,20 @@
         </x-ui.card>
     @endif
 
-    {{-- Collection profile (M8) --}}
-    @if ($collectionProfile)
-        <x-ui.card title="Collection profile" subtitle="Across all confirmed bookings where this buyer is primary. Figures from the M7 ledger.">
+    {{-- Payment profile (M7) --}}
+    @if ($paymentProfile)
+        <x-ui.card title="Payment profile" subtitle="Across all confirmed bookings where this buyer is primary. Figures from the payment ledger.">
             <dl class="grid gap-4 text-sm sm:grid-cols-3 lg:grid-cols-4">
-                <div><dt class="text-(--content-muted)">Total bookings</dt><dd class="mt-0.5 text-lg font-semibold">{{ $collectionProfile['total_bookings'] }}</dd></div>
-                <div><dt class="text-(--content-muted)">Total value</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums">₹{{ number_format((float) $collectionProfile['total_value'], 2) }}</dd></div>
-                <div><dt class="text-(--content-muted)">Total paid</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums">₹{{ number_format((float) $collectionProfile['total_paid'], 2) }}</dd></div>
-                <div><dt class="text-(--content-muted)">Outstanding</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums">₹{{ number_format((float) $collectionProfile['total_outstanding'], 2) }}</dd></div>
-                <div><dt class="text-(--content-muted)">Overdue</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums text-red-600">₹{{ number_format((float) $collectionProfile['total_overdue'], 2) }}</dd></div>
-                <div><dt class="text-(--content-muted)">Open promises</dt><dd class="mt-0.5 text-lg font-semibold">{{ $collectionProfile['open_promises'] }}</dd></div>
-                <div><dt class="text-(--content-muted)">Broken promises</dt><dd class="mt-0.5 text-lg font-semibold">{{ $collectionProfile['broken_promises'] }}</dd></div>
+                <div><dt class="text-(--content-muted)">Total bookings</dt><dd class="mt-0.5 text-lg font-semibold">{{ $paymentProfile['total_bookings'] }}</dd></div>
+                <div><dt class="text-(--content-muted)">Total value</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums">₹{{ number_format((float) $paymentProfile['total_value'], 2) }}</dd></div>
+                <div><dt class="text-(--content-muted)">Total paid</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums">₹{{ number_format((float) $paymentProfile['total_paid'], 2) }}</dd></div>
+                <div><dt class="text-(--content-muted)">Outstanding</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums">₹{{ number_format((float) $paymentProfile['total_outstanding'], 2) }}</dd></div>
                 <div>
                     <dt class="text-(--content-muted)">Last payment</dt>
                     <dd class="mt-0.5">
-                        @if ($collectionProfile['last_payment_date'])
-                            ₹{{ number_format((float) $collectionProfile['last_payment_amount'], 2) }}
-                            <span class="text-(--content-muted)">on {{ \Illuminate\Support\Carbon::parse($collectionProfile['last_payment_date'])->format('d M Y') }}</span>
+                        @if ($paymentProfile['last_payment_date'])
+                            ₹{{ number_format((float) $paymentProfile['last_payment_amount'], 2) }}
+                            <span class="text-(--content-muted)">on {{ \Illuminate\Support\Carbon::parse($paymentProfile['last_payment_date'])->format('d M Y') }}</span>
                         @else — @endif
                     </dd>
                 </div>
@@ -183,20 +180,4 @@
             @endif
         </x-ui.card>
     @endif
-
-    {{-- Converted from --}}
-    <x-ui.card title="Origin">
-        @if ($buyer->leads->isEmpty())
-            <p class="text-sm text-(--content-muted)">Created directly (not from a lead).</p>
-        @else
-            <ul class="space-y-1 text-sm">
-                @foreach ($buyer->leads as $l)
-                    <li>
-                        <a href="{{ route('leads.show', $l) }}" wire:navigate class="text-(--brand-primary) hover:underline">{{ $l->name }}</a>
-                        <span class="text-(--content-muted)"> · converted {{ $l->converted_at?->format('d M Y') }}</span>
-                    </li>
-                @endforeach
-            </ul>
-        @endif
-    </x-ui.card>
 </div>

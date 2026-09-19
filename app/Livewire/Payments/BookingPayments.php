@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Payments;
 
-use App\Actions\Payments\ActivatePaymentPlanAction;
-use App\Actions\Payments\AllocatePaymentAction;
-use App\Actions\Payments\CancelPaymentPlanAction;
-use App\Actions\Payments\CreatePaymentPlanAction;
 use App\Actions\Payments\RecordPaymentAction;
 use App\Actions\Payments\ReversePaymentAction;
 use App\Actions\Payments\VerifyPaymentAction;
@@ -16,7 +12,6 @@ use App\Exceptions\DomainException;
 use App\Models\Booking;
 use App\Models\Masters\PaymentMode;
 use App\Models\Payment;
-use App\Models\PaymentPlan;
 use App\Services\Payments\PaymentLedger;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
@@ -26,16 +21,6 @@ use Livewire\Component;
 class BookingPayments extends Component
 {
     public Booking $booking;
-
-    // --- plan builder ---
-    public bool $showPlanBuilder = false;
-
-    public string $scheduleType = 'percentage';
-
-    /** @var array<int, array{value: string, due_date: string, name: string}> */
-    public array $rows = [];
-
-    public string $planName = 'Payment plan';
 
     // --- record payment ---
     public bool $showRecord = false;
@@ -63,82 +48,10 @@ class BookingPayments extends Component
 
     public function mount(Booking $booking): void
     {
-        $this->authorize('viewAny', PaymentPlan::class);
+        $this->authorize('viewAny', Payment::class);
         abort_unless($booking->isConfirmed(), 404);
         $this->booking = $booking;
         $this->payDate = now()->toDateString();
-        $this->resetRows();
-    }
-
-    private function resetRows(): void
-    {
-        $this->rows = [
-            ['value' => '25', 'due_date' => now()->addMonth()->toDateString(), 'name' => ''],
-            ['value' => '25', 'due_date' => now()->addMonths(2)->toDateString(), 'name' => ''],
-            ['value' => '25', 'due_date' => now()->addMonths(3)->toDateString(), 'name' => ''],
-            ['value' => '25', 'due_date' => now()->addMonths(4)->toDateString(), 'name' => ''],
-        ];
-    }
-
-    public function addRow(): void
-    {
-        $this->rows[] = ['value' => '', 'due_date' => now()->addMonths(count($this->rows) + 1)->toDateString(), 'name' => ''];
-    }
-
-    public function removeRow(int $i): void
-    {
-        unset($this->rows[$i]);
-        $this->rows = array_values($this->rows);
-    }
-
-    // --- Plan actions -------------------------------------------------
-
-    public function createPlan(): void
-    {
-        $this->authorize('create', PaymentPlan::class);
-
-        try {
-            app(CreatePaymentPlanAction::class)->handle($this->booking, [
-                'name' => $this->planName,
-                'schedule' => array_map(fn ($r) => [
-                    'type' => $this->scheduleType,
-                    'value' => $r['value'],
-                    'due_date' => $r['due_date'],
-                    'name' => $r['name'] ?: null,
-                ], $this->rows),
-            ], auth()->user());
-
-            $this->showPlanBuilder = false;
-            $this->dispatch('toast', message: 'Payment plan created.', variant: 'success');
-        } catch (DomainException $e) {
-            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
-        }
-    }
-
-    public function activatePlan(int $planId): void
-    {
-        $plan = $this->booking->paymentPlans()->findOrFail($planId);
-        $this->authorize('activate', $plan);
-
-        try {
-            app(ActivatePaymentPlanAction::class)->handle($plan, auth()->user());
-            $this->dispatch('toast', message: 'Payment plan activated.', variant: 'success');
-        } catch (DomainException $e) {
-            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
-        }
-    }
-
-    public function cancelPlan(int $planId): void
-    {
-        $plan = $this->booking->paymentPlans()->findOrFail($planId);
-        $this->authorize('cancel', $plan);
-
-        try {
-            app(CancelPaymentPlanAction::class)->handle($plan, auth()->user(), 'Cancelled from booking payments');
-            $this->dispatch('toast', message: 'Payment plan cancelled.', variant: 'success');
-        } catch (DomainException $e) {
-            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
-        }
     }
 
     // --- Payment actions -------------------------------------------
@@ -190,19 +103,6 @@ class BookingPayments extends Component
         }
     }
 
-    public function autoAllocate(int $paymentId): void
-    {
-        $payment = $this->booking->payments()->findOrFail($paymentId);
-        $this->authorize('allocate', $payment);
-
-        try {
-            app(AllocatePaymentAction::class)->handle($payment, null, auth()->user());
-            $this->dispatch('toast', message: 'Payment allocated.', variant: 'success');
-        } catch (DomainException $e) {
-            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
-        }
-    }
-
     public function openReverse(int $paymentId): void
     {
         $this->reversingPaymentId = $paymentId;
@@ -226,31 +126,19 @@ class BookingPayments extends Component
 
     public function render(): View
     {
-        $booking = $this->booking->fresh(['project', 'plot', 'activePaymentPlan.installments', 'paymentPlans']);
+        $booking = $this->booking->fresh(['project', 'plot']);
         $ledger = app(PaymentLedger::class);
 
         $payments = $booking->payments()
-            ->with(['paymentMode', 'receipt', 'allocations'])
+            ->with(['paymentMode', 'receipt'])
             ->orderByDesc('id')
             ->get();
-
-        $plan = $booking->activePaymentPlan;
 
         return view('livewire.payments.booking-payments', [
             'booking' => $booking,
             'summary' => $ledger->summary($booking),
-            'plan' => $plan,
-            'installments' => $plan?->installments->map(fn ($i) => [
-                'model' => $i,
-                'paid' => $ledger->installmentPaid($i),
-                'outstanding' => $ledger->installmentOutstanding($i),
-            ]) ?? collect(),
-            'payments' => $payments->map(fn ($p) => [
-                'model' => $p,
-                'unallocated' => $ledger->paymentUnallocated($p),
-            ]),
+            'payments' => $payments,
             'paymentModes' => PaymentMode::query()->where('is_active', true)->orderBy('sort_order')->get(),
-            'ledger' => $ledger,
         ])->title("Payments · {$booking->booking_number}");
     }
 }

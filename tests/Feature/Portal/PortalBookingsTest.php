@@ -29,16 +29,16 @@ it('lists only the customer’s own bookings', function () {
         ->assertViewHas('bookings', fn ($p) => $p->total() === 1);
 });
 
-it('shows a booking the customer owns with M8-derived figures', function () {
+it('shows a booking the customer owns with M7-derived figures', function () {
     ['customer' => $customer, 'booking' => $booking] = portalBooking();
 
     Livewire::actingAs($customer, 'customer')
         ->test(Show::class, ['booking' => $booking])
         ->assertOk()
         ->assertSee($booking->booking_number)
-        ->assertSee('Payment schedule')
+        ->assertSee('Payment history')
         ->assertViewHas('financials', fn ($f) => $f->paid->store() === '300000.00' && $f->outstanding->store() === '700000.00')
-        ->assertViewHas('schedule', fn ($s) => count($s['rows']) === 4);
+        ->assertViewHas('schedule', fn ($s) => count($s['rows']) === 1);
 });
 
 it('404s when a customer requests a booking they do not own (IDOR)', function () {

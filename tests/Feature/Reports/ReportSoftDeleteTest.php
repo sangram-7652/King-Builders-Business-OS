@@ -8,8 +8,8 @@ use App\Enums\PaymentStatus;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\Plot;
-use App\Services\Reports\CollectionAnalytics;
 use App\Services\Reports\InventoryAnalytics;
+use App\Services\Reports\PaymentsAnalytics;
 use App\Services\Reports\SalesAnalytics;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -29,38 +29,25 @@ function wideFilter()
 
 it('excludes a soft-deleted confirmed booking from the sales + collections + inventory reports', function () {
     $keep = confirmedBookingScenario('1000000');
-    activePlanFor($keep['booking'], $keep['actor'], [
-        ['type' => 'amount', 'value' => '1000000', 'due_date' => now()->subMonth()->toDateString()],
-    ]);
-
     $drop = confirmedBookingScenario('5000000');
-    activePlanFor($drop['booking'], $drop['actor'], [
-        ['type' => 'amount', 'value' => '5000000', 'due_date' => now()->subMonth()->toDateString()],
-    ]);
 
     $filters = wideFilter();
-    $collection = app(CollectionAnalytics::class);
+    $payments = app(PaymentsAnalytics::class);
     $sales = app(SalesAnalytics::class);
 
-    $beforeReceivable = $collection->kpis($filters)['receivable'];
-    $beforeValue = $collection->reconciliation($filters)['bookingValue'];
+    $beforeValue = $payments->summary($filters)['bookingValue'];
 
     // Soft-delete the ₹50 L booking (skip the CancelBookingAction guard —
     // this is the "operator data fix / GDPR erase" path the finding is about).
     Booking::withoutEvents(fn () => $drop['booking']->delete());
 
-    $afterReceivable = app(CollectionAnalytics::class)->kpis($filters)['receivable'];
-    $afterValue = app(CollectionAnalytics::class)->reconciliation($filters)['bookingValue'];
+    $afterValue = app(PaymentsAnalytics::class)->summary($filters)['bookingValue'];
 
-    expect(round($beforeReceivable - $afterReceivable, 2))->toBe(5000000.0)
-        ->and(round($beforeValue - $afterValue, 2))->toBe(5000000.0);
+    expect(round($beforeValue - $afterValue, 2))->toBe(5000000.0);
 });
 
 it('excludes a soft-deleted payment from collections cash figures', function () {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor'], [
-        ['type' => 'amount', 'value' => '1000000', 'due_date' => now()->subMonth()->toDateString()],
-    ]);
     $p = app(RecordPaymentAction::class)->handle([
         'booking_id' => $s['booking']->id, 'payment_mode_id' => cashMode()->id,
         'amount' => '400000', 'payment_date' => now()->toDateString(),
@@ -68,11 +55,11 @@ it('excludes a soft-deleted payment from collections cash figures', function () 
     app(VerifyPaymentAction::class)->handle($p, PaymentStatus::Success, $s['actor']);
 
     $filters = wideFilter();
-    $before = app(CollectionAnalytics::class)->reconciliation($filters)['cashCollected'];
+    $before = app(PaymentsAnalytics::class)->summary($filters)['collectedAllTime'];
 
     Payment::withoutEvents(fn () => $p->fresh()->delete());
 
-    $after = app(CollectionAnalytics::class)->reconciliation($filters)['cashCollected'];
+    $after = app(PaymentsAnalytics::class)->summary($filters)['collectedAllTime'];
 
     expect(round($before - $after, 2))->toBe(400000.0);
 });

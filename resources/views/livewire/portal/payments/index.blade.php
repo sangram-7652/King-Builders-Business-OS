@@ -1,10 +1,8 @@
-@php use App\Enums\InstallmentStatus; @endphp
-
 <div class="space-y-6">
     <h1 class="text-xl font-semibold">Payments</h1>
 
     <div class="flex gap-1 border-b border-(--border)">
-        <button wire:click="setTab('schedule')" @class(['px-3 py-2 text-sm font-medium', 'border-b-2 border-(--brand-primary) text-(--content)' => $tab === 'schedule', 'text-(--content-muted)' => $tab !== 'schedule'])>Schedule</button>
+        <button wire:click="setTab('schedule')" @class(['px-3 py-2 text-sm font-medium', 'border-b-2 border-(--brand-primary) text-(--content)' => $tab === 'schedule', 'text-(--content-muted)' => $tab !== 'schedule'])>By booking</button>
         <button wire:click="setTab('history')" @class(['px-3 py-2 text-sm font-medium', 'border-b-2 border-(--brand-primary) text-(--content)' => $tab === 'history', 'text-(--content-muted)' => $tab !== 'history'])>Payments made</button>
     </div>
 
@@ -17,30 +15,28 @@
                     </span>
                 </x-slot:actions>
 
-                @if ($bs['schedule'])
+                @if (empty($bs['schedule']['rows']))
+                    <p class="text-sm text-(--content-muted)">No payments recorded for this booking yet.</p>
+                @else
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-(--border) text-sm">
                             <thead class="text-left text-xs font-semibold uppercase tracking-wider text-(--content-muted)">
-                                <tr><th class="py-2 pr-4">#</th><th class="py-2 pr-4">Due</th><th class="py-2 pr-4 text-right">Amount</th>
-                                    <th class="py-2 pr-4 text-right">Paid</th><th class="py-2 pr-4 text-right">Outstanding</th><th class="py-2 pr-4">Status</th></tr>
+                                <tr><th class="py-2 pr-4">Payment</th><th class="py-2 pr-4">Date</th><th class="py-2 pr-4">Mode</th>
+                                    <th class="py-2 pr-4 text-right">Amount</th><th class="py-2 pr-4">Receipt</th></tr>
                             </thead>
                             <tbody class="divide-y divide-(--border)">
                                 @foreach ($bs['schedule']['rows'] as $row)
-                                    @php $st = InstallmentStatus::from($row['status']); @endphp
                                     <tr>
-                                        <td class="py-2 pr-4 tabular-nums">{{ $row['number'] }}</td>
-                                        <td class="py-2 pr-4">{{ \Illuminate\Support\Carbon::parse($row['due_date'])->format('d M Y') }}</td>
+                                        <td class="py-2 pr-4">{{ $row['payment_number'] }}</td>
+                                        <td class="py-2 pr-4">{{ \Illuminate\Support\Carbon::parse($row['date'])->format('d M Y') }}</td>
+                                        <td class="py-2 pr-4">{{ $row['mode'] }}</td>
                                         <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) $row['amount'], 2) }}</td>
-                                        <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) $row['paid'], 2) }}</td>
-                                        <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) $row['outstanding'], 2) }}</td>
-                                        <td class="py-2 pr-4"><x-ui.badge :variant="$st->color()" size="sm">{{ $st->label() }}</x-ui.badge></td>
+                                        <td class="py-2 pr-4">{{ $row['receipt_number'] ?? '—' }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
-                @else
-                    <p class="text-sm text-(--content-muted)">No payment plan has been set up for this booking yet.</p>
                 @endif
             </x-ui.card>
         @empty

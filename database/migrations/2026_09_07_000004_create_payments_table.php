@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Schema;
  * Payments (M7). `payment_number` (PAY-000001) is the public identifier —
  * unique, concurrency-safe, NOT the primary key.
  *
- * Financial truth flows Payment → PaymentAllocation → Installment; a payment's
- * effect on balances comes ONLY from its status being SUCCESS. Confirmed
+ * Financial truth flows Payment → PaymentAllocation → the booking's ledger; a
+ * payment's effect on balances comes ONLY from its status being SUCCESS. Confirmed
  * payments are never deleted — they move to REVERSED with a reason.
  *
  * `idempotency_key` (nullable, unique) lets a duplicate "record payment"

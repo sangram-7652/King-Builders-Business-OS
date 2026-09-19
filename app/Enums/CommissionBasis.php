@@ -27,8 +27,8 @@ enum CommissionBasis: string
     public function label(): string
     {
         return match ($this) {
-            self::BookingValue => 'Booking value (M6 final amount)',
-            self::CollectedAmount => 'Collected amount (M7)',
+            self::BookingValue => 'Booking value',
+            self::CollectedAmount => 'Collected amount',
         };
     }
 

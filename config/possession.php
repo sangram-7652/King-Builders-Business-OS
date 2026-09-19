@@ -22,9 +22,6 @@ return [
         // Every REQUIRED booking document must be VERIFIED (M9 checklist).
         'require_documents_verified' => (bool) env('POSSESSION_REQUIRE_DOCUMENTS', true),
 
-        // An overdue balance (M8) blocks possession.
-        'block_on_overdue' => (bool) env('POSSESSION_BLOCK_ON_OVERDUE', true),
-
         // Minimum % of the booking's final amount that must be collected (M7).
         'required_paid_percent' => (float) env('POSSESSION_REQUIRED_PAID_PERCENT', 100),
 

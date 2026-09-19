@@ -50,7 +50,7 @@ trait ResolvesPortalRecords
             ->whereKey($paymentId)
             ->whereIn('booking_id', $this->customerBookingIds() ?: [0])
             ->where('status', PaymentStatus::Success->value)
-            ->with(['paymentMode:id,name', 'booking:id,booking_number', 'allocations.installment:id,installment_number,name', 'receipt'])
+            ->with(['paymentMode:id,name', 'booking:id,booking_number', 'receipt'])
             ->firstOr(fn () => abort(404));
     }
 

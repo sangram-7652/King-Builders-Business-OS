@@ -47,12 +47,7 @@ class MisReportService
         $monthly = $safe('Monthly MIS', fn () => $this->analytics->monthly($filters), []);
         $projects = $safe('Project MIS', fn () => $this->analytics->projects($filters), []);
 
-        $scoped = ! $user->can('leads.view_all');
-        $salespeople = $safe('Salesperson MIS', fn () => $this->analytics->salespeople(
-            $filters, $scoped ? (int) $user->getKey() : null,
-        ), []);
-
-        $collectionSummary = $safe('Collection MIS', fn () => $this->analytics->collectionSummary($filters), []);
+        $salespeople = $safe('Salesperson MIS', fn () => $this->analytics->salespeople($filters), []);
 
         $err = fn (string $s) => $errors[$s] ?? null;
         $kErr = $err('Management KPIs');
@@ -67,15 +62,8 @@ class MisReportService
 
             new Kpi('total_bookings', 'Total bookings', $k['total_bookings'] ?? null, 'number', error: $kErr, hint: 'Confirmed in period'),
             new Kpi('booking_value', 'Booking value', $k['booking_value'] ?? null, 'currency', error: $kErr, hint: 'Confirmed final amount'),
-            new Kpi('receivable', 'Receivable', $k['receivable'] ?? null, 'currency', error: $kErr, hint: 'Demand raised (M7 plan)'),
             new Kpi('collected', 'Collected', $k['collected'] ?? null, 'currency', error: $kErr),
-            new Kpi('outstanding', 'Outstanding', $k['outstanding'] ?? null, 'currency', error: $kErr, hint: 'M8 installment walk'),
-            new Kpi('overdue', 'Overdue', $k['overdue'] ?? null, 'currency', error: $kErr),
-            new Kpi('collection_efficiency', 'Collection efficiency', $k['collection_efficiency'] ?? null, 'percent', error: $kErr),
-
-            new Kpi('total_leads', 'Total leads', $k['total_leads'] ?? null, 'number', error: $kErr),
-            new Kpi('converted_leads', 'Converted leads', $k['converted_leads'] ?? null, 'number', error: $kErr),
-            new Kpi('conversion_pct', 'Conversion %', $k['conversion_pct'] ?? null, 'percent', error: $kErr),
+            new Kpi('outstanding', 'Outstanding', $k['outstanding'] ?? null, 'currency', error: $kErr, hint: 'Final amount − successful payments'),
 
             new Kpi('registry_pending', 'Registry pending', $k['registry_pending'] ?? null, 'number', error: $kErr),
             new Kpi('possession_pending', 'Possession pending', $k['possession_pending'] ?? null, 'number', error: $kErr),
@@ -90,8 +78,6 @@ class MisReportService
             monthly: $monthly,
             projects: $projects,
             salespeople: $salespeople,
-            salespeopleScoped: $scoped,
-            collectionSummary: $collectionSummary,
             filters: $filters,
             generatedAt: now()->toIso8601String(),
             errors: $errors,

@@ -93,13 +93,4 @@ abstract class ReportQuery
     {
         return ReportFilterScope::plotStatus($query, $this->filters, $column);
     }
-
-    /**
-     * @param  Builder<*>  $query
-     * @return Builder<*>
-     */
-    protected function applyLeadSource(Builder $query, string $column = 'lead_source_id'): Builder
-    {
-        return ReportFilterScope::leadSource($query, $this->filters, $column);
-    }
 }

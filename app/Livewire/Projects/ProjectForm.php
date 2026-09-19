@@ -105,9 +105,8 @@ class ProjectForm extends Component
     {
         $id = $this->project?->id;
 
-        return [
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:32', 'regex:/^[A-Za-z0-9-]+$/', Rule::unique('projects', 'code')->ignore($id)->withoutTrashed()],
             'description' => ['nullable', 'string', 'max:2000'],
             'address' => ['nullable', 'string', 'max:255'],
             'state_id' => ['required', Rule::exists('states', 'id')->withoutTrashed()],
@@ -116,15 +115,27 @@ class ProjectForm extends Component
                 Rule::exists('cities', 'id')->where('state_id', $this->state_id ?: null)->withoutTrashed(),
             ],
             'pincode' => ['nullable', 'string', 'max:12'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'contact_name' => ['nullable', 'string', 'max:255'],
-            'contact_phone' => ['nullable', 'string', 'max:32'],
-            'contact_email' => ['nullable', 'email', 'max:255'],
-            'logo_path' => ['nullable', 'string', 'max:2048'],
-            'cover_image_path' => ['nullable', 'string', 'max:2048'],
             'launch_date' => ['nullable', 'date'],
         ];
+
+        // Code / latitude / longitude / primary contact / imagery are edit-only
+        // fields — the create form neither renders nor accepts them, so keep
+        // them out of the create rule set entirely rather than just hiding the
+        // inputs. validate() only returns keys with rules, so on create these
+        // never reach $data (and therefore never reach SaveProject), even if a
+        // client tried to submit them directly.
+        if ($this->project !== null) {
+            $rules['code'] = ['required', 'string', 'max:32', 'regex:/^[A-Za-z0-9-]+$/', Rule::unique('projects', 'code')->ignore($id)->withoutTrashed()];
+            $rules['latitude'] = ['nullable', 'numeric', 'between:-90,90'];
+            $rules['longitude'] = ['nullable', 'numeric', 'between:-180,180'];
+            $rules['contact_name'] = ['nullable', 'string', 'max:255'];
+            $rules['contact_phone'] = ['nullable', 'string', 'max:32'];
+            $rules['contact_email'] = ['nullable', 'email', 'max:255'];
+            $rules['logo_path'] = ['nullable', 'string', 'max:2048'];
+            $rules['cover_image_path'] = ['nullable', 'string', 'max:2048'];
+        }
+
+        return $rules;
     }
 
     protected function messages(): array

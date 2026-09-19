@@ -16,9 +16,6 @@ return [
         // unless a reviewer overrides with an explicit waiver reason.
         'block_on_outstanding' => (bool) env('TRANSFER_BLOCK_ON_OUTSTANDING', true),
 
-        // Block while there is an overdue balance (M8).
-        'block_on_overdue' => (bool) env('TRANSFER_BLOCK_ON_OVERDUE', true),
-
         // Maximum outstanding that still counts as "clear".
         'max_outstanding' => (string) env('TRANSFER_MAX_OUTSTANDING', '0'),
     ],

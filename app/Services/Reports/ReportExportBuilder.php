@@ -8,7 +8,6 @@ use App\Enums\AgingBucket;
 use App\Enums\PlotStatus;
 use App\Enums\ReportType;
 use App\Models\Block;
-use App\Models\Masters\LeadSource;
 use App\Models\Project;
 use App\Models\User;
 use App\Support\Reports\ReportColumn;
@@ -23,11 +22,10 @@ use Carbon\CarbonImmutable;
  *
  * Every table is built from the *same* analytics services the on-screen report
  * uses — there is no export-only query path, so an exported figure can never
- * drift from the screen. The salesperson tables honour RBAC: a user without
- * `leads.view_all` only ever sees their own row.
+ * drift from the screen.
  *
- * All figures are M7/M8 truth (receivable = demand raised, outstanding = the
- * installment walk) — never "booking value − collected".
+ * All figures are M7 truth (outstanding = booking final amount − successful
+ * payments) — never a separate engine.
  */
 class ReportExportBuilder
 {
@@ -35,18 +33,14 @@ class ReportExportBuilder
         private readonly MisAnalytics $mis,
         private readonly SalesAnalytics $sales,
         private readonly InventoryAnalytics $inventory,
-        private readonly CollectionAnalytics $collection,
     ) {}
 
     public function build(ReportType $type, ReportFilterData $filters, User $user): ReportExportPayload
     {
-        $scopedId = $user->can('leads.view_all') ? null : (int) $user->getKey();
-
         $tables = match ($type) {
-            ReportType::Mis => $this->misTables($filters, $scopedId),
-            ReportType::Sales => $this->salesTables($filters, $scopedId),
+            ReportType::Mis => $this->misTables($filters),
+            ReportType::Sales => $this->salesTables($filters),
             ReportType::Inventory => $this->inventoryTables($filters),
-            ReportType::Collections => $this->collectionTables($filters, $scopedId),
         };
 
         return new ReportExportPayload(
@@ -54,7 +48,7 @@ class ReportExportBuilder
             title: $type->title(),
             periodLabel: $filters->periodLabel().' ('.$filters->from->format('d M Y').' – '.$filters->to->format('d M Y').')',
             tables: $tables,
-            filterSummary: $this->filterSummary($filters, $scopedId !== null),
+            filterSummary: $this->filterSummary($filters),
             generatedAt: CarbonImmutable::now(config('app.timezone')),
             generatedBy: (string) $user->name,
         );
@@ -63,7 +57,7 @@ class ReportExportBuilder
     // -- MIS -----------------------------------------------------------------
 
     /** @return list<ReportTable> */
-    private function misTables(ReportFilterData $filters, ?int $scopedId): array
+    private function misTables(ReportFilterData $filters): array
     {
         $daily = $this->mis->daily($filters);
         $projects = $this->mis->projects($filters);
@@ -78,14 +72,8 @@ class ReportExportBuilder
                 'possession_completed' => ['Possession completed', 'number'],
                 'total_bookings' => ['Total bookings', 'number'],
                 'booking_value' => ['Booking value', 'currency'],
-                'receivable' => ['Receivable', 'currency'],
                 'collected' => ['Collected', 'currency'],
                 'outstanding' => ['Outstanding', 'currency'],
-                'overdue' => ['Overdue', 'currency'],
-                'collection_efficiency' => ['Collection efficiency', 'percent'],
-                'total_leads' => ['Total leads', 'number'],
-                'converted_leads' => ['Converted leads', 'number'],
-                'conversion_pct' => ['Conversion %', 'percent'],
                 'registry_pending' => ['Registry pending', 'number'],
                 'possession_pending' => ['Possession pending', 'number'],
                 'transfer_pending' => ['Transfer pending', 'number'],
@@ -95,16 +83,12 @@ class ReportExportBuilder
                 'daily', 'Daily MIS',
                 [
                     ReportColumn::date('date', 'Date'),
-                    ReportColumn::number('leads', 'Leads'),
                     ReportColumn::number('bookings', 'Bookings'),
                     ReportColumn::currency('booking_value', 'Booking value'),
-                    ReportColumn::currency('receivable', 'Receivable'),
                     ReportColumn::currency('collected', 'Collected'),
-                    ReportColumn::currency('outstanding', 'Outstanding'),
-                    ReportColumn::currency('overdue', 'Overdue'),
                 ],
                 $daily['rows'],
-                $this->sumRow($daily['rows'], ['leads', 'bookings', 'booking_value', 'receivable', 'collected', 'outstanding', 'overdue'], 'date', 'Total'),
+                $this->sumRow($daily['rows'], ['bookings', 'booking_value', 'collected'], 'date', 'Total'),
                 $daily['truncated'] ? 'Showing the most recent '.MisAnalytics::MAX_DAILY_ROWS.' days of the selected window.' : null,
             ),
             new ReportTable(
@@ -113,13 +97,7 @@ class ReportExportBuilder
                     ReportColumn::text('month', 'Month'),
                     ReportColumn::number('bookings', 'Bookings'),
                     ReportColumn::currency('booking_value', 'Booking value'),
-                    ReportColumn::currency('receivable', 'Receivable'),
                     ReportColumn::currency('collected', 'Collected'),
-                    ReportColumn::currency('outstanding', 'Outstanding'),
-                    ReportColumn::currency('overdue', 'Overdue'),
-                    ReportColumn::percent('collection_efficiency', 'Efficiency'),
-                    ReportColumn::number('leads', 'Leads'),
-                    ReportColumn::number('converted_leads', 'Converted'),
                 ],
                 $this->mis->monthly($filters),
             ),
@@ -133,40 +111,28 @@ class ReportExportBuilder
                     ReportColumn::currency('sales_value', 'Sales value'),
                     ReportColumn::currency('collected', 'Collected'),
                     ReportColumn::currency('outstanding', 'Outstanding'),
-                    ReportColumn::currency('overdue', 'Overdue'),
                 ],
                 $projects,
-                $this->sumRow($projects, ['plots', 'booked', 'available', 'sales_value', 'collected', 'outstanding', 'overdue'], 'project', 'Total'),
+                $this->sumRow($projects, ['plots', 'booked', 'available', 'sales_value', 'collected', 'outstanding'], 'project', 'Total'),
             ),
             new ReportTable(
-                'salespeople', $scopedId !== null ? 'Salesperson MIS (your figures)' : 'Salesperson MIS',
+                'salespeople', 'Salesperson MIS',
                 [
                     ReportColumn::text('name', 'Salesperson'),
-                    ReportColumn::number('leads', 'Leads'),
                     ReportColumn::number('bookings', 'Bookings'),
                     ReportColumn::currency('booking_value', 'Booking value'),
                     ReportColumn::currency('collected', 'Collected'),
                     ReportColumn::currency('outstanding', 'Outstanding'),
-                    ReportColumn::percent('conversion', 'Conversion'),
                 ],
-                $this->mis->salespeople($filters, $scopedId),
+                $this->mis->salespeople($filters),
             ),
-            $this->metricTable('collection', 'Collection MIS', $this->mis->collectionSummary($filters), [
-                'booking_value' => ['Booking value', 'currency'],
-                'receivable' => ['Receivable', 'currency'],
-                'collected' => ['Collected', 'currency'],
-                'cash_collected' => ['Cash collected', 'currency'],
-                'outstanding' => ['Outstanding', 'currency'],
-                'overdue' => ['Overdue', 'currency'],
-                'collection_efficiency' => ['Collection efficiency', 'percent'],
-            ]),
         ];
     }
 
     // -- Sales -------------------------------------------------------------
 
     /** @return list<ReportTable> */
-    private function salesTables(ReportFilterData $filters, ?int $scopedId): array
+    private function salesTables(ReportFilterData $filters): array
     {
         $ps = $this->sales->projectSales($filters);
 
@@ -192,13 +158,11 @@ class ReportExportBuilder
                 ReportColumn::currency('value', 'Value'),
                 ReportColumn::percent('sold_pct', 'Sold %'),
             ], $this->sales->blockSales($filters)),
-            new ReportTable('salespeople', $scopedId !== null ? 'Salesperson performance (your figures)' : 'Salesperson performance', [
+            new ReportTable('salespeople', 'Salesperson performance', [
                 ReportColumn::text('name', 'Salesperson'),
-                ReportColumn::number('leads', 'Leads'),
                 ReportColumn::number('bookings', 'Bookings'),
                 ReportColumn::currency('value', 'Value'),
-                ReportColumn::percent('conversion', 'Conversion'),
-            ], $this->sales->salespersonPerformance($filters, $scopedId)),
+            ], $this->sales->salespersonPerformance($filters)),
         ];
     }
 
@@ -263,92 +227,6 @@ class ReportExportBuilder
         ];
     }
 
-    // -- Collections ---------------------------------------------------
-
-    /** @return list<ReportTable> */
-    private function collectionTables(ReportFilterData $filters, ?int $scopedId): array
-    {
-        $recon = $this->collection->reconciliation($filters);
-        $top = $this->collection->topCustomers($filters);
-        $pc = $this->collection->projectCollection($filters);
-
-        return [
-            $this->metricTable('kpis', 'Collection KPIs', array_merge($this->collection->kpis($filters), [
-                'booking_value' => $recon['bookingValue'], 'cash_collected' => $recon['cashCollected'],
-            ]), [
-                'booking_value' => ['Booking value', 'currency'],
-                'receivable' => ['Receivable', 'currency'],
-                'collected' => ['Collected', 'currency'],
-                'cash_collected' => ['Cash collected', 'currency'],
-                'outstanding' => ['Outstanding', 'currency'],
-                'overdue' => ['Overdue', 'currency'],
-                'efficiency' => ['Collection efficiency', 'percent'],
-            ]),
-            new ReportTable('ageing', 'Ageing of overdue receivables', [
-                ReportColumn::text('label', 'Bucket'),
-                ReportColumn::number('customers', 'Customers'),
-                ReportColumn::number('installments', 'Installments'),
-                ReportColumn::currency('outstanding', 'Outstanding'),
-            ], $this->collection->ageing($filters)),
-            new ReportTable('projects', 'Project collection', [
-                ReportColumn::text('project', 'Project'),
-                ReportColumn::currency('receivable', 'Receivable'),
-                ReportColumn::currency('collected', 'Collected'),
-                ReportColumn::currency('outstanding', 'Outstanding'),
-                ReportColumn::currency('overdue', 'Overdue'),
-                ReportColumn::percent('efficiency', 'Collection %'),
-            ], $pc, $this->sumRow($pc, ['receivable', 'collected', 'outstanding', 'overdue'], 'project', 'Total')),
-            new ReportTable('blocks', 'Block collection', [
-                ReportColumn::text('block', 'Block'),
-                ReportColumn::text('project', 'Project'),
-                ReportColumn::currency('receivable', 'Receivable'),
-                ReportColumn::currency('collected', 'Collected'),
-                ReportColumn::currency('outstanding', 'Outstanding'),
-                ReportColumn::currency('overdue', 'Overdue'),
-                ReportColumn::percent('efficiency', 'Collection %'),
-            ], $this->collection->blockCollection($filters)),
-            new ReportTable('salespeople', $scopedId !== null ? 'Salesperson collection (your figures)' : 'Salesperson collection', [
-                ReportColumn::text('name', 'Salesperson'),
-                ReportColumn::number('customers', 'Customers'),
-                ReportColumn::currency('receivable', 'Receivable'),
-                ReportColumn::currency('collected', 'Collected'),
-                ReportColumn::currency('outstanding', 'Outstanding'),
-                ReportColumn::currency('overdue', 'Overdue'),
-            ], $this->collection->salespersonCollection($filters, $scopedId)),
-            new ReportTable('payment_methods', 'Payment method mix', [
-                ReportColumn::text('method', 'Method'),
-                ReportColumn::currency('amount', 'Amount'),
-                ReportColumn::number('transactions', 'Transactions'),
-                ReportColumn::percent('percent', 'Share'),
-            ], $this->collection->paymentMethods($filters)),
-            $this->metricTable('cheques', 'Cheque analytics', $this->collection->cheques($filters), [
-                'received' => ['Received', 'number'],
-                'cleared' => ['Cleared', 'number'],
-                'pending' => ['Pending', 'number'],
-                'bounced' => ['Bounced', 'number'],
-                'bounced_amount' => ['Bounced amount', 'currency'],
-                'bank_charges' => ['Bank charges', 'currency'],
-            ]),
-            new ReportTable('monthly', 'Monthly collection', [
-                ReportColumn::text('month', 'Month'),
-                ReportColumn::currency('receivable', 'Receivable'),
-                ReportColumn::currency('collected', 'Collected'),
-                ReportColumn::currency('outstanding', 'Outstanding'),
-                ReportColumn::percent('efficiency', 'Efficiency'),
-            ], $this->collection->monthly($filters)),
-            new ReportTable('top_outstanding', 'Top outstanding customers', [
-                ReportColumn::text('name', 'Customer'),
-                ReportColumn::text('customer_code', 'Code'),
-                ReportColumn::currency('amount', 'Outstanding'),
-            ], $top['outstanding']),
-            new ReportTable('top_overdue', 'Top overdue customers', [
-                ReportColumn::text('name', 'Customer'),
-                ReportColumn::text('customer_code', 'Code'),
-                ReportColumn::currency('amount', 'Overdue'),
-            ], $top['overdue']),
-        ];
-    }
-
     // -- helpers ---------------------------------------------------------
 
     /**
@@ -402,7 +280,7 @@ class ReportExportBuilder
      *
      * @return array<string, string>
      */
-    private function filterSummary(ReportFilterData $filters, bool $scoped): array
+    private function filterSummary(ReportFilterData $filters): array
     {
         $summary = ['Period' => $filters->periodLabel().' ('.$filters->from->format('d M Y').' – '.$filters->to->format('d M Y').')'];
 
@@ -423,12 +301,6 @@ class ReportExportBuilder
         }
         if ($filters->plotStatus !== null) {
             $summary['Plot status'] = $filters->plotStatus->label();
-        }
-        if ($filters->leadSourceId !== null) {
-            $summary['Lead source'] = (string) (LeadSource::query()->whereKey($filters->leadSourceId)->value('name') ?? $filters->leadSourceId);
-        }
-        if ($scoped) {
-            $summary['Scope'] = 'Own records only (no leads.view_all)';
         }
 
         return $summary;

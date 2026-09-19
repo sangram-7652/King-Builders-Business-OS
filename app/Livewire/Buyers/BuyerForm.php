@@ -11,7 +11,7 @@ use App\Exceptions\DomainException;
 use App\Models\Buyer;
 use App\Models\Masters\City;
 use App\Models\Masters\State;
-use App\Support\Leads\DuplicateFinder;
+use App\Support\Buyers\DuplicateFinder;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;

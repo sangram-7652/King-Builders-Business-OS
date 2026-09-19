@@ -17,16 +17,10 @@ uses(RefreshDatabase::class);
 
 beforeEach(fn () => seedRbac());
 
-/** An active portal customer who is the primary buyer on a confirmed ₹10L booking with a 4×25% plan, ₹300000 paid. */
+/** An active portal customer who is the primary buyer on a confirmed ₹10L booking, ₹300000 paid directly. */
 function portalCustomerWithBooking(): array
 {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor'], [
-        ['type' => 'amount', 'value' => '250000', 'due_date' => now()->subMonth()->toDateString()],
-        ['type' => 'amount', 'value' => '250000', 'due_date' => now()->addMonth()->toDateString()],
-        ['type' => 'amount', 'value' => '250000', 'due_date' => now()->addMonths(2)->toDateString()],
-        ['type' => 'amount', 'value' => '250000', 'due_date' => now()->addMonths(3)->toDateString()],
-    ]);
     $payment = app(RecordPaymentAction::class)->handle([
         'booking_id' => $s['booking']->id, 'payment_mode_id' => cashMode()->id,
         'amount' => '300000', 'payment_date' => now()->toDateString(),
@@ -44,7 +38,7 @@ function portalCustomerWithBooking(): array
     return ['customer' => $customer->fresh(), 'booking' => $s['booking']->fresh()];
 }
 
-it('aggregates the dashboard from M7/M8 truth, not booking_value − paid', function () {
+it('aggregates the dashboard from M7 ledger truth', function () {
     ['customer' => $customer] = portalCustomerWithBooking();
 
     $summary = app(CustomerPortfolioService::class)->summary($customer);
@@ -52,9 +46,7 @@ it('aggregates the dashboard from M7/M8 truth, not booking_value − paid', func
     expect($summary['bookings'])->toBe(1)
         ->and($summary['plots'])->toBe(1)
         ->and((float) $summary['paid'])->toBe(300000.0)
-        ->and((float) $summary['outstanding'])->toBe(700000.0)   // M8 truth, not final − paid arithmetic in the component
-        ->and((float) $summary['overdue'])->toBeGreaterThanOrEqual(0.0)
-        ->and($summary['next_due'])->not->toBeNull();
+        ->and((float) $summary['outstanding'])->toBe(700000.0);
 });
 
 it('shows only the customer’s own bookings', function () {
@@ -86,8 +78,7 @@ it('handles a customer with no bookings gracefully', function () {
     $summary = app(CustomerPortfolioService::class)->summary($customer);
 
     expect($summary['bookings'])->toBe(0)
-        ->and((float) $summary['outstanding'])->toBe(0.0)
-        ->and($summary['next_due'])->toBeNull();
+        ->and((float) $summary['outstanding'])->toBe(0.0);
 
     Livewire::actingAs($customer, 'customer')->test(Dashboard::class)->assertOk();
 });

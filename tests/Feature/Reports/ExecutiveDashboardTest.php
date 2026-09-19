@@ -16,17 +16,15 @@ use App\Models\Booking;
 use App\Models\BookingBuyer;
 use App\Models\Buyer;
 use App\Models\Document;
-use App\Models\Lead;
 use App\Models\Plot;
 use App\Models\PossessionCase;
 use App\Models\Project;
 use App\Models\RegistryCase;
 use App\Models\TransferRequest;
 use App\Models\User;
-use App\Services\Payments\PaymentLedger;
-use App\Services\Reports\CollectionAnalytics;
 use App\Services\Reports\ExecutiveDashboardService;
 use App\Services\Reports\InventoryAnalytics;
+use App\Services\Reports\PaymentsAnalytics;
 use App\Services\Reports\SalesAnalytics;
 use App\Support\Reports\ExecutiveDashboardData;
 use App\Support\Reports\ReportFilterData;
@@ -89,27 +87,13 @@ function execWorld(): array
     $draft = $mkBooking($projectA, $blockA, 'draft', '2026-06-09', '4000000', $asha);
 
     // --- Payments -------------------------------------------------
-    // a1: partial 400,000 collected in June
-    activePlanFor($a1->fresh(), $actor, [
-        ['type' => 'amount', 'value' => '400000', 'due_date' => '2026-06-01'],
-        ['type' => 'amount', 'value' => '600000', 'due_date' => '2026-08-01'],
-    ]);
+    // a1: partial 400,000 collected in June (₹600,000 still outstanding)
     execPay($a1->fresh(), $actor, '400000', '2026-06-06');
 
-    // a2: overdue installment 500,000 (due in May), unpaid
-    activePlanFor($a2->fresh(), $actor, [
-        ['type' => 'amount', 'value' => '500000', 'due_date' => '2026-05-01'],
-        ['type' => 'amount', 'value' => '1500000', 'due_date' => '2026-09-01'],
-    ]);
+    // a2: unpaid (₹2,000,000 outstanding)
 
     // b1: fully paid in June
-    activePlanFor($b1->fresh(), $actor, [['type' => 'amount', 'value' => '500000', 'due_date' => '2026-06-01']]);
     execPay($b1->fresh(), $actor, '500000', '2026-06-13');
-
-    // --- Leads ---------------------------------------------------
-    Lead::factory()->count(2)->create(['assigned_to' => $asha->id, 'created_at' => '2026-06-03', 'status' => 'new']);
-    Lead::factory()->create(['assigned_to' => $asha->id, 'created_at' => '2026-06-04', 'status' => 'converted', 'converted_at' => '2026-06-09']);
-    Lead::factory()->create(['assigned_to' => $ravi->id, 'created_at' => '2026-05-10', 'status' => 'new']); // previous period
 
     // --- Operational (M9/M10) -----------------------------------
     RegistryCase::factory()->forBooking($a1)->status(RegistryCaseStatus::Scheduled)->create();
@@ -130,7 +114,7 @@ function execPay(Booking $booking, User $actor, string $amount, string $date): v
 
 function execDashboard(ReportFilterData $filters, ?User $user = null): ExecutiveDashboardData
 {
-    return app(ExecutiveDashboardService::class)->build($filters, $user ?? makeUser(permissions: ['reports.view', 'leads.view_all']));
+    return app(ExecutiveDashboardService::class)->build($filters, $user ?? makeUser(permissions: ['reports.view']));
 }
 
 /*
@@ -164,38 +148,24 @@ it('computes collected as successful payments in the period', function () {
     expect($d->kpi('total_collected')->value)->toBe(900_000.0);
 });
 
-it('computes outstanding from the M8 installment walk — not booking value minus collected (M11.6)', function () {
+it('computes outstanding as booking value minus collected, across the whole book (M11.6)', function () {
     execWorld();
     $d = execDashboard(ReportFilterData::default());
 
-    // Single source of M8 truth (the M11.4 collection analytics); every M11
-    // surface must agree.
-    $m8 = app(CollectionAnalytics::class)->kpis(ReportFilterData::default())['outstanding'];
+    // Single source of M7 truth (PaymentsAnalytics); every M11 surface must agree.
+    $m7 = app(PaymentsAnalytics::class)->kpis(ReportFilterData::default())['outstanding'];
 
-    expect($d->kpi('outstanding')->value)->toBe($m8)
-        // a1 ₹0.6M + a2 ₹2.0M + b1 ₹0 = ₹2.6M. The ₹3M confirmed "may" booking
-        // has no payment plan yet → no installment demand → nothing outstanding
-        // (its value still shows under the Booking value KPI). This is the M8
-        // definition — "booking value − collected" (₹5.6M) is explicitly wrong.
-        ->and($d->kpi('outstanding')->value)->toBe(2_600_000.0)
+    expect($d->kpi('outstanding')->value)->toBe($m7)
+        // a1 ₹0.6M + a2 ₹2.0M + b1 ₹0 + may ₹3.0M (unpaid, no date filter on this
+        // snapshot KPI) = ₹5.6M. There is no installment schedule anymore —
+        // outstanding is simply booking value minus successful payments.
+        ->and($d->kpi('outstanding')->value)->toBe(5_600_000.0)
         ->and($d->kpi('outstanding')->hasComparison())->toBeFalse(); // snapshot, no delta
-});
-
-it('computes overdue identically to Σ PaymentLedger::bookingOverdue', function () {
-    execWorld();
-    $d = execDashboard(ReportFilterData::default());
-
-    $ledger = app(PaymentLedger::class);
-    $expected = Booking::query()->where('status', BookingStatus::Confirmed->value)->get()
-        ->sum(fn (Booking $b) => (float) $ledger->bookingOverdue($b)->store());
-
-    expect($d->kpi('overdue')->value)->toBe(round($expected, 2))
-        ->and($d->kpi('overdue')->value)->toBe(500_000.0); // a2's May installment
 });
 
 it('counts a partial payment as partly collected, not fully', function () {
     execWorld();
-    $collection = app(CollectionAnalytics::class)->summary(ReportFilterData::default());
+    $collection = app(PaymentsAnalytics::class)->summary(ReportFilterData::default());
 
     // a1 owes 1,000,000, paid 400,000 → still 600,000 outstanding on that booking
     expect($collection['collectedAllTime'])->toBe(900_000.0)
@@ -224,15 +194,6 @@ it('computes the inventory + project + operational snapshot KPIs', function () {
         ->and($d->kpi('registry_pending')->value)->toBe(1)
         ->and($d->kpi('possession_pending')->value)->toBe(1)
         ->and($d->kpi('transfer_pending')->value)->toBe(1);
-});
-
-it('computes the lead KPIs cohort-style for the period', function () {
-    execWorld();
-    $d = execDashboard(ReportFilterData::default());
-
-    expect($d->kpi('total_leads')->value)->toBe(3)      // 3 created in June
-        ->and($d->kpi('converted_leads')->value)->toBe(1)
-        ->and($d->kpi('conversion_percent')->value)->toBe(33.3);
 });
 
 /*
@@ -319,8 +280,7 @@ it('filters KPIs by salesperson', function () {
     ));
 
     expect($d->kpi('total_bookings')->value)->toBe(2)              // a1 + a2
-        ->and($d->kpi('booking_value')->value)->toBe(3_000_000.0)
-        ->and($d->kpi('total_leads')->value)->toBe(3);            // Asha's June leads
+        ->and($d->kpi('booking_value')->value)->toBe(3_000_000.0);
 });
 
 /*
@@ -391,8 +351,7 @@ it('counts operational alerts from real M9/M10 rows only', function () {
     expect($alerts['registry']['count'])->toBe(1)
         ->and($alerts['possession']['count'])->toBe(1)
         ->and($alerts['transfers']['count'])->toBe(1)     // the under_review transfer
-        ->and($alerts['documents']['count'])->toBe(1)
-        ->and($alerts['overdue']['count'])->toBe(1);      // a2 only
+        ->and($alerts['documents']['count'])->toBe(1);
 });
 
 it('does not count a completed transfer as pending (transferred ownership edge case)', function () {
@@ -413,13 +372,13 @@ it('does not count a completed transfer as pending (transferred ownership edge c
 it('reports a section error instead of a fake zero when a query fails', function () {
     execWorld();
 
-    // break the leads table so LeadAnalytics throws
-    Schema::drop('leads');
+    // break the registry_cases table so OperationsAnalytics::registryPending() throws
+    Schema::drop('registry_cases');
 
     $d = execDashboard(ReportFilterData::default());
 
-    expect($d->kpi('total_leads')->value)->toBeNull()
-        ->and($d->kpi('total_leads')->failed())->toBeTrue()
+    expect($d->kpi('registry_pending')->value)->toBeNull()
+        ->and($d->kpi('registry_pending')->failed())->toBeTrue()
         ->and($d->hasErrors())->toBeTrue()
         // the rest of the dashboard still works
         ->and($d->kpi('total_bookings')->value)->toBe(3);

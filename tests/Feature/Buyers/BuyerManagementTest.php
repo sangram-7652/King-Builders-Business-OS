@@ -25,7 +25,7 @@ it('creates a buyer with a generated customer code', function () {
     $state = State::factory()->create();
     $city = City::factory()->create(['state_id' => $state->id]);
 
-    Livewire::actingAs(leadManager())
+    Livewire::actingAs(buyerManager())
         ->test(BuyerForm::class)
         ->set('first_name', 'Anita')
         ->set('last_name', 'Sharma')
@@ -75,7 +75,7 @@ it('resolves state / city relationships and validates the pairing', function () 
     ], User::factory()->create()))->toThrow(DomainException::class, 'does not belong');
 
     // Form validation
-    Livewire::actingAs(leadManager())
+    Livewire::actingAs(buyerManager())
         ->test(BuyerForm::class)
         ->set('first_name', 'Mismatch')
         ->set('phone', '9876543210')
@@ -88,7 +88,7 @@ it('resolves state / city relationships and validates the pairing', function () 
 it('updates a buyer', function () {
     $buyer = Buyer::factory()->create(['first_name' => 'Old']);
 
-    Livewire::actingAs(leadManager())
+    Livewire::actingAs(buyerManager())
         ->test(BuyerForm::class, ['buyer' => $buyer])
         ->set('first_name', 'New')
         ->call('save')
@@ -100,12 +100,12 @@ it('updates a buyer', function () {
 it('archives and restores a buyer via status transitions', function () {
     $buyer = Buyer::factory()->create(['status' => BuyerStatus::Active]);
 
-    Livewire::actingAs(leadManager())
+    Livewire::actingAs(buyerManager())
         ->test(BuyerIndex::class)
         ->call('setStatus', $buyer->id, 'archived');
     expect($buyer->fresh()->status)->toBe(BuyerStatus::Archived);
 
-    Livewire::actingAs(leadManager())
+    Livewire::actingAs(buyerManager())
         ->test(BuyerIndex::class)
         ->call('setStatus', $buyer->id, 'active');
     expect($buyer->fresh()->status)->toBe(BuyerStatus::Active);

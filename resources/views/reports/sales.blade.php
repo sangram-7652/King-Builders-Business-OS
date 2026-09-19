@@ -11,7 +11,7 @@
     $qs = $filters->toQueryString();
     $metricLabel = $sales->trendMetric === 'value' ? 'Booking value' : 'Bookings';
 
-    $spColumns = ['value' => 'Value', 'bookings' => 'Bookings', 'conversion' => 'Conversion'];
+    $spColumns = ['value' => 'Value', 'bookings' => 'Bookings'];
     $spLink = fn (string $col) => route('reports.sales', $qs + ['sp_sort' => $col, 'metric' => $sales->trendMetric]);
 @endphp
 
@@ -26,7 +26,7 @@
     <x-reports.tabs :reports="$reports" :active="$report" :filters="$filters" />
 
     <x-reports.filters :filters="$filters" :options="$options" :action="route('reports.sales')" :can-export="$canExport" :report="$report"
-        :only="['period', 'project_id', 'block_id', 'salesperson_id', 'booking_status', 'lead_source']" />
+        :only="['period', 'project_id', 'block_id', 'salesperson_id', 'booking_status']" />
 
     @if ($sales->hasErrors())
         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -153,23 +153,18 @@
 
     {{-- Salesperson performance --}}
     <x-reports.section title="Salesperson performance"
-        :subtitle="$sales->salespeopleScoped ? 'Your performance (you can only see your own).' : 'Sorted by '.strtolower($spColumns[$sales->salespeopleSort])"
+        :subtitle="'Sorted by '.strtolower($spColumns[$sales->salespeopleSort])"
         :error="$sales->error('Salesperson performance')" :empty="$sales->salespeople === []">
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-(--border) text-sm">
                 <thead class="text-left text-xs font-semibold uppercase tracking-wider text-(--content-muted)">
                     <tr>
                         <th class="py-2 pr-4">Salesperson</th>
-                        <th class="py-2 pr-4 text-right">Leads</th>
                         @foreach ($spColumns as $col => $label)
                             <th class="py-2 pr-4 text-right">
-                                @if (! $sales->salespeopleScoped)
-                                    <a href="{{ $spLink($col) }}" class="hover:text-(--content) {{ $sales->salespeopleSort === $col ? 'text-(--brand-primary)' : '' }}">
-                                        {{ $label }} {!! $sales->salespeopleSort === $col ? '▾' : '' !!}
-                                    </a>
-                                @else
-                                    {{ $label }}
-                                @endif
+                                <a href="{{ $spLink($col) }}" class="hover:text-(--content) {{ $sales->salespeopleSort === $col ? 'text-(--brand-primary)' : '' }}">
+                                    {{ $label }} {!! $sales->salespeopleSort === $col ? '▾' : '' !!}
+                                </a>
                             </th>
                         @endforeach
                     </tr>
@@ -178,10 +173,8 @@
                     @foreach ($sales->salespeople as $row)
                         <tr class="hover:bg-(--surface-muted)/50">
                             <td class="py-2 pr-4 font-medium">{{ $row['name'] }}</td>
-                            <td class="py-2 pr-4 text-right tabular-nums">{{ ReportFormat::number($row['leads']) }}</td>
                             <td class="py-2 pr-4 text-right tabular-nums">{{ ReportFormat::currency($row['value']) }}</td>
                             <td class="py-2 pr-4 text-right tabular-nums">{{ ReportFormat::number($row['bookings']) }}</td>
-                            <td class="py-2 pr-4 text-right tabular-nums">{{ ReportFormat::percent($row['conversion']) }}</td>
                         </tr>
                     @endforeach
                 </tbody>

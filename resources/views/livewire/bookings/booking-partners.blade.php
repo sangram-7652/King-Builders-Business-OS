@@ -18,13 +18,6 @@
             @endif
         </x-slot:actions>
 
-        @if ($suggestedPartnerLabel && $rows === [])
-            <x-ui.alert variant="info" title="Suggested from the originating lead">
-                <p class="text-sm">{{ $suggestedPartnerLabel }} sourced a lead for a buyer on this booking.</p>
-                <x-ui.button size="sm" class="mt-2" wire:click="applySuggestion">Use as primary (100%)</x-ui.button>
-            </x-ui.alert>
-        @endif
-
         @if ($rows === [])
             <p class="text-sm text-(--content-muted)">No partners attributed — this is a direct sale.</p>
         @else

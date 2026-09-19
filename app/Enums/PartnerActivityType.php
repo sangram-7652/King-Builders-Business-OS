@@ -33,8 +33,6 @@ enum PartnerActivityType: string
     case ProjectRevoked = 'project_revoked';
     case BankDetailsUpdated = 'bank_details_updated';
     case NoteAdded = 'note_added';
-    case LeadAttributed = 'lead_attributed';
-    case LeadAttributionRemoved = 'lead_attribution_removed';
     case BookingAttributed = 'booking_attributed';
     case BookingAttributionUpdated = 'booking_attribution_updated';
     case BookingAttributionRemoved = 'booking_attribution_removed';
@@ -60,8 +58,6 @@ enum PartnerActivityType: string
             self::ProjectRevoked => 'Project authorisation revoked',
             self::BankDetailsUpdated => 'Payout bank details updated',
             self::NoteAdded => 'Note added',
-            self::LeadAttributed => 'Lead attributed to partner',
-            self::LeadAttributionRemoved => 'Lead attribution removed',
             self::BookingAttributed => 'Booking attributed to partner',
             self::BookingAttributionUpdated => 'Booking attribution updated',
             self::BookingAttributionRemoved => 'Booking attribution removed',
@@ -78,7 +74,6 @@ enum PartnerActivityType: string
             self::Reactivated, self::Retired => 'user',
             self::KycUploaded, self::KycVerified, self::KycRejected => 'building',
             self::ProjectAuthorized, self::ProjectRevoked => 'building',
-            self::LeadAttributed, self::LeadAttributionRemoved => 'inbox',
             self::BookingAttributed, self::BookingAttributionUpdated, self::BookingAttributionRemoved => 'inbox',
         };
     }

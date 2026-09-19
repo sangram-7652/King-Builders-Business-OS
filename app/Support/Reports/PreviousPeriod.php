@@ -31,7 +31,6 @@ final class PreviousPeriod
             bookingStatus: $current->bookingStatus,
             paymentStatus: $current->paymentStatus,
             plotStatus: $current->plotStatus,
-            leadSourceId: $current->leadSourceId,
         );
     }
 

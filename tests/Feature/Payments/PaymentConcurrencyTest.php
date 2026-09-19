@@ -2,13 +2,10 @@
 
 declare(strict_types=1);
 
-use App\Actions\Payments\AllocatePaymentAction;
 use App\Actions\Payments\RecordPaymentAction;
 use App\Actions\Payments\VerifyPaymentAction;
 use App\Enums\PaymentStatus;
-use App\Exceptions\DomainException;
 use App\Models\Receipt;
-use App\Services\Payments\PaymentLedger;
 use App\Support\Sequences\SequenceGenerator;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,41 +15,12 @@ uses(RefreshDatabase::class);
 
 /*
 | Guarantee 1 — the in-transaction re-check (every driver)
-| Once one allocation has consumed an installment's outstanding balance, a
-| second allocation attempting to consume the same balance is rejected. No UI
-| guard involved.
+| The payment row is locked FOR UPDATE for the whole verify (and reverse)
+| transaction, so two concurrent requests against the same payment can never
+| both process it. No UI guard involved.
 */
-it('two allocations cannot both consume the same installment balance', function () {
+it('verification locks the payment row FOR UPDATE', function () {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor'], [
-        ['type' => 'amount', 'value' => '300000', 'due_date' => now()->addMonth()->toDateString()],
-        ['type' => 'amount', 'value' => '700000', 'due_date' => now()->addMonths(2)->toDateString()],
-    ]);
-    $i1 = $s['booking']->activePaymentPlan->installments->first();
-
-    $mkPayment = function () use ($s) {
-        $p = app(RecordPaymentAction::class)->handle(['booking_id' => $s['booking']->id, 'payment_mode_id' => cashMode()->id, 'amount' => '300000'], $s['actor']);
-        $p = app(VerifyPaymentAction::class)->handle($p, PaymentStatus::Success, $s['actor']);
-        $p->allocations()->delete();
-
-        return $p->fresh();
-    };
-
-    $a = $mkPayment();
-    $b = $mkPayment();
-
-    app(AllocatePaymentAction::class)->handle($a, [['installment_id' => $i1->id, 'amount' => '300000']], financeManager());
-
-    expect(fn () => app(AllocatePaymentAction::class)->handle($b, [['installment_id' => $i1->id, 'amount' => '300000']], financeManager()))
-        ->toThrow(DomainException::class);
-
-    expect(app(PaymentLedger::class)->installmentPaid($i1->fresh())->store())->toBe('300000.00');
-});
-
-it('auto-allocation locks the installment rows FOR UPDATE', function () {
-    $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor']);
-
     $payment = app(RecordPaymentAction::class)->handle(['booking_id' => $s['booking']->id, 'payment_mode_id' => cashMode()->id, 'amount' => '250000'], $s['actor']);
 
     $sql = [];
@@ -80,7 +48,6 @@ it('generates distinct payment numbers under repeated calls (3)', function () {
 
 it('generates distinct receipt numbers under repeated verification (4)', function () {
     $s = confirmedBookingScenario('2000000');
-    activePlanFor($s['booking'], $s['actor']);
 
     $receipts = collect(range(1, 10))->map(function () use ($s) {
         $p = app(RecordPaymentAction::class)->handle(['booking_id' => $s['booking']->id, 'payment_mode_id' => cashMode()->id, 'amount' => '10000'], $s['actor']);

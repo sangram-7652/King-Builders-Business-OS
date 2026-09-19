@@ -30,28 +30,25 @@ class PaymentDashboard extends Component
 
         $bookings = Booking::query()
             ->where('status', BookingStatus::Confirmed->value)
-            ->with(['activePaymentPlan.installments', 'primaryBookingBuyer.buyer', 'project:id,name'])
+            ->with(['primaryBookingBuyer.buyer', 'project:id,name'])
             ->get();
 
         $totalOutstanding = Money::zero();
-        $totalOverdue = Money::zero();
         $rows = [];
 
         foreach ($bookings as $booking) {
             $summary = $ledger->summary($booking);
             $totalOutstanding = $totalOutstanding->plus($summary->outstanding->clampToZero());
-            $totalOverdue = $totalOverdue->plus($summary->overdue);
 
-            if ($summary->outstanding->isPositive() || $summary->overdue->isPositive()) {
+            if ($summary->outstanding->isPositive()) {
                 $rows[] = ['booking' => $booking, 'summary' => $summary];
             }
         }
 
-        usort($rows, fn ($a, $b) => (float) $b['summary']->overdue->store() <=> (float) $a['summary']->overdue->store());
+        usort($rows, fn ($a, $b) => (float) $b['summary']->outstanding->store() <=> (float) $a['summary']->outstanding->store());
 
         return view('livewire.payments.payment-dashboard', [
             'totalOutstanding' => $totalOutstanding,
-            'totalOverdue' => $totalOverdue,
             'confirmedBookings' => $bookings->count(),
             'rows' => array_slice($rows, 0, 25),
             'pendingVerification' => Payment::query()->where('status', PaymentStatus::Pending->value)

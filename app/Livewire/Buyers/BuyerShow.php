@@ -10,9 +10,13 @@ use App\Actions\Customers\RequestCustomerPasswordReset;
 use App\Actions\Customers\SetCustomerPortalAccess;
 use App\Enums\BuyerStatus;
 use App\Exceptions\DomainException;
+use App\Enums\BookingStatus;
+use App\Enums\PaymentStatus;
 use App\Models\Buyer;
+use App\Models\Payment;
 use App\Models\TransferRequest;
-use App\Services\Collections\BuyerCollectionProfile;
+use App\Services\Payments\PaymentLedger;
+use App\Support\Money;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -30,7 +34,7 @@ class BuyerShow extends Component
     public function mount(Buyer $buyer): void
     {
         $this->authorize('view', $buyer);
-        $this->buyer = $buyer->load(['state', 'city', 'createdBy', 'leads']);
+        $this->buyer = $buyer->load(['state', 'city', 'createdBy']);
     }
 
     // --- Customer portal access (M15) --------------------------------
@@ -41,7 +45,7 @@ class BuyerShow extends Component
 
         try {
             $fn();
-            $this->buyer = $this->buyer->fresh(['state', 'city', 'createdBy', 'leads']);
+            $this->buyer = $this->buyer->fresh(['state', 'city', 'createdBy']);
         } catch (DomainException $e) {
             $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
         }
@@ -100,11 +104,52 @@ class BuyerShow extends Component
 
         try {
             app(ChangeBuyerStatus::class)->handle($this->buyer, $target);
-            $this->buyer = $this->buyer->fresh(['state', 'city', 'createdBy', 'leads']);
+            $this->buyer = $this->buyer->fresh(['state', 'city', 'createdBy']);
             $this->dispatch('toast', message: "Buyer {$target->label()}.", variant: 'success');
         } catch (DomainException $e) {
             $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
         }
+    }
+
+    /**
+     * Payment summary across every confirmed booking where this buyer is
+     * primary. Figures come straight from the M7 ledger.
+     *
+     * @return array<string, mixed>
+     */
+    private function paymentProfile(): array
+    {
+        $ledger = app(PaymentLedger::class);
+
+        $bookings = $this->buyer->bookings()
+            ->wherePivot('is_primary', true)
+            ->where('bookings.status', BookingStatus::Confirmed->value)
+            ->get();
+
+        $value = Money::zero();
+        $paid = Money::zero();
+        $outstanding = Money::zero();
+
+        foreach ($bookings as $booking) {
+            $value = $value->plus(Money::of($booking->final_amount));
+            $paid = $paid->plus($ledger->bookingPaid($booking));
+            $outstanding = $outstanding->plus($ledger->bookingOutstanding($booking)->clampToZero());
+        }
+
+        $lastPayment = Payment::query()
+            ->whereIn('booking_id', $bookings->pluck('id'))
+            ->where('status', PaymentStatus::Success->value)
+            ->latest('payment_date')
+            ->first();
+
+        return [
+            'total_bookings' => $bookings->count(),
+            'total_value' => $value->store(),
+            'total_paid' => $paid->store(),
+            'total_outstanding' => $outstanding->store(),
+            'last_payment_date' => $lastPayment?->payment_date?->toDateString(),
+            'last_payment_amount' => $lastPayment !== null ? Money::of($lastPayment->amount)->store() : null,
+        ];
     }
 
     public function render(): View
@@ -117,8 +162,8 @@ class BuyerShow extends Component
             'pan' => $this->displaySensitive('pan_number', $canViewDocuments),
             'aadhaar' => $this->displaySensitive('aadhaar_number', $canViewDocuments),
             'allowedStatuses' => $this->buyer->status->allowedTransitions(),
-            'collectionProfile' => auth()->user()->can('collections.view')
-                ? app(BuyerCollectionProfile::class)->for($this->buyer)
+            'paymentProfile' => auth()->user()->can('payments.view')
+                ? $this->paymentProfile()
                 : null,
             'ownerships' => auth()->user()->can('ownership.view')
                 ? $this->buyer->plotOwnerships()->with(['plot:id,plot_number', 'booking:id,booking_number'])->limit(20)->get()

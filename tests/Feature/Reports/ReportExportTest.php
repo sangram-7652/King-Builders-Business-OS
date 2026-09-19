@@ -24,7 +24,7 @@ beforeEach(function () {
 /** misWorld() + misFilter() are defined in MisReportTest.php (shared Pest helpers). */
 function exportUser(): User
 {
-    return makeUser(permissions: ['reports.view', 'reports.export', 'leads.view_all', 'projects.view']);
+    return makeUser(permissions: ['reports.view', 'reports.export', 'projects.view']);
 }
 
 // ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ function exportUser(): User
 
 it('forbids export for a user with reports.view but not reports.export', function (string $format) {
     misWorld();
-    $this->actingAs(makeUser(permissions: ['reports.view', 'leads.view_all']))
+    $this->actingAs(makeUser(permissions: ['reports.view']))
         ->get(route('reports.export', ['type' => 'mis', 'format' => $format]))
         ->assertForbidden();
 })->with(['csv', 'xlsx', 'pdf', 'print']);
@@ -139,25 +139,6 @@ it('rejects a foreign project id on the export route (IDOR guard)', function () 
         ->assertJsonValidationErrors('project_id');
 });
 
-it('forbids a scoped user exporting another salesperson and scopes their own export', function () {
-    $w = misWorld();
-    $scoped = makeUser(permissions: ['reports.view', 'reports.export']); // no leads.view_all
-
-    // cannot target someone else
-    $this->actingAs($scoped)
-        ->getJson(route('reports.export', ['type' => 'mis', 'format' => 'csv', 'salesperson_id' => $w['asha']->id]))
-        ->assertStatus(422);
-
-    // own export is scoped + labelled
-    $body = $this->actingAs($scoped)
-        ->get(route('reports.export', ['type' => 'mis', 'format' => 'csv']))
-        ->streamedContent();
-
-    expect($body)->toContain('Own records only')
-        ->not->toContain('Asha Rao')
-        ->not->toContain('Ravi Menon');
-});
-
 // ---------------------------------------------------------------------------
 //  AUDIT
 // ---------------------------------------------------------------------------
@@ -167,13 +148,13 @@ it('writes one report.exported audit row per export, filters but no PII', functi
     $me = exportUser();
 
     $this->actingAs($me)->get(route('reports.export', [
-        'type' => 'collections', 'format' => 'xlsx', 'project_id' => $w['alpha']->id,
+        'type' => 'mis', 'format' => 'xlsx', 'project_id' => $w['alpha']->id,
     ]))->assertOk();
 
     $audit = ReportExport::query()->latest('id')->first();
     expect($audit)->not->toBeNull()
         ->and($audit->user_id)->toBe($me->id)
-        ->and($audit->report_type)->toBe(ReportType::Collections)
+        ->and($audit->report_type)->toBe(ReportType::Mis)
         ->and($audit->format)->toBe(ExportFormat::Xlsx)
         ->and($audit->filters)->toBe(['project_id' => (string) $w['alpha']->id])
         ->and($audit->row_count)->toBeGreaterThan(0)
@@ -182,7 +163,7 @@ it('writes one report.exported audit row per export, filters but no PII', functi
 
 it('does not audit a failed (forbidden) export', function () {
     misWorld();
-    $this->actingAs(makeUser(permissions: ['reports.view', 'leads.view_all']))
+    $this->actingAs(makeUser(permissions: ['reports.view']))
         ->get(route('reports.export', ['type' => 'mis', 'format' => 'csv']))
         ->assertForbidden();
 
@@ -219,7 +200,6 @@ it('exports every tabular report format without error', function (string $type, 
 })->with([
     ['sales', 'csv'], ['sales', 'pdf'],
     ['inventory', 'xlsx'], ['inventory', 'print'],
-    ['collections', 'csv'], ['collections', 'pdf'],
     ['mis', 'xlsx'],
 ]);
 

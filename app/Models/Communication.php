@@ -32,7 +32,7 @@ class Communication extends Model
 
     protected $fillable = [
         'uuid', 'channel', 'category', 'status', 'to_address', 'subject', 'body', 'context',
-        'event_key', 'subject_type', 'subject_id', 'buyer_id', 'lead_id',
+        'event_key', 'subject_type', 'subject_id', 'buyer_id',
         'provider', 'provider_message_id', 'attempts', 'error',
         'queued_at', 'sending_at', 'sent_at', 'delivered_at', 'failed_at',
         'idempotency_key', 'created_by',
@@ -47,7 +47,6 @@ class Communication extends Model
             'context' => 'array',
             'subject_id' => 'integer',
             'buyer_id' => 'integer',
-            'lead_id' => 'integer',
             'attempts' => 'integer',
             'created_by' => 'integer',
             'queued_at' => 'datetime',
@@ -77,12 +76,6 @@ class Communication extends Model
     public function buyer(): BelongsTo
     {
         return $this->belongsTo(Buyer::class);
-    }
-
-    /** @return BelongsTo<Lead, $this> */
-    public function lead(): BelongsTo
-    {
-        return $this->belongsTo(Lead::class);
     }
 
     /** @return BelongsTo<User, $this> */

@@ -6,7 +6,7 @@ historical financial truth: it records **who** (`booking_buyers`), **what plot**
 `booking_price_lines` + `pricing_snapshot`) and **under which authorisation**
 (`created_by` / `confirmed_by` / `price_override_*`).
 
-Hierarchy: **Lead → Buyer → Booking → Plot**. A booking references a plot; a
+Hierarchy: **Buyer → Booking → Plot**. A booking references a plot; a
 buyer is never attached directly to a plot.
 
 ## Entities

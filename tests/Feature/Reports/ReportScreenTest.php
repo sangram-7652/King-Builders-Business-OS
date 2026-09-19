@@ -24,8 +24,6 @@ dataset('report routes', [
     'overview' => ['reports.overview', 'Executive dashboard'], // M11.2 replaced the placeholder
     'sales' => ['reports.sales', 'Sales report'],
     'inventory' => ['reports.inventory', 'Inventory report'],
-    'collections' => ['reports.collections', 'Collections report'],
-    'leads' => ['reports.leads', 'Leads report'],
     'mis' => ['reports.mis', 'MIS report'],
 ]);
 
@@ -123,17 +121,7 @@ it('rejects a block that does not belong to the selected project', function () {
 
 it('rejects a non-existent salesperson', function () {
     $this->actingAs(reportUser())
-        ->getJson(route('reports.leads', ['salesperson_id' => 999999]))
-        ->assertStatus(422)
-        ->assertJsonValidationErrors('salesperson_id');
-});
-
-it('forbids a scoped user from reporting on another salesperson', function () {
-    $scoped = makeUser(permissions: ['reports.view', 'leads.view']); // no leads.view_all
-    $other = User::factory()->create();
-
-    $this->actingAs($scoped)
-        ->getJson(route('reports.leads', ['salesperson_id' => $other->id]))
+        ->getJson(route('reports.sales', ['salesperson_id' => 999999]))
         ->assertStatus(422)
         ->assertJsonValidationErrors('salesperson_id');
 });
@@ -149,24 +137,13 @@ it('rejects an inverted custom date range', function () {
 | FILTER OPTIONS ARE SCOPED
 */
 
-it('offers only the active projects and (for view_all) all users as filter options', function () {
+it('offers only the active projects as filter options', function () {
     $active = Project::factory()->create(['name' => 'Green Meadows']);
     Project::factory()->inactive()->create(['name' => 'Archived Estate']);
 
-    $this->actingAs(reportUser(['projects.view', 'leads.view_all']))
+    $this->actingAs(reportUser(['projects.view']))
         ->get(route('reports.sales'))
         ->assertOk()
         ->assertSee('Green Meadows')
         ->assertDontSee('Archived Estate');
-});
-
-it('shows a scoped user only themselves in the salesperson filter', function () {
-    $scoped = makeUser(permissions: ['reports.view', 'leads.view'], attributes: ['name' => 'Only Me']);
-    User::factory()->create(['name' => 'Someone Else']);
-
-    $this->actingAs($scoped)
-        ->get(route('reports.leads'))
-        ->assertOk()
-        ->assertSee('Only Me')
-        ->assertDontSee('Someone Else');
 });

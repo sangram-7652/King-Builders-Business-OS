@@ -17,37 +17,32 @@ use Illuminate\Support\Facades\Log;
  *
  * Only an authorised user reaches this (policy + `payments.verify`). It is
  * idempotent: verifying a payment that is already in the requested state
- * returns it unchanged — no second receipt, no re-allocation, no double count.
+ * returns it unchanged — no second receipt, no double count.
  *
- * On SUCCESS the payment is auto-allocated (oldest installment first, or an
- * explicit split for `payments.allocate` holders) and its receipt is issued —
- * all inside one transaction with the payment row locked.
+ * On SUCCESS the payment's receipt is issued — a SUCCESS payment counts
+ * toward the booking's Paid amount immediately, straight from
+ * {@see \App\Services\Payments\PaymentLedger} — there is no separate
+ * allocation step.
  */
 class VerifyPaymentAction
 {
     use RunsInTransaction;
 
-    public function __construct(
-        private readonly AllocatePaymentAction $allocator,
-        private readonly GenerateReceiptAction $receipts,
-    ) {}
+    public function __construct(private readonly GenerateReceiptAction $receipts) {}
 
-    /**
-     * @param  list<array{installment_id: int|string, amount: mixed}>|null  $allocations
-     */
-    public function handle(Payment $payment, PaymentStatus $outcome, User $actor, ?array $allocations = null): Payment
+    public function handle(Payment $payment, PaymentStatus $outcome, User $actor): Payment
     {
         if (! in_array($outcome, [PaymentStatus::Success, PaymentStatus::Failed], true)) {
             throw new DomainException('A payment can only be verified as successful or failed.');
         }
 
-        return $this->transaction(function () use ($payment, $outcome, $actor, $allocations): Payment {
+        return $this->transaction(function () use ($payment, $outcome, $actor): Payment {
             /** @var Payment $locked */
             $locked = Payment::query()->whereKey($payment->getKey())->lockForUpdate()->firstOrFail();
             $locked->loadMissing('paymentMode');
 
             if ($locked->status === $outcome) {
-                return $locked->load(['allocations.installment', 'receipt']);
+                return $locked->load('receipt');
             }
 
             if ($locked->status !== PaymentStatus::Pending) {
@@ -73,11 +68,10 @@ class VerifyPaymentAction
             ]);
 
             if ($outcome === PaymentStatus::Success) {
-                $this->allocator->allocate($locked, $allocations, $actor);
                 $this->receipts->handle($locked->fresh(['booking.primaryBookingBuyer.buyer', 'paymentMode']), $actor);
             }
 
-            return $locked->load(['allocations.installment', 'receipt']);
+            return $locked->load('receipt');
         });
     }
 }

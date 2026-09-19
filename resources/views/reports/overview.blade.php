@@ -53,12 +53,6 @@
         @can('bookings.create')
             <x-ui.button size="sm" :href="route('bookings.create')" wire:navigate>New booking</x-ui.button>
         @endcan
-        @can('leads.create')
-            <x-ui.button size="sm" variant="secondary" :href="route('leads.create')" wire:navigate>Add lead</x-ui.button>
-        @endcan
-        @can('collections.view')
-            <x-ui.button size="sm" variant="secondary" :href="route('collections.queue')" wire:navigate>Record collection</x-ui.button>
-        @endcan
         <x-ui.button size="sm" variant="ghost" :href="route('reports.sales', $filters->toQueryString())">Detailed reports</x-ui.button>
     </div>
 
@@ -67,8 +61,8 @@
         @foreach ([
             'total_projects', 'total_plots', 'available_plots', 'booked_plots',
             'total_bookings', 'booking_value', 'total_collected', 'outstanding',
-            'overdue', 'collection_percent', 'total_leads', 'converted_leads',
-            'conversion_percent', 'registry_pending', 'possession_pending', 'transfer_pending',
+            'collection_percent',
+            'registry_pending', 'possession_pending', 'transfer_pending',
         ] as $key)
             @if ($kpi($key))
                 <x-reports.kpi-card :kpi="$kpi($key)" />
@@ -107,14 +101,14 @@
             </p>
         </x-reports.section>
 
-        <x-reports.section title="Collection overview" subtitle="Reuses the M7/M8 ledger — no separate calculation"
+        <x-reports.section title="Payments overview" subtitle="Reuses the M7 ledger — no separate calculation"
             :error="$dashboard->kpi('outstanding')?->error"
-            :empty="$dashboard->collectionOverview === []">
+            :empty="$dashboard->paymentsOverview === []">
             <dl class="space-y-3">
-                @foreach ($dashboard->collectionOverview as $label => $amount)
+                @foreach ($dashboard->paymentsOverview as $label => $amount)
                     <div class="flex items-center justify-between text-sm">
                         <dt class="text-(--content-muted)">{{ $label }}</dt>
-                        <dd class="font-semibold tabular-nums {{ str_contains($label, 'Overdue') ? 'text-red-600' : 'text-(--content)' }}">
+                        <dd class="font-semibold tabular-nums text-(--content)">
                             {{ ReportFormat::currencyFull($amount) }}
                         </dd>
                     </div>

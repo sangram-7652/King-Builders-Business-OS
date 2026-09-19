@@ -8,12 +8,9 @@
     // --- Primary (always-visible workspace) --------------------------------
     $primaryNav = array_values(array_filter([
         ['label' => 'Dashboard', 'route' => 'dashboard', 'params' => [], 'icon' => 'home', 'can' => true],
-        ['label' => 'Leads', 'route' => 'leads.index', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::LeadsView->value)],
-        ['label' => 'Follow-ups', 'route' => 'follow-ups.index', 'params' => [], 'icon' => 'clock', 'can' => (bool) $user?->can(Permission::FollowUpsView->value)],
         ['label' => 'Buyers', 'route' => 'buyers.index', 'params' => [], 'icon' => 'user', 'can' => (bool) $user?->can(Permission::BuyersView->value)],
         ['label' => 'Bookings', 'route' => 'bookings.index', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::BookingsView->value)],
         ['label' => 'Finance', 'route' => 'finance.dashboard', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::PaymentsView->value)],
-        ['label' => 'Collections', 'route' => 'collections.queue', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::CollectionsView->value)],
         ['label' => 'Documents', 'route' => 'documents.dashboard', 'params' => [], 'icon' => 'inbox', 'can' => (bool) $user?->can(Permission::DocumentsView->value)],
         ['label' => 'Registry', 'route' => 'registry.dashboard', 'params' => [], 'icon' => 'building', 'can' => (bool) $user?->can(Permission::RegistryView->value)],
         ['label' => 'Possession', 'route' => 'possession.dashboard', 'params' => [], 'icon' => 'building', 'can' => (bool) $user?->can(Permission::PossessionView->value)],
@@ -30,13 +27,11 @@
         ['label' => 'Overview', 'route' => 'reports.overview'],
         ['label' => 'Sales', 'route' => 'reports.sales'],
         ['label' => 'Inventory', 'route' => 'reports.inventory'],
-        ['label' => 'Collections', 'route' => 'reports.collections'],
-        ['label' => 'Leads', 'route' => 'reports.leads'],
         ['label' => 'MIS', 'route' => 'reports.mis'],
     ] : [];
 
     // Modules that are live now — excluded from the "coming soon" roadmap list.
-    $liveModules = ['projects', 'plots', 'leads', 'follow_ups', 'buyers', 'bookings', 'pricing', 'payments', 'payment_plans', 'receipts', 'collections', 'promises', 'cheques', 'penalties', 'documents', 'agreements', 'registry', 'registry_expenses', 'handover', 'possession', 'transfer', 'ownership', 'reports', 'partners', 'commission_schemes', 'commission'];
+    $liveModules = ['projects', 'plots', 'buyers', 'bookings', 'pricing', 'payments', 'receipts', 'documents', 'agreements', 'registry', 'registry_expenses', 'handover', 'possession', 'transfer', 'ownership', 'reports', 'partners', 'commission_schemes', 'commission'];
 
     // --- Administration ---------------------------------------------------
     $adminNav = array_values(array_filter([
@@ -52,7 +47,7 @@
     $upcoming = [];
     foreach (Permission::grouped() as $groupValue => $perms) {
         $group = PermissionGroup::from($groupValue);
-        if (in_array($group, [PermissionGroup::Administration, PermissionGroup::MasterData, PermissionGroup::Settings], true)) {
+        if (in_array($group, [PermissionGroup::Administration, PermissionGroup::MasterData, PermissionGroup::Settings, PermissionGroup::Communication], true)) {
             continue;
         }
         $futurePerms = array_values(array_filter($perms, fn (Permission $p) => ! in_array($p->module(), $liveModules, true)));

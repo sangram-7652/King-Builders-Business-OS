@@ -35,11 +35,6 @@ class PaymentPolicy
         return $user->can(Permission::PaymentsVerify->value) && $payment->isPending();
     }
 
-    public function allocate(User $user, Payment $payment): bool
-    {
-        return $user->can(Permission::PaymentsAllocate->value) && $payment->isSuccessful();
-    }
-
     public function reverse(User $user, Payment $payment): bool
     {
         return $user->can(Permission::PaymentsReverse->value) && $payment->isSuccessful();

@@ -30,9 +30,8 @@ class ExecutiveDashboardService
 {
     public function __construct(
         private readonly SalesAnalytics $sales,
-        private readonly CollectionAnalytics $collection,
+        private readonly PaymentsAnalytics $payments,
         private readonly InventoryAnalytics $inventory,
-        private readonly LeadAnalytics $leads,
         private readonly OperationsAnalytics $operations,
     ) {}
 
@@ -58,11 +57,8 @@ class ExecutiveDashboardService
         $salesNow = $safe('Sales', fn () => $this->sales->bookingSummary($filters), null);
         $salesPrev = $salesNow === null ? null : $safe('Sales', fn () => $this->sales->bookingSummary($previous), null);
 
-        $collectionNow = $safe('Collections', fn () => $this->collection->summary($filters), null);
-        $collectionPrev = $collectionNow === null ? null : $safe('Collections', fn () => $this->collection->summary($previous), null);
-
-        $leadsNow = $safe('Leads', fn () => $this->leads->summary($filters), null);
-        $leadsPrev = $leadsNow === null ? null : $safe('Leads', fn () => $this->leads->summary($previous), null);
+        $paymentsNow = $safe('Payments', fn () => $this->payments->summary($filters), null);
+        $paymentsPrev = $paymentsNow === null ? null : $safe('Payments', fn () => $this->payments->summary($previous), null);
 
         $inventoryDist = $safe('Inventory', fn () => $this->inventory->statusDistribution($filters), null);
         $totalProjects = $safe('Projects', fn () => $this->inventory->totalProjects($filters), null);
@@ -72,16 +68,13 @@ class ExecutiveDashboardService
         $transferPending = $safe('Transfers', fn () => $this->operations->transferPending($filters), null);
         $transferApproval = $safe('Transfers', fn () => $this->operations->transferAwaitingApproval($filters), null);
         $docsPending = $safe('Documents', fn () => $this->operations->documentsAwaitingVerification($filters), null);
-        $overdueBookings = $safe('Overdue customers', fn () => $this->collection->overdueBookingCount($filters), null);
 
         $bookingStatus = $safe('Booking status', fn () => $this->sales->statusDistribution($filters), []);
         $salesSeries = $safe('Sales trend', fn () => $this->sales->timeSeries($filters, $salesMetric), ChartSeries::failed('Could not load the sales trend.'));
         $projectPerf = $safe('Project performance', fn () => $this->sales->projectPerformance($filters), []);
         $recent = $safe('Recent bookings', fn () => $this->sales->recentBookings($filters), []);
 
-        $topSalespeople = $user->can('leads.view_all')
-            ? $safe('Top salespeople', fn () => $this->sales->topSalespeople($filters), [])
-            : null;
+        $topSalespeople = $safe('Top salespeople', fn () => $this->sales->topSalespeople($filters), []);
 
         // --- KPIs --------------------------------------------------------
         $err = fn (string $section) => $errors[$section] ?? null;
@@ -93,14 +86,9 @@ class ExecutiveDashboardService
 
             new Kpi('total_bookings', 'Bookings', $salesNow['bookings'] ?? null, 'number', previous: $salesPrev['bookings'] ?? null, error: $err('Sales'), hint: 'Confirmed in period'),
             new Kpi('booking_value', 'Booking value', $salesNow['value'] ?? null, 'currency', previous: $salesPrev['value'] ?? null, error: $err('Sales')),
-            new Kpi('total_collected', 'Collected', $collectionNow['collectedInPeriod'] ?? null, 'currency', previous: $collectionPrev['collectedInPeriod'] ?? null, error: $err('Collections'), hint: 'Successful payments in period'),
-            new Kpi('outstanding', 'Outstanding', $collectionNow['outstanding'] ?? null, 'currency', error: $err('Collections'), hint: 'M8 installment walk'),
-            new Kpi('overdue', 'Overdue', $collectionNow['overdue'] ?? null, 'currency', error: $err('Collections')),
-            new Kpi('collection_percent', 'Collection %', $collectionNow['collectionPercent'] ?? null, 'percent', error: $err('Collections')),
-
-            new Kpi('total_leads', 'Leads', $leadsNow['total'] ?? null, 'number', previous: $leadsPrev['total'] ?? null, error: $err('Leads')),
-            new Kpi('converted_leads', 'Converted leads', $leadsNow['converted'] ?? null, 'number', previous: $leadsPrev['converted'] ?? null, error: $err('Leads')),
-            new Kpi('conversion_percent', 'Conversion %', $leadsNow['conversionPercent'] ?? null, 'percent', previous: $leadsPrev['conversionPercent'] ?? null, error: $err('Leads')),
+            new Kpi('total_collected', 'Collected', $paymentsNow['collectedInPeriod'] ?? null, 'currency', previous: $paymentsPrev['collectedInPeriod'] ?? null, error: $err('Payments'), hint: 'Successful payments in period'),
+            new Kpi('outstanding', 'Outstanding', $paymentsNow['outstanding'] ?? null, 'currency', error: $err('Payments'), hint: 'Final amount − successful payments'),
+            new Kpi('collection_percent', 'Collection %', $paymentsNow['collectionPercent'] ?? null, 'percent', error: $err('Payments')),
 
             new Kpi('registry_pending', 'Registry pending', $registryPending, 'number', error: $err('Registry')),
             new Kpi('possession_pending', 'Possession pending', $possessionPending, 'number', error: $err('Possession')),
@@ -109,7 +97,6 @@ class ExecutiveDashboardService
 
         // --- Attention required ----------------------------------------
         $attention = [
-            $this->alert($user, 'overdue', 'Overdue customers', $overdueBookings, 'danger', 'collections.queue', 'collections.view', $err('Overdue customers')),
             $this->alert($user, 'registry', 'Registry cases pending', $registryPending, 'warning', 'registry.dashboard', 'registry.view', $err('Registry')),
             $this->alert($user, 'possession', 'Possession cases pending', $possessionPending, 'warning', 'possession.dashboard', 'possession.view', $err('Possession')),
             $this->alert($user, 'documents', 'Documents awaiting verification', $docsPending, 'info', 'documents.dashboard', 'documents.view', $err('Documents')),
@@ -120,7 +107,7 @@ class ExecutiveDashboardService
             kpis: $kpis,
             salesSeries: $salesSeries,
             salesMetric: $salesMetric,
-            collectionOverview: $this->collectionOverview($collectionNow),
+            paymentsOverview: $this->paymentsOverview($paymentsNow),
             inventoryDistribution: $inventoryDist ?? [],
             bookingStatusDistribution: $bookingStatus,
             projectPerformance: $projectPerf,
@@ -135,21 +122,19 @@ class ExecutiveDashboardService
     }
 
     /**
-     * @param  array<string, float|null>|null  $collection
+     * @param  array<string, float|null>|null  $payments
      * @return array<string, float|null>
      */
-    private function collectionOverview(?array $collection): array
+    private function paymentsOverview(?array $payments): array
     {
-        if ($collection === null) {
+        if ($payments === null) {
             return [];
         }
 
         return [
-            'Expected (period)' => $collection['expectedInPeriod'],
-            'Collected (period)' => $collection['collectedInPeriod'],
-            'Collected (all time)' => $collection['collectedAllTime'],
-            'Outstanding' => $collection['outstanding'],
-            'Overdue' => $collection['overdue'],
+            'Collected (period)' => $payments['collectedInPeriod'],
+            'Collected (all time)' => $payments['collectedAllTime'],
+            'Outstanding' => $payments['outstanding'],
         ];
     }
 

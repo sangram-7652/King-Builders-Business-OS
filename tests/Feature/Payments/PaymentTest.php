@@ -62,8 +62,6 @@ it('rejects a payment against a non-confirmed booking and a non-positive amount 
 
 it('verifies a payment SUCCESS — moves the balance and issues a receipt (17)', function () {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor']);
-
     $payment = app(RecordPaymentAction::class)->handle(['booking_id' => $s['booking']->id, 'payment_mode_id' => cashMode()->id, 'amount' => '250000'], $s['actor']);
     $verified = app(VerifyPaymentAction::class)->handle($payment, PaymentStatus::Success, $s['actor']);
 
@@ -100,8 +98,6 @@ it('supports configurable payment methods from the master (19)', function () {
 
 it('captures cheque metadata and runs the cheque lifecycle (20)', function () {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor']);
-
     // missing cheque details are rejected
     expect(fn () => app(RecordPaymentAction::class)->handle([
         'booking_id' => $s['booking']->id, 'payment_mode_id' => chequeMode()->id, 'amount' => '250000',

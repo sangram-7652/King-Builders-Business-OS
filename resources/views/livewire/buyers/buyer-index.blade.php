@@ -1,7 +1,7 @@
 @php use App\Enums\BuyerStatus; @endphp
 
 <div class="space-y-6">
-    <x-ui.page-header title="Buyers" description="Customers. A buyer is created from a qualified lead, or directly.">
+    <x-ui.page-header title="Buyers" description="Customers, created directly.">
         <x-slot:actions>
             @can('create', App\Models\Buyer::class)
                 <x-ui.button :href="route('buyers.create')" wire:navigate>

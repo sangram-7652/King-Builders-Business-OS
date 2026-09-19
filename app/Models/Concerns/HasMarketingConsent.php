@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Models\Concerns;
 
 /**
- * Marketing-consent state for a contactable party (Buyer, Lead) — F-M16-3.
+ * Marketing-consent state for a contactable party (Buyer) — F-M16-3.
  *
  * Consent is ACTIVE only when it has been explicitly given and not withdrawn.
  * An opt-out always wins, even if consent is later re-recorded without clearing

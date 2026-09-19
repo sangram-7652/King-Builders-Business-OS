@@ -36,7 +36,7 @@
             </main>
 
             <footer class="border-t border-(--border) px-4 py-4 text-center text-xs text-(--content-muted) sm:px-6 lg:px-8">
-                {{ $branding->name }} Business OS — M0 Foundation
+                {{ $branding->name }} Business OS
             </footer>
         </div>
     </div>

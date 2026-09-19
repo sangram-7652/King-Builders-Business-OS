@@ -9,7 +9,6 @@ use App\Actions\Partners\SetBookingPartnerAttribution;
 use App\Enums\BookingAttributionRole;
 use App\Exceptions\DomainException;
 use App\Models\Booking;
-use App\Models\Lead;
 use App\Models\Partner;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
@@ -30,53 +29,12 @@ class BookingPartners extends Component
     /** @var list<array{partner_id: string, share_percentage: string, role: string}> */
     public array $rows = [];
 
-    /** Partner carried over from the originating lead, if the booking has no split yet. */
-    public ?int $suggestedPartnerId = null;
-
-    public ?string $suggestedPartnerLabel = null;
-
     public function mount(Booking $booking): void
     {
         $this->authorize('view', $booking);
         $this->authorize('attributePartners', $booking);
         $this->booking = $booking;
         $this->loadRows();
-        $this->resolveSuggestion();
-    }
-
-    private function resolveSuggestion(): void
-    {
-        if ($this->rows !== []) {
-            return;
-        }
-
-        $buyerIds = $this->booking->bookingBuyers()->pluck('buyer_id');
-
-        $partner = Partner::query()->active()
-            ->whereIn('id', Lead::query()
-                ->whereIn('buyer_id', $buyerIds)
-                ->whereNotNull('partner_id')
-                ->select('partner_id'))
-            ->orderByDesc('id')
-            ->first();
-
-        if ($partner !== null) {
-            $this->suggestedPartnerId = $partner->id;
-            $this->suggestedPartnerLabel = $partner->displayName().' ('.$partner->partner_code.')';
-        }
-    }
-
-    public function applySuggestion(): void
-    {
-        if ($this->suggestedPartnerId === null) {
-            return;
-        }
-
-        $this->rows = [[
-            'partner_id' => (string) $this->suggestedPartnerId,
-            'share_percentage' => '100',
-            'role' => BookingAttributionRole::Primary->value,
-        ]];
     }
 
     private function loadRows(): void

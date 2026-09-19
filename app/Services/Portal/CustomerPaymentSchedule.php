@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Services\Portal;
 
+use App\Enums\PaymentStatus;
 use App\Models\Booking;
-use App\Models\Installment;
+use App\Models\Payment;
 use App\Services\Payments\PaymentLedger;
 
 /**
- * Builds the customer-visible installment schedule for a booking (M15.2).
- * Every figure is derived from the M7 ledger — no balance is recomputed here
- * and there is no booking_value − paid arithmetic.
+ * Builds the customer-visible payment history for a booking (M15.2). Every
+ * figure is derived from the M7 ledger — no balance is recomputed here and
+ * there is no booking_value − paid arithmetic. There is no installment
+ * schedule to show: a booking is paid directly, not against a plan.
  */
 class CustomerPaymentSchedule
 {
@@ -19,41 +21,32 @@ class CustomerPaymentSchedule
 
     /**
      * @return array{
-     *   plan_total: string,
-     *   rows: list<array{number: int, name: string|null, due_date: string, amount: string, paid: string, outstanding: string, status: string}>
-     * }|null
+     *   total: string, paid: string, outstanding: string,
+     *   rows: list<array{payment_number: string, date: string, amount: string, mode: string|null, receipt_number: string|null}>
+     * }
      */
-    public function forBooking(Booking $booking): ?array
+    public function forBooking(Booking $booking): array
     {
-        $plan = $booking->relationLoaded('activePaymentPlan')
-            ? $booking->activePaymentPlan
-            : $booking->activePaymentPlan()->with('installments')->first();
+        $payments = Payment::query()
+            ->where('booking_id', $booking->getKey())
+            ->where('status', PaymentStatus::Success->value)
+            ->with(['paymentMode', 'receipt'])
+            ->orderByDesc('payment_date')
+            ->get();
 
-        if ($plan === null) {
-            return null;
-        }
+        $rows = $payments->map(fn (Payment $payment) => [
+            'payment_number' => $payment->payment_number,
+            'date' => $payment->payment_date->toDateString(),
+            'amount' => (string) $payment->amount,
+            'mode' => $payment->paymentMode?->name,
+            'receipt_number' => $payment->receipt?->receipt_number,
+        ])->values()->all();
 
-        $plan->loadMissing('installments');
-
-        $rows = $plan->installments
-            ->sortBy('installment_number')
-            ->map(function (Installment $installment) {
-                $paid = $this->ledger->installmentPaid($installment);
-                $outstanding = $this->ledger->installmentOutstanding($installment);
-
-                return [
-                    'number' => (int) $installment->installment_number,
-                    'name' => $installment->name,
-                    'due_date' => $installment->due_date->toDateString(),
-                    'amount' => (string) $installment->amount,
-                    'paid' => $paid->store(),
-                    'outstanding' => $outstanding->store(),
-                    'status' => $this->ledger->deriveInstallmentStatus($installment)->value,
-                ];
-            })
-            ->values()
-            ->all();
-
-        return ['plan_total' => (string) $plan->total_amount, 'rows' => $rows];
+        return [
+            'total' => (string) $booking->final_amount,
+            'paid' => $this->ledger->bookingPaid($booking)->store(),
+            'outstanding' => $this->ledger->bookingOutstanding($booking)->store(),
+            'rows' => $rows,
+        ];
     }
 }

@@ -60,7 +60,7 @@
             </x-ui.card>
 
             {{-- Project authorizations --}}
-            <x-ui.card title="Project authorisation" subtitle="Projects this partner is cleared to source leads and bookings for.">
+            <x-ui.card title="Project authorisation" subtitle="Projects this partner is cleared to source bookings for.">
                 @can('authorizeProjects', $partner)
                     <form wire:submit="authorizeProject" class="mb-4 flex flex-wrap items-end gap-3">
                         <div class="min-w-56 flex-1">
@@ -185,26 +185,9 @@
 
             {{-- Attribution 360 (M14.2) --}}
             <x-ui.card title="Attributed business">
-                <div class="grid grid-cols-2 gap-3 text-center">
-                    <div><p class="text-2xl font-semibold">{{ $partner->leads_count }}</p><p class="text-xs text-(--content-muted)">Leads</p></div>
+                <div class="grid grid-cols-1 gap-3 text-center">
                     <div><p class="text-2xl font-semibold">{{ $partner->booking_attributions_count }}</p><p class="text-xs text-(--content-muted)">Bookings</p></div>
                 </div>
-
-                @if ($recentLeads->isNotEmpty())
-                    <p class="mt-4 text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Recent leads</p>
-                    <ul class="mt-1 space-y-1 text-sm">
-                        @foreach ($recentLeads as $lead)
-                            <li wire:key="pl-{{ $lead->id }}" class="flex items-center justify-between gap-2">
-                                @can('leads.view')
-                                    <a href="{{ route('leads.show', $lead) }}" wire:navigate class="text-(--brand-primary) hover:underline">{{ $lead->name }}</a>
-                                @else
-                                    <span>{{ $lead->name }}</span>
-                                @endcan
-                                <x-ui.badge :variant="$lead->status->color()" size="sm">{{ $lead->status->label() }}</x-ui.badge>
-                            </li>
-                        @endforeach
-                    </ul>
-                @endif
 
                 @if ($recentBookings->isNotEmpty())
                     <p class="mt-4 text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Recent bookings</p>

@@ -20,8 +20,6 @@ enum RoleName: string
     case SalesManager = 'Sales Manager';
     case SalesExecutive = 'Sales Executive';
     case Accountant = 'Accountant';
-    case CollectionManager = 'Collection Manager';
-    case CollectionExecutive = 'Collection Executive';
     case RegistryManager = 'Registry Manager';
     case PossessionManager = 'Possession Manager';
     case AssociateManager = 'Associate Manager';
@@ -40,8 +38,6 @@ enum RoleName: string
             self::SalesManager => 'Manages projects, plots, buyers and bookings.',
             self::SalesExecutive => 'Day-to-day sales: view inventory, manage buyers, create bookings.',
             self::Accountant => 'Manages and approves payments; read access to sales.',
-            self::CollectionManager => 'Oversees the whole collection queue: assigns cases, approves penalties.',
-            self::CollectionExecutive => 'Works assigned collection cases: follow-ups and promises to pay.',
             self::RegistryManager => 'Handles registry records and related sales data.',
             self::PossessionManager => 'Handles possession hand-over and related sales data.',
             self::AssociateManager => 'Manages promoters and associates.',

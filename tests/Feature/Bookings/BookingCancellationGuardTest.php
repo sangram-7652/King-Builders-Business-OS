@@ -14,7 +14,6 @@ use App\Enums\PlotStatus;
 use App\Enums\TransferRequestStatus;
 use App\Exceptions\DomainException;
 use App\Models\Agreement;
-use App\Models\CollectionCase;
 use App\Models\PossessionCase;
 use App\Models\RegistryCase;
 use App\Models\TransferRequest;
@@ -42,7 +41,6 @@ it('cancels a confirmed booking with no downstream dependencies and frees the pl
 
 it('rejects cancellation of a confirmed booking with a successful payment and keeps the plot BOOKED', function () {
     $s = confirmedBookingScenario();
-    activePlanFor($s['booking'], $s['actor']);
     $payment = app(RecordPaymentAction::class)->handle([
         'booking_id' => $s['booking']->id, 'payment_mode_id' => cashMode()->id,
         'amount' => '100000', 'payment_date' => now()->toDateString(),
@@ -51,28 +49,6 @@ it('rejects cancellation of a confirmed booking with a successful payment and ke
 
     expect(fn () => app(CancelBookingAction::class)->handle($s['booking']->fresh(), $s['actor'], 'x'))
         ->toThrow(DomainException::class, 'pending/successful payment');
-
-    expect($s['booking']->fresh()->status)->toBe(BookingStatus::Confirmed)
-        ->and($s['booking']->plot->fresh()->status)->toBe(PlotStatus::Booked);
-});
-
-it('rejects cancellation while an active payment plan exists', function () {
-    $s = confirmedBookingScenario();
-    activePlanFor($s['booking'], $s['actor']); // no payments recorded
-
-    expect(fn () => app(CancelBookingAction::class)->handle($s['booking']->fresh(), $s['actor'], 'x'))
-        ->toThrow(DomainException::class, 'active payment plan');
-
-    expect($s['booking']->fresh()->status)->toBe(BookingStatus::Confirmed)
-        ->and($s['booking']->plot->fresh()->status)->toBe(PlotStatus::Booked);
-});
-
-it('rejects cancellation while an open collection case exists', function () {
-    $s = confirmedBookingScenario();
-    CollectionCase::factory()->forBooking($s['booking'])->create();
-
-    expect(fn () => app(CancelBookingAction::class)->handle($s['booking']->fresh(), $s['actor'], 'x'))
-        ->toThrow(DomainException::class, 'collection case');
 
     expect($s['booking']->fresh()->status)->toBe(BookingStatus::Confirmed)
         ->and($s['booking']->plot->fresh()->status)->toBe(PlotStatus::Booked);

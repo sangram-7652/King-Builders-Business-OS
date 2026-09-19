@@ -22,6 +22,20 @@ it('renders the project list, create and edit screens', function () {
     $this->get(route('projects.edit', $project))->assertOk()->assertSee('Edit project');
 });
 
+it('shows only Basics and Location on the create form, but the full field set on edit', function () {
+    $this->actingAs(projectManager());
+    $project = Project::factory()->create();
+
+    $create = $this->get(route('projects.create'))->assertOk();
+    $create->assertSee('Basics')->assertSee('Location');
+    $create->assertDontSee('Code')->assertDontSee('Latitude')->assertDontSee('Longitude')
+        ->assertDontSee('Primary contact')->assertDontSee('Imagery');
+
+    $edit = $this->get(route('projects.edit', $project))->assertOk();
+    $edit->assertSee('Code')->assertSee('Latitude')->assertSee('Longitude')
+        ->assertSee('Primary contact')->assertSee('Imagery');
+});
+
 it('renders every tab on the project detail page', function () {
     $this->actingAs(projectManager());
 

@@ -146,4 +146,27 @@ class Project extends Model
 
         return $slug;
     }
+
+    /**
+     * A short, unique project code auto-generated from the name for projects
+     * created without one (the create form no longer collects it).
+     */
+    public static function generateCode(string $name, ?int $ignoreId = null): string
+    {
+        $base = Str::upper(Str::slug($name, '')) ?: 'PROJECT';
+        $base = substr($base, 0, 20);
+        $code = $base;
+        $suffix = 2;
+
+        while (static::withTrashed()
+            ->where('code', $code)
+            ->when($ignoreId, fn (Builder $q) => $q->whereKeyNot($ignoreId))
+            ->exists()
+        ) {
+            $code = "{$base}-{$suffix}";
+            $suffix++;
+        }
+
+        return $code;
+    }
 }

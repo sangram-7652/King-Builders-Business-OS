@@ -118,19 +118,6 @@ final class ReportFilterScope
     }
 
     /**
-     * @template TBuilder of EloquentBuilder<*>|BaseBuilder
-     *
-     * @param  TBuilder  $query
-     * @return TBuilder
-     */
-    public static function leadSource(EloquentBuilder|BaseBuilder $query, ReportFilterData $filters, string $column = 'lead_source_id'): EloquentBuilder|BaseBuilder
-    {
-        return $filters->leadSourceId === null
-            ? $query
-            : $query->where($column, $filters->leadSourceId);
-    }
-
-    /**
      * Exclude soft-deleted rows from a raw report query. The operational
      * modules use Eloquent and never see soft-deleted records — a raw report
      * query must apply the same `deleted_at IS NULL` filter or it double-counts

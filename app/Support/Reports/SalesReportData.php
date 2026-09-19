@@ -13,7 +13,7 @@ namespace App\Support\Reports;
  *
  * @phpstan-type ProjectRow array{project_id:int, project:string, bookings:int, value:float, average:float|null, sold_pct:float|null}
  * @phpstan-type BlockRow array{block_id:int, project_id:int, block:string, project:string, total:int, available:int, booked:int, value:float, sold_pct:float|null}
- * @phpstan-type PersonRow array{user_id:int, name:string, leads:int, bookings:int, value:float, conversion:float|null}
+ * @phpstan-type PersonRow array{user_id:int, name:string, bookings:int, value:float}
  */
 final readonly class SalesReportData
 {
@@ -33,7 +33,6 @@ final readonly class SalesReportData
         public array $blockSales,
         public array $salespeople,
         public string $salespeopleSort,
-        public bool $salespeopleScoped,
         public array $velocity,
         public string $statusLabel,
         public ReportFilterData $filters,

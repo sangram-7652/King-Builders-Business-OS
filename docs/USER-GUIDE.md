@@ -13,8 +13,8 @@ the matching technical doc is linked at the end of each section below.
 ## 1. What this is
 
 A real-estate ERP for running a plotted-development business: everything
-from "someone enquired about a plot" through to "the plot is registered,
-handed over, and the customer owns it." One system replaces separate
+from a customer buying a plot through to "the plot is registered, handed
+over, and the customer owns it." One system replaces separate
 spreadsheets/tools for sales, collections, documentation, and registry.
 
 Two separate front doors:
@@ -44,15 +44,15 @@ under the hood.
 
 ## 3. Roles — who does what
 
-Permissions are fine-grained (`leads.create`, `payments.verify`, …) and
+Permissions are fine-grained (`bookings.create`, `payments.verify`, …) and
 assigned to roles, not hard-coded per user. The seeded roles and their
 intent:
 
 | Role | Day-to-day job |
 |---|---|
 | **Super Admin / Admin** | Full access to everything, including Users, Roles, and Master Data. |
-| **Sales Manager** | Everything a Sales Executive does, plus team-wide visibility (`leads.view_all`), pricing overrides, booking cancellation, collections oversight, and project/plot setup. |
-| **Sales Executive** | Owns their own leads → follow-ups → buyer conversion → bookings. Can hold/release plots and view (not manage) pricing and payments. |
+| **Sales Manager** | Everything a Sales Executive does, plus pricing overrides, booking cancellation, collections oversight, and project/plot setup. |
+| **Sales Executive** | Owns buyers → bookings. Can hold/release plots and view (not manage) pricing and payments. |
 | **Accountant** | Payment plans, recording/verifying/allocating/reversing payments, receipts, cheque bounces, penalties, registry expenses, and the commission payout workflow. |
 | **Collection Manager / Collection Executive** | The collections queue and cases, promise-to-pay tracking, cheque follow-up. Manager has team-wide visibility and assignment; Executive works their own queue. |
 | **Registry Manager** | Documents (upload/verify/reject), agreements, registry cases and appointments, registry expenses, document handover. |
@@ -68,23 +68,23 @@ A user can hold more than one role. Custom roles can be created from
 This is the backbone every plot sale follows through the system:
 
 ```
-Lead  ──convert──▶  Buyer  ──book a plot──▶  Booking (priced, confirmed)
-                                                   │
-                                    ┌──────────────┼───────────────┐
-                                    ▼              ▼               ▼
-                             Payment Plan   Documents/Agreement  Channel-partner
-                             + Payments      (KYC + sale docs)    commission
-                                    │              │
-                                    ▼              ▼
-                              Collections    Registry (eligibility →
-                              (if overdue)    appointment → completion)
-                                                   │
-                                                   ▼
-                                          Possession → Handover
-                                                   │
-                                                   ▼
-                                   Ownership Transfer (if resold/gifted)
-                                     + append-only ownership ledger
+Buyer  ──book a plot──▶  Booking (priced, confirmed)
+                               │
+                ┌──────────────┼───────────────┐
+                ▼              ▼               ▼
+         Payment Plan   Documents/Agreement  Channel-partner
+         + Payments      (KYC + sale docs)    commission
+                │              │
+                ▼              ▼
+          Collections    Registry (eligibility →
+          (if overdue)    appointment → completion)
+                               │
+                               ▼
+                      Possession → Handover
+                               │
+                               ▼
+               Ownership Transfer (if resold/gifted)
+                 + append-only ownership ledger
 ```
 
 Everything downstream is *gated* by what happened upstream — you can't book
@@ -103,24 +103,25 @@ A **Project** is a development/site (e.g. "Madhav Kunj") — the top of the
    (`/projects/create`).
 2. **Basics**
    - **Name** — required, e.g. `Madhav Kunj`.
-   - **Code** — required, unique, letters/numbers/hyphens only (e.g. `MK`).
-     This is the short code used elsewhere in the system, so pick something
-     stable — it can be edited later but stays unique.
    - **Description** — optional.
    - **Launch date** — optional.
 3. **Location**
    - **State** — required. Pick this first.
    - **City** — optional, and its list only loads *after* a state is
      selected (it's filtered to that state).
-   - **Address**, **Pincode**, **Latitude/Longitude** — all optional.
+   - **Address**, **Pincode** — optional.
    - States and cities come from **Master Data** — if the state/city you
      need isn't in the dropdown, it has to be added there first
      (Settings → Master Data → States/Cities).
-4. **Primary contact** — optional contact name/phone/email for the site.
-5. **Imagery** — optional logo/cover image path or URL (there's no file
-   uploader for this yet — paste a path/URL).
-6. Click **Create project**. A new project always starts in **Planning**
+4. Click **Create project**. A new project always starts in **Planning**
    status — you can't set the initial status yourself.
+
+The create form is intentionally short — **Code**, **Latitude/Longitude**,
+**Primary contact**, and **Imagery** are no longer asked for up front. A
+unique code is generated for you automatically (e.g. from the project
+name). If you need to set a specific code, adjust coordinates, add a site
+contact, or set a logo/cover image path, open the project afterwards and
+use **Edit** — those fields still live there.
 
 **Right after creating it**, from the project's page you'll typically:
 
@@ -137,24 +138,70 @@ A **Project** is a development/site (e.g. "Madhav Kunj") — the top of the
 
 → Full technical detail: [`docs/PROJECTS.md`](PROJECTS.md)
 
-## 6. Module-by-module walkthrough
+## 6. How to book a plot
+
+A **Booking** turns "buyer + plot" into a priced sale. You need
+`bookings.create` permission (Admin, Sales Manager and Sales Executive all
+have it by default). A buyer must already exist (add one from **Buyers**
+first if you don't have one yet), and the plot you want must be
+`Available` or already `On Hold` for you.
+
+1. Go to **Bookings** in the sidebar, then click **New Booking**
+   (`/bookings/create`).
+2. **Pick the plot** — choose Project, then Block, then Plot. Only plots
+   that are `Available` or on `Hold` are offered; a plot that's already
+   `Booked`/`Sold` won't show up.
+3. **Add buyer(s)** — at least one, with exactly one marked **primary**.
+   For a co-owned purchase, add every buyer and set each one's ownership
+   share — the shares must add up to exactly 100%.
+4. **Set the price** — enter the base area/rate, then optionally add PLC
+   (location charge), other charges, discounts and tax lines. A live
+   preview below the form recalculates as you type: Base + PLC + Charges
+   − Discount = Subtotal, then + Tax = Final. This is the same calculation
+   the server re-runs and trusts — the preview is just a convenience.
+5. Click either:
+   - **Save as draft** — nothing touches inventory yet; the plot stays
+     free for anyone else.
+   - **Save & Submit** — moves the booking straight to **Pending**, which
+     claims the plot so no one else can submit or confirm a booking
+     against it while yours is live.
+
+**From the booking's page** (`/bookings/{id}`) after that:
+
+- **Submit** — if you saved as a draft, do this when you're ready to claim
+  the plot (`Draft → Pending`).
+- **Confirm** — requires `bookings.confirm` (Sales Manager and above).
+  This freezes the price into a permanent snapshot (later price-list
+  changes never affect it) and flips the plot to `Booked`. Do this only
+  once the buyer has genuinely committed.
+- **Cancel** — requires `bookings.cancel`. Works from Pending or
+  Confirmed; cancelling a Confirmed booking frees the plot back to
+  `Available`. It does not touch payments or refunds — that's handled
+  separately in Finance/Collections.
+- **Override price** — requires `pricing.override`. Use only when the
+  computed price is wrong for a legitimate reason; a reason is mandatory
+  and the adjustment shows up as its own labelled line, never a silent
+  edit.
+
+There's no going backwards in the lifecycle — no un-cancelling, and no
+moving a Confirmed booking back to Pending.
+
+Once confirmed, the booking's page is the hub for everything downstream:
+**Payment Plan/Payments**, **Documents**, **Registry**,
+**Possession/Transfers**, and **Channel-partner/Commission**.
+
+→ Full technical detail: [`docs/BOOKINGS-PRICING.md`](BOOKINGS-PRICING.md)
+
+## 7. Module-by-module walkthrough
 
 ### Dashboard (`/dashboard`)
 Landing page after login. Summarizes what's relevant to your role.
 
-### Leads (`/leads`) & Follow-ups (`/follow-ups`)
-Where every enquiry starts. A lead is created (walk-in, call, channel
-partner referral, portal), assigned to a sales executive, and worked
-through scheduled follow-ups until it converts to a **Buyer** or is closed
-lost. The **Follow-ups** screen is a personal/team queue of what's due
-today across all your leads — that's the page to live in day-to-day.
-Leads can also be merged (duplicate enquiries) and reassigned.
-→ [`docs/LEADS-BUYERS.md`](LEADS-BUYERS.md)
-
 ### Buyers (`/buyers`)
-The converted-customer record: contact details, encrypted KYC, linked
-bookings, and the buyer's document checklist. This is also where you send
-a customer-portal invitation. → [`docs/LEADS-BUYERS.md`](LEADS-BUYERS.md)
+The customer record, created directly (there is no lead/enquiry stage):
+contact details, encrypted KYC, linked bookings, and the buyer's document
+checklist. This is also where you send a customer-portal invitation.
+→ [`docs/BUYERS.md`](BUYERS.md)
 
 ### Projects (`/projects`) & Plots
 Projects are the top of the hierarchy (a development/site), divided into
@@ -216,17 +263,16 @@ reconstructable. → [`docs/POSSESSION-TRANSFER.md`](POSSESSION-TRANSFER.md)
 
 ### Channel Partners (`/partners`) & Commissions (`/commissions`)
 Brokers/referral partners are onboarded with their own KYC, then
-*attributed* to a lead or booking (including co-broker splits). Commission
+*attributed* to a booking (including co-broker splits). Commission
 is computed against a versioned commission scheme and locked into an
 immutable snapshot when a commission case is generated, then moves through
 approve → payout → (if needed) reverse.
 
 ### Reports (`/reports`)
 Analytics over the same data every other module writes — Overview, Sales,
-Inventory, Collections, MIS, and (in progress) Leads. Every report can be
-filtered and exported (CSV/XLSX/PDF/print). This is read-only: it never
-changes underlying records, so it's safe to hand to management without
-booking-level access.
+Inventory, Collections, and MIS. Every report can be filtered and exported
+(CSV/XLSX/PDF/print). This is read-only: it never changes underlying
+records, so it's safe to hand to management without booking-level access.
 
 ### Customer Portal (`/portal`)
 What a buyer sees after logging in themselves: their own bookings, payment
@@ -242,13 +288,11 @@ read-mostly view scoped to that one buyer's own records.
   master modules rather than a bespoke CRUD per list.
   → [`docs/MASTER-DATA.md`](MASTER-DATA.md)
 
-## 7. Quick reference — "how do I…"
+## 8. Quick reference — "how do I…"
 
 | Task | Where |
 |---|---|
-| Log a new enquiry | Leads → New Lead |
-| See what's due today across my leads | Follow-ups |
-| Turn a lead into a customer | Lead → Convert to Buyer |
+| Add a new customer | Buyers → New Buyer |
 | Sell a plot | Booking → New Booking (pick buyer + plot, review computed price, Confirm) |
 | Record a payment | Booking → Payments → Record Payment, then Verify |
 | Chase an overdue account | Collections → Queue |
@@ -261,13 +305,13 @@ read-mostly view scoped to that one buyer's own records.
 | Add/edit a dropdown list (states, charge types, …) | Settings → Master Data |
 | Give someone access to a screen | Administration → Users (assign role) or Roles & Permissions (edit what a role can do) |
 
-## 8. Where to go deeper
+## 9. Where to go deeper
 
 Every module above has a matching technical doc under `docs/` describing
 the actual data model, invariants, and Actions/state machines enforcing
 them: [`RBAC.md`](RBAC.md), [`MASTER-DATA.md`](MASTER-DATA.md),
 [`PROJECTS.md`](PROJECTS.md), [`PLOTS.md`](PLOTS.md),
-[`LEADS-BUYERS.md`](LEADS-BUYERS.md), [`BOOKINGS-PRICING.md`](BOOKINGS-PRICING.md),
+[`BUYERS.md`](BUYERS.md), [`BOOKINGS-PRICING.md`](BOOKINGS-PRICING.md),
 [`PAYMENTS.md`](PAYMENTS.md), [`COLLECTIONS.md`](COLLECTIONS.md),
 [`REGISTRY-DOCUMENTATION.md`](REGISTRY-DOCUMENTATION.md),
 [`POSSESSION-TRANSFER.md`](POSSESSION-TRANSFER.md),

@@ -39,23 +39,6 @@ enum Permission: string
     case PlotsArchive = 'plots.archive';
     case PlotsBulkCreate = 'plots.bulk_create';
 
-    // --- Sales ---------------------------------------------------------
-    case LeadsView = 'leads.view';
-    case LeadsViewAll = 'leads.view_all';
-    case LeadsCreate = 'leads.create';
-    case LeadsUpdate = 'leads.update';
-    case LeadsDelete = 'leads.delete';
-    case LeadsAssign = 'leads.assign';
-    case LeadsConvert = 'leads.convert';
-    case LeadsFollowUp = 'leads.follow_up';
-    case LeadsMerge = 'leads.merge';
-
-    // --- Follow-up engine (M13.1) --------------------------------------
-    case FollowUpsView = 'follow_ups.view';
-    case FollowUpsCreate = 'follow_ups.create';
-    case FollowUpsUpdate = 'follow_ups.update';
-    case FollowUpsComplete = 'follow_ups.complete';
-
     case BuyersView = 'buyers.view';
     case BuyersCreate = 'buyers.create';
     case BuyersUpdate = 'buyers.update';
@@ -76,41 +59,14 @@ enum Permission: string
     case PricingManage = 'pricing.manage';
     case PricingOverride = 'pricing.override';
 
-    // --- Finance: Payments / Installments / Receipts (M7) ---------------
-    case PaymentPlansView = 'payment_plans.view';
-    case PaymentPlansCreate = 'payment_plans.create';
-    case PaymentPlansUpdate = 'payment_plans.update';
-    case PaymentPlansActivate = 'payment_plans.activate';
-
+    // --- Finance: Payments / Receipts (M7) -------------------------------
     case PaymentsView = 'payments.view';
     case PaymentsCreate = 'payments.create';
     case PaymentsVerify = 'payments.verify';
-    case PaymentsAllocate = 'payments.allocate';
     case PaymentsReverse = 'payments.reverse';
 
     case ReceiptsView = 'receipts.view';
     case ReceiptsGenerate = 'receipts.generate';
-
-    // --- Collections (M8) -------------------------------------------
-    case CollectionsView = 'collections.view';
-    case CollectionsViewAll = 'collections.view_all';
-    case CollectionsCreate = 'collections.create';
-    case CollectionsUpdate = 'collections.update';
-    case CollectionsAssign = 'collections.assign';
-    case CollectionsFollowUp = 'collections.follow_up';
-    case CollectionsReports = 'collections.reports';
-
-    case PromisesView = 'promises.view';
-    case PromisesCreate = 'promises.create';
-    case PromisesUpdate = 'promises.update';
-
-    case ChequesView = 'cheques.view';
-    case ChequesUpdate = 'cheques.update';
-    case ChequesBounce = 'cheques.bounce';
-
-    case PenaltiesView = 'penalties.view';
-    case PenaltiesAssess = 'penalties.assess';
-    case PenaltiesApprove = 'penalties.approve';
 
     // --- Documentation / Agreement / Registry (M9) --------------------
     case DocumentsView = 'documents.view';
@@ -226,9 +182,8 @@ enum Permission: string
     {
         return match ($this->module()) {
             'projects', 'plots' => PermissionGroup::Inventory,
-            'leads', 'buyers', 'bookings', 'follow_ups' => PermissionGroup::Sales,
-            'payments', 'pricing', 'payment_plans', 'receipts' => PermissionGroup::Finance,
-            'collections', 'promises', 'cheques', 'penalties' => PermissionGroup::Collections,
+            'buyers', 'bookings' => PermissionGroup::Sales,
+            'payments', 'pricing', 'receipts' => PermissionGroup::Finance,
             'documents', 'agreements', 'registry', 'registry_expenses', 'handover',
             'possession', 'transfer', 'ownership' => PermissionGroup::Operations,
             'partners' => PermissionGroup::Associates,

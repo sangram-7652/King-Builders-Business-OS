@@ -16,14 +16,13 @@ uses(RefreshDatabase::class);
 
 beforeEach(fn () => seedRbac());
 
-it('creates a project (starts in Planning, gets a slug)', function () {
+it('creates a project (starts in Planning, gets a slug and an auto-generated code)', function () {
     $state = State::factory()->create();
     $city = City::factory()->create(['state_id' => $state->id]);
 
     Livewire::actingAs(projectManager())
         ->test(ProjectForm::class)
         ->set('name', 'Madhav Kunj')
-        ->set('code', 'MK')
         ->set('description', 'Township on NH-9')
         ->set('state_id', (string) $state->id)
         ->set('city_id', (string) $city->id)
@@ -32,14 +31,40 @@ it('creates a project (starts in Planning, gets a slug)', function () {
         ->call('save')
         ->assertHasNoErrors();
 
-    $project = Project::firstWhere('code', 'MK');
+    $project = Project::firstWhere('slug', 'madhav-kunj');
 
     expect($project)->not->toBeNull()
         ->and($project->slug)->toBe('madhav-kunj')
+        ->and($project->code)->not->toBeEmpty()
+        ->and($project->code)->toMatch('/^[A-Za-z0-9-]+$/')
         ->and($project->status)->toBe(ProjectStatus::Planning)
         ->and($project->is_active)->toBeTrue()
         ->and($project->state_id)->toBe($state->id)
         ->and($project->city_id)->toBe($city->id);
+});
+
+it('auto-generates a unique code when two projects share a name', function () {
+    $stateA = State::factory()->create();
+    $stateB = State::factory()->create();
+
+    Livewire::actingAs(projectManager())
+        ->test(ProjectForm::class)
+        ->set('name', 'Twin Towers')
+        ->set('state_id', (string) $stateA->id)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    Livewire::actingAs(projectManager())
+        ->test(ProjectForm::class)
+        ->set('name', 'Twin Towers')
+        ->set('state_id', (string) $stateB->id)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $codes = Project::where('name', 'Twin Towers')->pluck('code');
+
+    expect($codes)->toHaveCount(2)
+        ->and($codes->unique())->toHaveCount(2);
 });
 
 it('updates a project without changing its slug or status', function () {

@@ -24,7 +24,6 @@ function successfulPayment(array $s, string $amount): Payment
 
 it('reverses a successful payment without deleting it (33)', function () {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor']);
     $payment = successfulPayment($s, '250000');
     $reverser = financeManager();
 
@@ -41,28 +40,8 @@ it('reverses a successful payment without deleting it (33)', function () {
         ->and($reversed->receipt->voided_at)->not->toBeNull();
 });
 
-it('reverses allocations and re-derives installment status (34)', function () {
-    $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor'], [
-        ['type' => 'amount', 'value' => '250000', 'due_date' => now()->addMonth()->toDateString()],
-        ['type' => 'amount', 'value' => '750000', 'due_date' => now()->addMonths(2)->toDateString()],
-    ]);
-    $payment = successfulPayment($s, '250000');
-
-    $i1 = $s['booking']->activePaymentPlan->installments->first();
-    expect($i1->fresh()->status->value)->toBe('paid');
-
-    app(ReversePaymentAction::class)->handle($payment, 'error', financeManager());
-
-    // allocation rows kept for history, but they stop counting
-    expect($payment->fresh()->allocations()->count())->toBeGreaterThan(0)
-        ->and(app(PaymentLedger::class)->installmentPaid($i1->fresh())->store())->toBe('0.00')
-        ->and($i1->fresh()->status->value)->not->toBe('paid');
-});
-
 it('requires a reason to reverse (35)', function () {
     $s = confirmedBookingScenario();
-    activePlanFor($s['booking'], $s['actor']);
     $payment = successfulPayment($s, '100000');
 
     expect(fn () => app(ReversePaymentAction::class)->handle($payment, '   ', financeManager()))
@@ -71,7 +50,6 @@ it('requires a reason to reverse (35)', function () {
 
 it('rejects an unauthorised reversal (36)', function () {
     $s = confirmedBookingScenario();
-    activePlanFor($s['booking'], $s['actor']);
     $payment = successfulPayment($s, '100000');
 
     expect(fn () => app(ReversePaymentAction::class)->handle($payment, 'nope', cashier()))
@@ -82,7 +60,6 @@ it('rejects an unauthorised reversal (36)', function () {
 
 it('rejects a double reversal (37)', function () {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor']);
     $payment = successfulPayment($s, '250000');
     $reverser = financeManager();
 

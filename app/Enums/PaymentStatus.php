@@ -13,9 +13,9 @@ use App\Enums\Concerns\HasLabel;
  *      ├──▶ FAILED
  *      └──▶ CANCELLED
  *
- * ONLY `SUCCESS` payments contribute to paid / outstanding balances and to
- * installment allocations. A confirmed payment is never deleted — it moves to
- * `REVERSED` with a reason, and financial history stays intact.
+ * ONLY `SUCCESS` payments contribute to a booking's paid / outstanding
+ * balances. A confirmed payment is never deleted — it moves to `REVERSED`
+ * with a reason, and financial history stays intact.
  */
 enum PaymentStatus: string
 {

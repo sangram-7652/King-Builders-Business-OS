@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <x-ui.page-header title="Channel Partners"
-        description="Brokers and channel partners who source leads and bookings. Attribution and commission build on this master.">
+        description="Brokers and channel partners who source bookings. Attribution and commission build on this master.">
         <x-slot:actions>
             @can('create', App\Models\Partner::class)
                 <x-ui.button :href="route('partners.create')" wire:navigate>

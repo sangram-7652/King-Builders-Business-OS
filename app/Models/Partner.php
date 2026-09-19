@@ -126,18 +126,6 @@ class Partner extends Model
         return $this->morphMany(Document::class, 'documentable')->latest('id');
     }
 
-    /** Leads currently attributed to this partner (M14.2). @return HasMany<Lead, $this> */
-    public function leads(): HasMany
-    {
-        return $this->hasMany(Lead::class)->latest('id');
-    }
-
-    /** @return HasMany<LeadPartnerAttribution, $this> */
-    public function leadAttributions(): HasMany
-    {
-        return $this->hasMany(LeadPartnerAttribution::class)->latest('attributed_at');
-    }
-
     /** This partner's current booking attribution rows (M14.2). @return HasMany<BookingPartnerAttribution, $this> */
     public function bookingAttributions(): HasMany
     {
@@ -174,7 +162,6 @@ class Partner extends Model
     protected function businessDependents(): array
     {
         return [
-            'leadAttributions' => $this->leadAttributions(),
             'bookingAttributions' => $this->hasMany(BookingPartnerAttribution::class),
             'commissionCases' => $this->commissionCases(),
         ];

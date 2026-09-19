@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Enums\LeadStatus;
 use App\Livewire\Buyers\BuyerForm;
 use App\Livewire\Buyers\BuyerIndex;
+use App\Models\Booking;
+use App\Models\BookingBuyer;
 use App\Models\Buyer;
-use App\Models\Lead;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -39,10 +39,11 @@ it('hides the KYC section from a user without buyers.documents', function () {
         ->assertDontSee('KYC identifiers');
 });
 
-it('blocks deleting a buyer that has converted leads', function () {
-    $manager = leadManager();
+it('blocks deleting a buyer that has a booking', function () {
+    $manager = buyerManager();
     $buyer = Buyer::factory()->create();
-    Lead::factory()->status(LeadStatus::Converted)->create(['buyer_id' => $buyer->id]);
+    $booking = Booking::factory()->create();
+    BookingBuyer::factory()->create(['booking_id' => $booking->id, 'buyer_id' => $buyer->id, 'is_primary' => true, 'ownership_percentage' => 100]);
 
     Livewire::actingAs($manager)
         ->test(BuyerIndex::class)

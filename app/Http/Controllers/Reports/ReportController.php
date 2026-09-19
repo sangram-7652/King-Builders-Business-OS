@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Reports;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Services\Reports\CollectionReportService;
 use App\Services\Reports\ExecutiveDashboardService;
 use App\Services\Reports\InventoryReportService;
 use App\Services\Reports\MisReportService;
@@ -36,7 +35,7 @@ class ReportController extends Controller
     private const REPORTS = [
         'overview' => [
             'title' => 'Executive dashboard',
-            'description' => 'Cross-module KPIs, sales & collection trends and the items that need attention.',
+            'description' => 'Cross-module KPIs, sales trends and the items that need attention.',
             'milestone' => 'M11.2',
             'route' => 'reports.overview',
         ],
@@ -52,21 +51,9 @@ class ReportController extends Controller
             'milestone' => 'M11.3',
             'route' => 'reports.inventory',
         ],
-        'collections' => [
-            'title' => 'Collections report',
-            'description' => 'Receivable, collection, outstanding & ageing — all M7/M8 financial truth, no separate engine.',
-            'milestone' => 'M11.4',
-            'route' => 'reports.collections',
-        ],
-        'leads' => [
-            'title' => 'Leads report',
-            'description' => 'Lead volume, source mix, conversion and salesperson performance.',
-            'milestone' => 'M11.5',
-            'route' => 'reports.leads',
-        ],
         'mis' => [
             'title' => 'MIS report',
-            'description' => 'Consolidated management figures across inventory, sales, collections & leads — M7/M8 truth. CSV / Excel / PDF / print.',
+            'description' => 'Consolidated management figures across inventory & sales — M7 truth. CSV / Excel / PDF / print.',
             'milestone' => 'M11.5',
             'route' => 'reports.mis',
         ],
@@ -78,7 +65,6 @@ class ReportController extends Controller
         private readonly ExecutiveDashboardService $dashboard,
         private readonly SalesReportService $salesReport,
         private readonly InventoryReportService $inventoryReport,
-        private readonly CollectionReportService $collectionReport,
         private readonly MisReportService $misReport,
     ) {}
 
@@ -129,31 +115,6 @@ class ReportController extends Controller
     }
 
     /**
-     * The collections report (M11.4).
-     */
-    public function collections(Request $request): View
-    {
-        $user = $request->user();
-        $filters = $this->resolver->resolve($request->query(), $user);
-        $extras = $this->resolver->resolveCollectionExtras($request->query());
-
-        return view('reports.collections', $this->common($request, 'collections', $filters) + [
-            'extras' => $extras,
-            'collections' => $this->collectionReport->build(
-                $filters,
-                $extras,
-                $user,
-                (string) $request->query('recovery_sort', 'days_overdue'),
-            ),
-        ]);
-    }
-
-    public function leads(Request $request): View
-    {
-        return $this->render($request, 'leads');
-    }
-
-    /**
      * The Management MIS report (M11.5).
      */
     public function mis(Request $request): View
@@ -164,14 +125,6 @@ class ReportController extends Controller
         return view('reports.mis', $this->common($request, 'mis', $filters) + [
             'mis' => $this->misReport->build($filters, $user),
         ]);
-    }
-
-    private function render(Request $request, string $key): View
-    {
-        $user = $request->user();
-        $filters = $this->resolver->resolve($request->query(), $user);
-
-        return view('reports.show', $this->common($request, $key, $filters));
     }
 
     /**

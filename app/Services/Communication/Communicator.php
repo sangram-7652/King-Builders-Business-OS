@@ -40,10 +40,10 @@ class Communicator
         // active marketing consent (given and not opted out). Transactional
         // messages (receipts, registry dates, …) are never gated by this.
         if ($request->category->requiresConsent()) {
-            $recipient = $request->buyer ?? $request->lead;
+            $recipient = $request->buyer;
 
             if ($recipient === null) {
-                throw new DomainException('A marketing message needs a known recipient (buyer or lead) with recorded consent.');
+                throw new DomainException('A marketing message needs a known recipient (buyer) with recorded consent.');
             }
 
             if (! $recipient->hasMarketingConsent()) {
@@ -73,7 +73,6 @@ class Communicator
             'subject_type' => $request->subjectModel?->getMorphClass(),
             'subject_id' => $request->subjectModel?->getKey(),
             'buyer_id' => $request->buyer?->getKey(),
-            'lead_id' => $request->lead?->getKey(),
             'idempotency_key' => $request->idempotencyKey,
             'created_by' => $request->actor?->getKey(),
         ]);

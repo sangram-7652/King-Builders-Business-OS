@@ -1,10 +1,9 @@
 <div class="space-y-6">
     <x-ui.page-header title="Finance" description="Collections position across all confirmed bookings. Every figure is derived from the payment ledger." />
 
-    <div class="grid gap-4 sm:grid-cols-3">
+    <div class="grid gap-4 sm:grid-cols-2">
         <x-ui.stat-card label="Confirmed bookings" :value="$confirmedBookings" />
         <x-ui.stat-card label="Total outstanding" :value="'₹'.number_format((float) $totalOutstanding->store(), 2)" />
-        <x-ui.stat-card label="Total overdue" :value="'₹'.number_format((float) $totalOverdue->store(), 2)" trend="down" />
     </div>
 
     <x-ui.card title="Pending verification">
@@ -41,7 +40,7 @@
                     <thead class="text-left text-xs font-semibold uppercase tracking-wider text-(--content-muted)">
                         <tr><th class="py-2 pr-4">Booking</th><th class="py-2 pr-4">Buyer</th>
                             <th class="py-2 pr-4 text-right">Total</th><th class="py-2 pr-4 text-right">Paid</th>
-                            <th class="py-2 pr-4 text-right">Outstanding</th><th class="py-2 pr-4 text-right">Overdue</th><th></th></tr>
+                            <th class="py-2 pr-4 text-right">Outstanding</th><th></th></tr>
                     </thead>
                     <tbody class="divide-y divide-(--border)">
                         @foreach ($rows as $row)
@@ -50,8 +49,7 @@
                                 <td class="py-2 pr-4 text-(--content-muted)">{{ $row['booking']->primaryBookingBuyer?->buyer?->fullName() ?? '—' }}</td>
                                 <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) $row['summary']->total->store(), 2) }}</td>
                                 <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) $row['summary']->paid->store(), 2) }}</td>
-                                <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) $row['summary']->outstanding->store(), 2) }}</td>
-                                <td class="py-2 pr-4 text-right tabular-nums text-red-600">₹{{ number_format((float) $row['summary']->overdue->store(), 2) }}</td>
+                                <td class="py-2 pr-4 text-right tabular-nums text-red-600">₹{{ number_format((float) $row['summary']->outstanding->store(), 2) }}</td>
                                 <td class="py-2 pr-4 text-right"><a href="{{ route('payments.booking', $row['booking']) }}" wire:navigate class="text-(--brand-primary) hover:underline">Manage</a></td>
                             </tr>
                         @endforeach

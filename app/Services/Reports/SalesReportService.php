@@ -30,7 +30,7 @@ class SalesReportService
     public function build(ReportFilterData $filters, User $user, string $trendMetric = 'value', string $spSort = 'value'): SalesReportData
     {
         $trendMetric = in_array($trendMetric, ['value', 'bookings'], true) ? $trendMetric : 'value';
-        $spSort = in_array($spSort, ['value', 'bookings', 'conversion'], true) ? $spSort : 'value';
+        $spSort = in_array($spSort, ['value', 'bookings'], true) ? $spSort : 'value';
         $previous = PreviousPeriod::for($filters);
 
         /** @var array<string, string> $errors */
@@ -54,8 +54,7 @@ class SalesReportService
         $blockSales = $safe('Block-wise sales', fn () => $this->sales->blockSales($filters), []);
         $velocity = $safe('Booking velocity', fn () => $this->sales->bookingVelocity($filters), ['bookings' => 0, 'days' => 1, 'per_day' => 0.0, 'per_week' => 0.0]);
 
-        $scoped = ! $user->can('leads.view_all');
-        $salespeople = $safe('Salesperson performance', fn () => $this->sales->salespersonPerformance($filters, $scoped ? $user->getKey() : null, $spSort), []);
+        $salespeople = $safe('Salesperson performance', fn () => $this->sales->salespersonPerformance($filters, null, $spSort), []);
 
         $err = fn (string $s) => $errors[$s] ?? null;
         $growth = new Kpi('_g', '_', $now['bookings'] ?? null, 'number', previous: $prev['bookings'] ?? null);
@@ -75,7 +74,6 @@ class SalesReportService
             blockSales: $blockSales,
             salespeople: $salespeople,
             salespeopleSort: $spSort,
-            salespeopleScoped: $scoped,
             velocity: $velocity,
             statusLabel: ($filters->bookingStatus ?? BookingStatus::Confirmed)->label(),
             filters: $filters,

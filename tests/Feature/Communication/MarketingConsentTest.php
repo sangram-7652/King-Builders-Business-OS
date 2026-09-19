@@ -7,7 +7,6 @@ use App\Enums\CommunicationChannel;
 use App\Enums\CommunicationStatus;
 use App\Exceptions\DomainException;
 use App\Models\Buyer;
-use App\Models\Lead;
 use App\Services\Communication\CommunicationRequest;
 use App\Services\Communication\Communicator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -92,22 +91,6 @@ it('allows a marketing message to a consented buyer', function () {
 
     expect($comm->category)->toBe(CommunicationCategory::Marketing)
         ->and($comm->status)->toBe(CommunicationStatus::Queued);
-});
-
-it('allows a marketing message to a consented lead', function () {
-    $lead = Lead::factory()->create(['email' => 'lead@example.com']);
-    $lead->grantMarketingConsent();
-
-    $request = new CommunicationRequest(
-        channel: CommunicationChannel::Email,
-        category: CommunicationCategory::Marketing,
-        to: $lead->email,
-        body: 'Promo',
-        eventKey: 'promo.newsletter',
-        lead: $lead,
-    );
-
-    expect(app(Communicator::class)->send($request)->exists)->toBeTrue();
 });
 
 it('never gates a transactional message', function () {

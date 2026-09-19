@@ -8,10 +8,8 @@ use App\Communication\CommunicationManager;
 use App\Enums\RoleName;
 use App\Masters\MasterRegistry;
 use App\Models\Booking;
-use App\Models\Payment;
 use App\Models\User;
 use App\Observers\BookingCommissionObserver;
-use App\Observers\PaymentCollectionObserver;
 use App\Policies\MasterDataPolicy;
 use App\Support\Branding;
 use Illuminate\Database\Eloquent\Model;
@@ -51,9 +49,6 @@ class AppServiceProvider extends ServiceProvider
         foreach (MasterRegistry::modelClasses() as $modelClass) {
             Gate::policy($modelClass, MasterDataPolicy::class);
         }
-
-        // M8: keep collection state in step with M7 payment state.
-        Payment::observe(PaymentCollectionObserver::class);
 
         // M14.4: keep commission cases in step with the M6 booking lifecycle.
         Booking::observe(BookingCommissionObserver::class);

@@ -26,17 +26,17 @@ final readonly class ExecutiveDashboardData
      * @param  array<string, int>  $inventoryDistribution  PlotStatus value => count
      * @param  array<string, int>  $bookingStatusDistribution
      * @param  list<array<string, mixed>>  $projectPerformance
-     * @param  list<array<string, mixed>>|null  $topSalespeople  null = not authorised to see it
+     * @param  list<array<string, mixed>>|null  $topSalespeople
      * @param  list<array<string, mixed>>  $recentBookings
      * @param  list<array<string, mixed>>  $attention
-     * @param  array<string, string>  $collectionOverview  label => formatted / raw values
+     * @param  array<string, string>  $paymentsOverview  label => formatted / raw values
      * @param  list<string>  $errors
      */
     public function __construct(
         public array $kpis,
         public ChartSeries $salesSeries,
         public string $salesMetric,
-        public array $collectionOverview,
+        public array $paymentsOverview,
         public array $inventoryDistribution,
         public array $bookingStatusDistribution,
         public array $projectPerformance,

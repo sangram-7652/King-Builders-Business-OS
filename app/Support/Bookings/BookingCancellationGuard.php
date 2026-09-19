@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Support\Bookings;
 
 use App\Enums\AgreementStatus;
-use App\Enums\CollectionCaseStatus;
-use App\Enums\PaymentPlanStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\PossessionCaseStatus;
 use App\Enums\RegistryCaseStatus;
@@ -21,10 +19,9 @@ use App\Observers\BookingCommissionObserver;
  *
  * A confirmed booking whose downstream financial / operational records already
  * exist must NOT be cancellable — cancelling it would free the plot while
- * payments, a payment plan, a collection case, a registry case, a possession
- * case, an ownership transfer or a signed agreement still reference it. Those
- * records must be unwound first (reverse the payments, cancel the plan, close
- * the case, …).
+ * payments, a registry case, a possession case, an ownership transfer or a
+ * signed agreement still reference it. Those records must be unwound first
+ * (reverse the payments, close the case, …).
  *
  * Commission cases (M14) are deliberately NOT a blocker: the existing
  * {@see BookingCommissionObserver} already cascades a booking
@@ -55,19 +52,6 @@ final class BookingCancellationGuard
 
         if ($livePayments > 0) {
             $blockers[] = "{$livePayments} pending/successful payment(s) exist — reverse them first";
-        }
-
-        // M7 — an ACTIVE payment plan (a DRAFT plan can be discarded).
-        if ($booking->paymentPlans()->where('status', PaymentPlanStatus::Active->value)->exists()) {
-            $blockers[] = 'an active payment plan exists — cancel the plan first';
-        }
-
-        // M8 — an unresolved collection case.
-        if ($booking->collectionCase()
-            ->where('status', '!=', CollectionCaseStatus::Resolved->value)
-            ->exists()
-        ) {
-            $blockers[] = 'an open collection case exists — resolve it first';
         }
 
         // M9 — a live registry case.

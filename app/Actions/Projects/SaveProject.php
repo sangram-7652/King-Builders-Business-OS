@@ -33,28 +33,34 @@ class SaveProject
             $creating = $project === null;
             $project ??= new Project;
 
+            // Always collected, by both the create and edit forms.
             $project->fill([
                 'name' => $data['name'],
-                'code' => $data['code'],
                 'description' => $data['description'] ?: null,
                 'address' => $data['address'] ?: null,
                 'state_id' => $data['state_id'] ?: null,
                 'city_id' => $data['city_id'] ?: null,
                 'pincode' => $data['pincode'] ?: null,
-                'latitude' => $data['latitude'] !== '' ? $data['latitude'] : null,
-                'longitude' => $data['longitude'] !== '' ? $data['longitude'] : null,
-                'contact_name' => $data['contact_name'] ?: null,
-                'contact_phone' => $data['contact_phone'] ?: null,
-                'contact_email' => $data['contact_email'] ?: null,
-                'logo_path' => $data['logo_path'] ?: null,
-                'cover_image_path' => $data['cover_image_path'] ?: null,
                 'launch_date' => $data['launch_date'] ?: null,
             ]);
+
+            // Only the edit form collects these — the create form no longer
+            // does, so these keys are simply absent from $data on create and
+            // must not be assumed present.
+            foreach (['code', 'latitude', 'longitude', 'contact_name', 'contact_phone', 'contact_email', 'logo_path', 'cover_image_path'] as $optional) {
+                if (array_key_exists($optional, $data)) {
+                    $project->{$optional} = $data[$optional] !== '' ? $data[$optional] : null;
+                }
+            }
 
             if ($creating) {
                 $project->status = ProjectStatus::Planning;
                 $project->is_active = true;
                 $project->slug = Project::generateSlug($data['name']);
+
+                if (! $project->code) {
+                    $project->code = Project::generateCode($data['name']);
+                }
             }
 
             $project->save();

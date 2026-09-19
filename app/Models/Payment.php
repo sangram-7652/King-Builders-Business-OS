@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -72,22 +71,10 @@ class Payment extends Model
         return $this->belongsTo(PaymentMode::class);
     }
 
-    /** @return HasMany<PaymentAllocation, $this> */
-    public function allocations(): HasMany
-    {
-        return $this->hasMany(PaymentAllocation::class);
-    }
-
     /** @return HasOne<Receipt, $this> */
     public function receipt(): HasOne
     {
         return $this->hasOne(Receipt::class);
-    }
-
-    /** Cheque bounce record, if this cheque payment bounced (M8). @return HasOne<\App\Models\ChequeBounce, $this> */
-    public function chequeBounce(): HasOne
-    {
-        return $this->hasOne(ChequeBounce::class);
     }
 
     /** @return BelongsTo<User, $this> */

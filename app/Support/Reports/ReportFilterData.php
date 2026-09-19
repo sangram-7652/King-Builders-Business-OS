@@ -33,7 +33,6 @@ final readonly class ReportFilterData
         public ?BookingStatus $bookingStatus = null,
         public ?PaymentStatus $paymentStatus = null,
         public ?PlotStatus $plotStatus = null,
-        public ?int $leadSourceId = null,
     ) {}
 
     /**
@@ -55,8 +54,7 @@ final readonly class ReportFilterData
             && $this->salespersonId === null
             && $this->bookingStatus === null
             && $this->paymentStatus === null
-            && $this->plotStatus === null
-            && $this->leadSourceId === null;
+            && $this->plotStatus === null;
     }
 
     /**
@@ -95,9 +93,6 @@ final readonly class ReportFilterData
         if ($this->plotStatus !== null) {
             $params['plot_status'] = $this->plotStatus->value;
         }
-        if ($this->leadSourceId !== null) {
-            $params['lead_source'] = (string) $this->leadSourceId;
-        }
 
         return $params;
     }
@@ -119,7 +114,6 @@ final readonly class ReportFilterData
             'booking_status' => $this->bookingStatus?->value ?? '',
             'payment_status' => $this->paymentStatus?->value ?? '',
             'plot_status' => $this->plotStatus?->value ?? '',
-            'lead_source' => (string) ($this->leadSourceId ?? ''),
         ];
     }
 

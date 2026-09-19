@@ -25,8 +25,6 @@ function verifiedPayment(array $s, string $amount = '250000'): Payment
 
 it('issues a receipt automatically on successful verification (29)', function () {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor']);
-
     $payment = verifiedPayment($s);
     $receipt = $payment->receipt;
 
@@ -41,8 +39,6 @@ it('issues a receipt automatically on successful verification (29)', function ()
 
 it('generates unique receipt numbers and one receipt per payment (30)', function () {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor']);
-
     $a = verifiedPayment($s, '100000');
     $b = verifiedPayment($s, '100000');
 
@@ -59,8 +55,6 @@ it('generates unique receipt numbers and one receipt per payment (30)', function
 
 it('records the correct amount and payment reference on the receipt (31)', function () {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor']);
-
     $payment = verifiedPayment($s, '333333.33');
 
     expect($payment->receipt->amount)->toBe('333333.33')
@@ -69,7 +63,6 @@ it('records the correct amount and payment reference on the receipt (31)', funct
 
 it('renders the receipt as a tenant-branded PDF (32)', function () {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor']);
     $payment = verifiedPayment($s);
 
     $receipt = $payment->receipt->load(['payment.paymentMode', 'booking.project', 'issuedBy']);

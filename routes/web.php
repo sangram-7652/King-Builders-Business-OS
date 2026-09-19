@@ -26,11 +26,6 @@ use App\Livewire\Buyers\BuyerDocuments;
 use App\Livewire\Buyers\BuyerForm;
 use App\Livewire\Buyers\BuyerIndex;
 use App\Livewire\Buyers\BuyerShow;
-use App\Livewire\Collections\BookingCollection;
-use App\Livewire\Collections\CollectionCaseShow;
-use App\Livewire\Collections\CollectionDashboard;
-use App\Livewire\Collections\CollectionQueue;
-use App\Livewire\Collections\CollectionReports;
 use App\Livewire\Commission\CommissionCaseShow;
 use App\Livewire\Commission\CommissionIndex;
 use App\Livewire\Commission\CommissionSchemeForm;
@@ -38,11 +33,6 @@ use App\Livewire\Commission\CommissionSchemeIndex;
 use App\Livewire\Commission\CommissionSchemeShow;
 use App\Livewire\Dashboard;
 use App\Livewire\Documents\DocumentDashboard;
-use App\Livewire\FollowUps\FollowUpQueue;
-use App\Livewire\Leads\LeadConvert;
-use App\Livewire\Leads\LeadForm;
-use App\Livewire\Leads\LeadIndex;
-use App\Livewire\Leads\LeadShow;
 use App\Livewire\Masters\MasterDashboard;
 use App\Livewire\Masters\MasterForm;
 use App\Livewire\Masters\MasterIndex;
@@ -146,31 +136,6 @@ Route::middleware(['auth:web', 'active'])->group(function (): void {
                 ->name('plots.index');
         });
 
-    // --- Leads (M5) ------------------------------------------------------
-    Route::get('/leads/create', LeadForm::class)
-        ->middleware('permission:'.Permission::LeadsCreate->value)
-        ->name('leads.create');
-    Route::get('/leads/{lead}/edit', LeadForm::class)
-        ->middleware('permission:'.Permission::LeadsUpdate->value)
-        ->whereNumber('lead')
-        ->name('leads.edit');
-    Route::get('/leads/{lead}/convert', LeadConvert::class)
-        ->middleware('permission:'.Permission::LeadsConvert->value)
-        ->whereNumber('lead')
-        ->name('leads.convert');
-    Route::get('/leads', LeadIndex::class)
-        ->middleware('permission:'.Permission::LeadsView->value)
-        ->name('leads.index');
-    Route::get('/leads/{lead}', LeadShow::class)
-        ->middleware('permission:'.Permission::LeadsView->value)
-        ->whereNumber('lead')
-        ->name('leads.show');
-
-    // --- Follow-up queue (M13.1) --------------------------------------
-    Route::get('/follow-ups', FollowUpQueue::class)
-        ->middleware('permission:'.Permission::FollowUpsView->value)
-        ->name('follow-ups.index');
-
     // --- Buyers / Customers (M5) --------------------------------------
     Route::get('/buyers/create', BuyerForm::class)
         ->middleware('permission:'.Permission::BuyersCreate->value)
@@ -211,13 +176,13 @@ Route::middleware(['auth:web', 'active'])->group(function (): void {
         ->whereNumber('booking')
         ->name('bookings.commission');
 
-    // --- Payments / Installments / Receipts (M7) ----------------------
+    // --- Payments / Receipts (M7) --------------------------------------
     Route::get('/finance', PaymentDashboard::class)
         ->middleware('permission:'.Permission::PaymentsView->value)
         ->name('finance.dashboard');
 
     Route::get('/bookings/{booking}/payments', BookingPayments::class)
-        ->middleware('permission:'.Permission::PaymentPlansView->value)
+        ->middleware('permission:'.Permission::PaymentsView->value)
         ->whereNumber('booking')
         ->name('payments.booking');
 
@@ -237,25 +202,6 @@ Route::middleware(['auth:web', 'active'])->group(function (): void {
         ->middleware('permission:'.Permission::ReceiptsView->value)
         ->whereNumber('receipt')
         ->name('receipts.pdf');
-
-    // --- Collections / Dues / Aging (M8) ------------------------------
-    Route::get('/collections/dashboard', CollectionDashboard::class)
-        ->middleware('permission:'.Permission::CollectionsView->value)
-        ->name('collections.dashboard');
-    Route::get('/collections/reports', CollectionReports::class)
-        ->middleware('permission:'.Permission::CollectionsReports->value)
-        ->name('collections.reports');
-    Route::get('/collections', CollectionQueue::class)
-        ->middleware('permission:'.Permission::CollectionsView->value)
-        ->name('collections.queue');
-    Route::get('/collections/{case}', CollectionCaseShow::class)
-        ->middleware('permission:'.Permission::CollectionsView->value)
-        ->whereNumber('case')
-        ->name('collections.show');
-    Route::get('/bookings/{booking}/collection', BookingCollection::class)
-        ->middleware('permission:'.Permission::CollectionsView->value)
-        ->whereNumber('booking')
-        ->name('collections.booking');
 
     // --- Documentation / Agreement / Registry (M9) --------------------
     Route::get('/documents', DocumentDashboard::class)
@@ -306,14 +252,12 @@ Route::middleware(['auth:web', 'active'])->group(function (): void {
             Route::get('/', [ReportController::class, 'overview'])->name('overview');
             Route::get('/sales', [ReportController::class, 'sales'])->name('sales');
             Route::get('/inventory', [ReportController::class, 'inventory'])->name('inventory');
-            Route::get('/collections', [ReportController::class, 'collections'])->name('collections');
-            Route::get('/leads', [ReportController::class, 'leads'])->name('leads');
             Route::get('/mis', [ReportController::class, 'mis'])->name('mis');
 
             // Report export (M11.5) — additionally gated by reports.export.
             Route::get('/{type}/export/{format}', ReportExportController::class)
                 ->middleware('permission:'.Permission::ReportsExport->value)
-                ->whereIn('type', ['sales', 'inventory', 'collections', 'mis'])
+                ->whereIn('type', ['sales', 'inventory', 'mis'])
                 ->whereIn('format', ['csv', 'xlsx', 'pdf', 'print'])
                 ->name('export');
         });

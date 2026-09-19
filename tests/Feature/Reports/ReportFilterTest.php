@@ -7,7 +7,6 @@ use App\Enums\DatePreset;
 use App\Enums\PaymentStatus;
 use App\Enums\PlotStatus;
 use App\Models\Block;
-use App\Models\Masters\LeadSource;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\Reports\ReportFilterResolver;
@@ -26,7 +25,7 @@ beforeEach(function () {
 
 function reportManager(): User
 {
-    return makeUser(permissions: ['reports.view', 'reports.export', 'leads.view_all', 'projects.view', 'bookings.view']);
+    return makeUser(permissions: ['reports.view', 'reports.export', 'projects.view', 'bookings.view']);
 }
 
 /*
@@ -151,7 +150,7 @@ it('rejects a block that belongs to a different project', function () {
 | SALESPERSON (RBAC-scoped)
 */
 
-it('lets a leads.view_all user filter by any salesperson', function () {
+it('lets a reports.view user filter by any salesperson', function () {
     $other = User::factory()->create();
 
     $f = $this->resolver->resolve(['salesperson_id' => (string) $other->id], reportManager());
@@ -164,36 +163,20 @@ it('rejects a non-existent salesperson id', function () {
         ->toThrow(ValidationException::class);
 });
 
-it('forbids a scoped user from filtering by another salesperson', function () {
-    $scoped = makeUser(permissions: ['reports.view', 'leads.view']); // NOT leads.view_all
-    $other = User::factory()->create();
-
-    expect(fn () => $this->resolver->resolve(['salesperson_id' => (string) $other->id], $scoped))
-        ->toThrow(ValidationException::class);
-
-    // ...but may filter by themselves
-    $f = $this->resolver->resolve(['salesperson_id' => (string) $scoped->id], $scoped);
-    expect($f->salespersonId)->toBe($scoped->id);
-});
-
 /*
 | ENUM FILTERS + COMBINED + RESET
 */
 
-it('parses the status + lead-source filters', function () {
-    $source = LeadSource::factory()->create();
-
+it('parses the status filters', function () {
     $f = $this->resolver->resolve([
         'booking_status' => 'confirmed',
         'payment_status' => 'success',
         'plot_status' => 'booked',
-        'lead_source' => (string) $source->id,
     ], reportManager());
 
     expect($f->bookingStatus)->toBe(BookingStatus::Confirmed)
         ->and($f->paymentStatus)->toBe(PaymentStatus::Success)
-        ->and($f->plotStatus)->toBe(PlotStatus::Booked)
-        ->and($f->leadSourceId)->toBe($source->id);
+        ->and($f->plotStatus)->toBe(PlotStatus::Booked);
 });
 
 it('rejects an invalid status enum value', function () {
@@ -204,7 +187,6 @@ it('rejects an invalid status enum value', function () {
 it('round-trips a fully combined filter set through the query string', function () {
     $project = Project::factory()->create();
     $block = Block::factory()->create(['project_id' => $project->id]);
-    $source = LeadSource::factory()->create();
     $me = reportManager();
 
     $input = [
@@ -215,7 +197,6 @@ it('round-trips a fully combined filter set through the query string', function 
         'booking_status' => 'confirmed',
         'payment_status' => 'pending',
         'plot_status' => 'sold',
-        'lead_source' => (string) $source->id,
     ];
 
     $f = $this->resolver->resolve($input, $me);

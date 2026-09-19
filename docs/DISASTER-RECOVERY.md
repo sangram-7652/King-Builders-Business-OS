@@ -2,7 +2,7 @@
 
 The system state is **two things**, and a valid backup contains both:
 
-1. **MySQL** — every business record (users, projects, plots, leads, buyers,
+1. **MySQL** — every business record (users, projects, plots, buyers,
    bookings, payment plans/installments/payments/allocations, collection cases,
    documents *metadata*, registry / possession / transfer cases, the
    append-only ownership ledger…).

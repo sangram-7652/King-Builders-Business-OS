@@ -21,8 +21,8 @@ use App\Support\Registry\EligibilityResult;
  *
  *   - booking is CONFIRMED
  *   - there is no OTHER active transfer on the same booking
- *   - financial clearance: outstanding / overdue within config, unless the
- *     reviewer recorded an explicit `financial_waiver_reason`
+ *   - financial clearance: outstanding within config, unless the reviewer
+ *     recorded an explicit `financial_waiver_reason`
  *   - required transfer documents are VERIFIED (for ownership-moving types)
  */
 class TransferEligibilityService
@@ -62,15 +62,13 @@ class TransferEligibilityService
         if ($booking !== null) {
             $waived = trim((string) $transfer->financial_waiver_reason) !== '';
             $outstanding = $this->ledger->bookingOutstanding($booking);
-            $overdue = $this->ledger->bookingOverdue($booking);
             $max = Money::of($cfg['financial']['max_outstanding']);
 
-            $financialOk = $waived || (
-                (! $cfg['financial']['block_on_outstanding'] || ! $outstanding->greaterThan($max))
-                && (! $cfg['financial']['block_on_overdue'] || ! $overdue->isPositive())
-            );
+            $financialOk = $waived
+                || ! $cfg['financial']['block_on_outstanding']
+                || ! $outstanding->greaterThan($max);
             $checks[] = $this->check('financial_clearance', 'Financial clearance', $financialOk,
-                $financialOk ? null : "Outstanding ₹{$outstanding->store()} / overdue ₹{$overdue->store()} (no waiver).");
+                $financialOk ? null : "Outstanding ₹{$outstanding->store()} (no waiver).");
         }
 
         // --- Documents (ownership-moving transfers only) --------------

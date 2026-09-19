@@ -24,11 +24,10 @@
                         <x-ui.badge :variant="$booking->status->color()">{{ $booking->status->label() }}</x-ui.badge>
                     </div>
 
-                    <dl class="mt-4 grid gap-3 border-t border-(--border) pt-3 text-sm sm:grid-cols-4">
+                    <dl class="mt-4 grid gap-3 border-t border-(--border) pt-3 text-sm sm:grid-cols-3">
                         <div><dt class="text-(--content-muted)">Booking value</dt><dd class="tabular-nums font-medium">₹{{ number_format((float) $booking->final_amount, 0) }}</dd></div>
                         <div><dt class="text-(--content-muted)">Paid</dt><dd class="tabular-nums font-medium">₹{{ $f ? number_format((float) $f->paid->store(), 0) : '—' }}</dd></div>
                         <div><dt class="text-(--content-muted)">Outstanding</dt><dd class="tabular-nums font-medium">₹{{ $f ? number_format((float) $f->outstanding->store(), 0) : '—' }}</dd></div>
-                        <div><dt class="text-(--content-muted)">Overdue</dt><dd @class(['tabular-nums font-medium', 'text-red-600' => $f && $f->overdue->isPositive()])>₹{{ $f ? number_format((float) $f->overdue->store(), 0) : '—' }}</dd></div>
                     </dl>
                 </x-ui.card>
             @endforeach

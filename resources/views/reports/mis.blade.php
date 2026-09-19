@@ -8,7 +8,6 @@
     /** @var \App\Support\Reports\MisReportData $mis */
     /** @var bool $canExport */
 
-    $cs = $mis->collectionSummary;
     $th = 'py-2 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-(--content-muted)';
     $thr = 'py-2 pr-4 text-right text-xs font-semibold uppercase tracking-wider text-(--content-muted)';
     $td = 'py-2 pr-4 tabular-nums';
@@ -25,7 +24,7 @@
     <x-reports.tabs :reports="$reports" :active="$report" :filters="$filters" />
 
     <x-reports.filters :filters="$filters" :options="$options" :action="route('reports.mis')" :can-export="$canExport" :report="$report"
-        :only="['period', 'project_id', 'block_id', 'salesperson_id', 'booking_status', 'payment_status', 'plot_status', 'lead_source']" />
+        :only="['period', 'project_id', 'block_id', 'salesperson_id', 'booking_status', 'payment_status', 'plot_status']" />
 
     @if ($mis->hasErrors())
         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -37,43 +36,22 @@
     @endif
 
     <p class="text-xs text-(--content-muted)">
-        Consolidated management figures. Financials are M7/M8 truth — receivable is demand raised on the live
-        payment plan, outstanding is the M8 installment walk (never booking value − collected). Snapshot KPIs
-        cover the whole book; the daily / monthly tables are driven by the selected date range.
+        Consolidated management figures. Financials are M7 truth — outstanding is booking final amount minus
+        successful payments (never a separate engine). Snapshot KPIs cover the whole book; the daily / monthly
+        tables are driven by the selected date range.
     </p>
 
     {{-- KPI grid --}}
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         @foreach ([
             'total_projects', 'total_plots', 'available', 'booked', 'registered',
-            'possession_completed', 'total_bookings', 'booking_value', 'receivable', 'collected',
-            'outstanding', 'overdue', 'collection_efficiency', 'total_leads', 'converted_leads',
-            'conversion_pct', 'registry_pending', 'possession_pending', 'transfer_pending', 'documents_pending',
+            'possession_completed', 'total_bookings', 'booking_value', 'collected',
+            'outstanding',
+            'registry_pending', 'possession_pending', 'transfer_pending', 'documents_pending',
         ] as $key)
             <x-reports.kpi-card :kpi="$mis->kpi($key)" />
         @endforeach
     </div>
-
-    {{-- Collection MIS --}}
-    <x-reports.section title="Collection MIS" subtitle="M8 financial truth for the selected filters"
-        :error="$mis->error('Collection MIS')" :empty="$cs === []">
-        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-            @foreach ([
-                'booking_value' => 'Booking value', 'receivable' => 'Receivable', 'collected' => 'Collected',
-                'cash_collected' => 'Cash collected', 'outstanding' => 'Outstanding', 'overdue' => 'Overdue',
-            ] as $k => $label)
-                <div>
-                    <p class="text-xs uppercase tracking-wider text-(--content-muted)">{{ $label }}</p>
-                    <p class="mt-1 text-lg font-semibold tabular-nums">{{ ReportFormat::currency($cs[$k] ?? null) }}</p>
-                </div>
-            @endforeach
-        </div>
-        <p class="mt-3 border-t border-(--border) pt-3 text-xs text-(--content-muted)">
-            Collection efficiency:
-            <span class="font-medium text-(--content)">{{ ReportFormat::percent($cs['collection_efficiency'] ?? null) }}</span>
-            · "Collected" settles demand; "Cash collected" is Σ SUCCESS payments (incl. unallocated). Booking value is not cash.
-        </p>
-    </x-reports.section>
 
     {{-- Project MIS --}}
     <x-reports.section title="Project MIS" :error="$mis->error('Project MIS')" :empty="$mis->projects === []">
@@ -88,7 +66,6 @@
                         <th class="{{ $thr }}">Sales value</th>
                         <th class="{{ $thr }}">Collected</th>
                         <th class="{{ $thr }}">Outstanding</th>
-                        <th class="{{ $thr }}">Overdue</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-(--border)">
@@ -105,7 +82,6 @@
                             <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['sales_value']) }}</td>
                             <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['collected']) }}</td>
                             <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['outstanding']) }}</td>
-                            <td class="{{ $td }} text-right text-red-600">{{ ReportFormat::currency($row['overdue']) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -114,32 +90,27 @@
     </x-reports.section>
 
     {{-- Salesperson MIS --}}
-    <x-reports.section title="Salesperson MIS"
-        :subtitle="$mis->salespeopleScoped ? 'Your figures only (no leads.view_all).' : 'Booking attribution + M8 collection'"
+    <x-reports.section title="Salesperson MIS" subtitle="Booking attribution + M7 payments"
         :error="$mis->error('Salesperson MIS')" :empty="$mis->salespeople === []">
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-(--border) text-sm">
                 <thead>
                     <tr>
                         <th class="{{ $th }}">Salesperson</th>
-                        <th class="{{ $thr }}">Leads</th>
                         <th class="{{ $thr }}">Bookings</th>
                         <th class="{{ $thr }}">Booking value</th>
                         <th class="{{ $thr }}">Collected</th>
                         <th class="{{ $thr }}">Outstanding</th>
-                        <th class="{{ $thr }}">Conversion</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-(--border)">
                     @foreach ($mis->salespeople as $row)
                         <tr class="hover:bg-(--surface-muted)/50">
                             <td class="py-2 pr-4 font-medium">{{ $row['name'] }}</td>
-                            <td class="{{ $td }} text-right">{{ ReportFormat::number($row['leads']) }}</td>
                             <td class="{{ $td }} text-right">{{ ReportFormat::number($row['bookings']) }}</td>
                             <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['booking_value']) }}</td>
                             <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['collected']) }}</td>
                             <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['outstanding']) }}</td>
-                            <td class="{{ $td }} text-right">{{ ReportFormat::percent($row['conversion']) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -156,13 +127,7 @@
                         <th class="{{ $th }}">Month</th>
                         <th class="{{ $thr }}">Bookings</th>
                         <th class="{{ $thr }}">Booking value</th>
-                        <th class="{{ $thr }}">Receivable</th>
                         <th class="{{ $thr }}">Collected</th>
-                        <th class="{{ $thr }}">Outstanding</th>
-                        <th class="{{ $thr }}">Overdue</th>
-                        <th class="{{ $thr }}">Efficiency</th>
-                        <th class="{{ $thr }}">Leads</th>
-                        <th class="{{ $thr }}">Converted</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-(--border)">
@@ -171,13 +136,7 @@
                             <td class="py-2 pr-4 font-medium">{{ $row['month'] }}</td>
                             <td class="{{ $td }} text-right">{{ ReportFormat::number($row['bookings']) }}</td>
                             <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['booking_value']) }}</td>
-                            <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['receivable']) }}</td>
                             <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['collected']) }}</td>
-                            <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['outstanding']) }}</td>
-                            <td class="{{ $td }} text-right text-red-600">{{ ReportFormat::currency($row['overdue']) }}</td>
-                            <td class="{{ $td }} text-right">{{ ReportFormat::percent($row['collection_efficiency']) }}</td>
-                            <td class="{{ $td }} text-right">{{ ReportFormat::number($row['leads']) }}</td>
-                            <td class="{{ $td }} text-right">{{ ReportFormat::number($row['converted_leads']) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -194,26 +153,18 @@
                 <thead class="sticky top-0 bg-(--surface)">
                     <tr>
                         <th class="{{ $th }}">Date</th>
-                        <th class="{{ $thr }}">Leads</th>
                         <th class="{{ $thr }}">Bookings</th>
                         <th class="{{ $thr }}">Booking value</th>
-                        <th class="{{ $thr }}">Receivable</th>
                         <th class="{{ $thr }}">Collected</th>
-                        <th class="{{ $thr }}">Outstanding</th>
-                        <th class="{{ $thr }}">Overdue</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-(--border)">
                     @foreach ($mis->daily as $row)
                         <tr>
                             <td class="py-2 pr-4">{{ \Illuminate\Support\Carbon::parse($row['date'])->format('d M Y') }}</td>
-                            <td class="{{ $td }} text-right">{{ ReportFormat::number($row['leads']) }}</td>
                             <td class="{{ $td }} text-right">{{ ReportFormat::number($row['bookings']) }}</td>
                             <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['booking_value']) }}</td>
-                            <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['receivable']) }}</td>
                             <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['collected']) }}</td>
-                            <td class="{{ $td }} text-right">{{ ReportFormat::currency($row['outstanding']) }}</td>
-                            <td class="{{ $td }} text-right text-red-600">{{ ReportFormat::currency($row['overdue']) }}</td>
                         </tr>
                     @endforeach
                 </tbody>

@@ -2,30 +2,23 @@
 
 declare(strict_types=1);
 
-use App\Actions\Payments\RecordPaymentAction;
-use App\Actions\Payments\VerifyPaymentAction;
-use App\Enums\AgingBucket;
 use App\Enums\DatePreset;
-use App\Enums\PaymentStatus;
 use App\Enums\ReportType;
 use App\Models\Block;
 use App\Models\Booking;
 use App\Models\BookingBuyer;
 use App\Models\Buyer;
-use App\Models\Lead;
 use App\Models\Payment;
 use App\Models\Plot;
 use App\Models\Project;
 use App\Models\ReportExport;
 use App\Models\User;
-use App\Services\Reports\CollectionAnalytics;
-use App\Services\Reports\CollectionReportService;
 use App\Services\Reports\ExecutiveDashboardService;
 use App\Services\Reports\InventoryReportService;
 use App\Services\Reports\MisReportService;
+use App\Services\Reports\PaymentsAnalytics;
 use App\Services\Reports\ReportExportBuilder;
 use App\Services\Reports\SalesReportService;
-use App\Support\Reports\CollectionFilters;
 use App\Support\Reports\InventoryFilters;
 use App\Support\Reports\ReportFilterData;
 use Carbon\CarbonImmutable;
@@ -38,47 +31,6 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     seedRbac();
     $this->travelTo(Carbon::parse('2026-09-15 09:00:00', 'UTC'));
-});
-
-// ===========================================================================
-//  8 · AGEING — exact bucket boundaries
-// ===========================================================================
-
-it('ages an overdue installment into the exact M8 bucket at each boundary day', function () {
-    // one confirmed booking + live plan per boundary, single installment N days overdue
-    $expected = [
-        30 => '0-30', 31 => '31-60', 60 => '31-60', 61 => '61-90',
-        90 => '61-90', 91 => '91-180', 180 => '91-180', 181 => '180+',
-    ];
-
-    foreach ($expected as $days => $bucket) {
-        $s = confirmedBookingScenario('1000000');
-        activePlanFor($s['booking']->fresh(), $s['actor'], [
-            ['type' => 'amount', 'value' => '1000000', 'due_date' => now()->subDays($days)->toDateString()],
-        ]);
-        expect(AgingBucket::fromDaysOverdue($days)->value)->toBe($bucket);
-    }
-
-    $rows = collect(app(CollectionAnalytics::class)->ageing(ReportFilterData::default()))->keyBy('bucket');
-
-    // exactly one ₹10L installment per bucket that has a boundary day mapped to it
-    expect($rows['0-30']['outstanding'])->toBe(1_000_000.0)     // day 30
-        ->and($rows['31-60']['outstanding'])->toBe(2_000_000.0) // days 31, 60
-        ->and($rows['61-90']['outstanding'])->toBe(2_000_000.0) // days 61, 90
-        ->and($rows['91-180']['outstanding'])->toBe(2_000_000.0) // days 91, 180
-        ->and($rows['180+']['outstanding'])->toBe(1_000_000.0); // day 181
-});
-
-it('never ages a not-yet-due or paid installment', function () {
-    expect(AgingBucket::fromDaysOverdue(0))->toBeNull()
-        ->and(AgingBucket::fromDaysOverdue(-5))->toBeNull();
-
-    $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking']->fresh(), $s['actor'], [
-        ['type' => 'amount', 'value' => '1000000', 'due_date' => now()->addDays(10)->toDateString()],
-    ]);
-
-    expect(collect(app(CollectionAnalytics::class)->ageing(ReportFilterData::default()))->sum('outstanding'))->toBe(0.0);
 });
 
 // ===========================================================================
@@ -111,10 +63,10 @@ it('resolves every preset to an inclusive, day-aligned window in the app timezon
 //  10 · FILTER SECURITY — invalid enums + foreign ids rejected everywhere
 // ===========================================================================
 
-dataset('every report route', ['reports.overview', 'reports.sales', 'reports.inventory', 'reports.collections', 'reports.mis']);
+dataset('every report route', ['reports.overview', 'reports.sales', 'reports.inventory', 'reports.mis']);
 
 it('rejects an invalid enum value for every status filter', function (string $route) {
-    $me = makeUser(permissions: ['reports.view', 'leads.view_all']);
+    $me = makeUser(permissions: ['reports.view']);
 
     foreach (['booking_status', 'payment_status', 'plot_status'] as $field) {
         $this->actingAs($me)->getJson(route($route, [$field => 'not-a-real-status']))
@@ -128,16 +80,10 @@ it('rejects an inverted custom date range', function () {
         ->assertStatus(422)->assertJsonValidationErrors('to');
 });
 
-it('rejects a foreign lead source id', function () {
-    $this->actingAs(makeUser(permissions: ['reports.view', 'leads.view_all']))
-        ->getJson(route('reports.leads', ['lead_source' => 999999]))
-        ->assertStatus(422)->assertJsonValidationErrors('lead_source');
-});
-
 it('accepts a fully-combined valid filter set', function () {
     $p = Project::factory()->create();
     $b = Block::factory()->create(['project_id' => $p->id]);
-    $me = makeUser(permissions: ['reports.view', 'leads.view_all']);
+    $me = makeUser(permissions: ['reports.view']);
 
     $this->actingAs($me)->get(route('reports.mis', [
         'preset' => 'this_year', 'project_id' => $p->id, 'block_id' => $b->id,
@@ -151,14 +97,14 @@ it('accepts a fully-combined valid filter set', function () {
 // ===========================================================================
 
 it('rejects foreign ids and unknown type/format on the export route', function () {
-    $me = makeUser(permissions: ['reports.view', 'reports.export', 'leads.view_all']);
+    $me = makeUser(permissions: ['reports.view', 'reports.export']);
     $foreignBlock = Block::factory()->create(['project_id' => Project::factory()->create()->id]);
     $p = Project::factory()->create();
 
     $this->actingAs($me)->getJson(route('reports.export', ['type' => 'mis', 'format' => 'csv', 'project_id' => $p->id, 'block_id' => $foreignBlock->id]))
         ->assertStatus(422)->assertJsonValidationErrors('block_id');
 
-    $this->actingAs($me)->getJson(route('reports.export', ['type' => 'collections', 'format' => 'csv', 'salesperson_id' => 999999]))
+    $this->actingAs($me)->getJson(route('reports.export', ['type' => 'mis', 'format' => 'csv', 'salesperson_id' => 999999]))
         ->assertStatus(422)->assertJsonValidationErrors('salesperson_id');
 
     $this->actingAs($me)->get('/reports/overview/export/csv')->assertNotFound();   // overview not exportable
@@ -175,13 +121,13 @@ it('never leaks another project\'s figures through the project filter (report + 
     // Alpha-scoped MIS: only Alpha figures
     $mis = app(MisReportService::class)->build(
         new ReportFilterData(from: CarbonImmutable::parse('2026-09-01')->startOfDay(), to: CarbonImmutable::parse('2026-09-30')->endOfDay(), preset: DatePreset::Custom, projectId: $w['alpha']->id),
-        makeUser(permissions: ['reports.view', 'leads.view_all']),
+        makeUser(permissions: ['reports.view']),
     );
     $projects = collect($mis->projects)->pluck('project');
     expect($projects)->toContain('Alpha Estate')->not->toContain('Beta Park');
 
     // Alpha-scoped CSV export: "Beta" appears nowhere
-    $body = $this->actingAs(makeUser(permissions: ['reports.view', 'reports.export', 'leads.view_all']))
+    $body = $this->actingAs(makeUser(permissions: ['reports.view', 'reports.export']))
         ->get(route('reports.export', ['type' => 'mis', 'format' => 'csv', 'project_id' => $w['alpha']->id, 'preset' => 'this_year']))
         ->streamedContent();
     expect($body)->toContain('Alpha Estate')->not->toContain('Beta Park');
@@ -197,9 +143,9 @@ it('exposes no reference numbers, notes or file paths in reports or exports', fu
     Payment::query()->first()?->update(['reference_number' => 'SECRET-REF-12345', 'notes' => 'internal only note']);
     Booking::query()->first()->update(['notes' => 'CONFIDENTIAL booking note']);
 
-    $viewer = makeUser(permissions: ['reports.view', 'reports.export', 'leads.view_all', 'projects.view', 'plots.view', 'buyers.view', 'bookings.view', 'payments.view']);
+    $viewer = makeUser(permissions: ['reports.view', 'reports.export', 'projects.view', 'plots.view', 'buyers.view', 'bookings.view', 'payments.view']);
 
-    foreach (['reports.overview', 'reports.sales', 'reports.inventory', 'reports.collections', 'reports.mis'] as $route) {
+    foreach (['reports.overview', 'reports.sales', 'reports.inventory', 'reports.mis'] as $route) {
         $html = $this->actingAs($viewer)->get(route($route, ['preset' => 'this_year']))->assertOk()->getContent();
         expect($html)->not->toContain('SECRET-REF-12345')
             ->not->toContain('CONFIDENTIAL booking note')
@@ -207,46 +153,41 @@ it('exposes no reference numbers, notes or file paths in reports or exports', fu
             ->not->toContain(storage_path());
     }
 
-    foreach ([ReportType::Mis, ReportType::Collections, ReportType::Sales, ReportType::Inventory] as $type) {
+    foreach ([ReportType::Mis, ReportType::Sales, ReportType::Inventory] as $type) {
         $body = $this->actingAs($viewer)->get(route('reports.export', ['type' => $type->value, 'format' => 'csv', 'preset' => 'this_year']))->streamedContent();
         expect($body)->not->toContain('SECRET-REF-12345')->not->toContain('CONFIDENTIAL')->not->toContain('internal only note');
     }
 });
 
 // ===========================================================================
-//  7 · FINANCIAL CORRECTNESS — outstanding is M8 truth on every surface
+//  7 · FINANCIAL CORRECTNESS — outstanding is M7 truth on every surface
 // ===========================================================================
 
-it('shows the identical M8 outstanding on the dashboard, collections report and MIS', function () {
+it('shows the identical M7 outstanding on the dashboard and MIS', function () {
     hardWorld();
     $f = new ReportFilterData(from: CarbonImmutable::parse('2026-09-01')->startOfDay(), to: CarbonImmutable::parse('2026-09-30')->endOfDay(), preset: DatePreset::Custom);
-    $user = makeUser(permissions: ['reports.view', 'leads.view_all']);
+    $user = makeUser(permissions: ['reports.view']);
 
-    $m8 = app(CollectionAnalytics::class)->kpis($f)['outstanding'];
+    $m7 = app(PaymentsAnalytics::class)->kpis($f)['outstanding'];
 
     $dash = app(ExecutiveDashboardService::class)->build($f, $user);
-    $coll = app(CollectionReportService::class)->build($f, CollectionFilters::none(), $user);
     $mis = app(MisReportService::class)->build($f, $user);
 
-    expect($dash->kpi('outstanding')->value)->toBe($m8)
-        ->and($coll->kpi('outstanding')->value)->toBe($m8)
-        ->and($mis->kpi('outstanding')->value)->toBe($m8)
-        ->and($m8)->toBeGreaterThan(0.0);
+    expect($dash->kpi('outstanding')->value)->toBe($m7)
+        ->and($mis->kpi('outstanding')->value)->toBe($m7)
+        ->and($m7)->toBeGreaterThan(0.0);
 });
 
-it('scopes the collections cash-collected KPI to the period with a real previous delta', function () {
+it('scopes the collected KPI to the period with a real previous delta', function () {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking']->fresh(), $s['actor'], [
-        ['type' => 'amount', 'value' => '1000000', 'due_date' => '2026-08-15'],
-    ]);
     // ₹200k collected in August, ₹500k in September
     payIn($s['booking'], $s['actor'], '200000', '2026-08-20');
     payIn($s['booking'], $s['actor'], '500000', '2026-09-10');
 
     $sept = new ReportFilterData(from: CarbonImmutable::parse('2026-09-01')->startOfDay(), to: CarbonImmutable::parse('2026-09-30')->endOfDay(), preset: DatePreset::Custom);
-    $coll = app(CollectionReportService::class)->build($sept, CollectionFilters::none(), makeUser(permissions: ['reports.view', 'leads.view_all']));
+    $dash = app(ExecutiveDashboardService::class)->build($sept, makeUser(permissions: ['reports.view']));
 
-    $kpi = $coll->kpi('cash_collected');
+    $kpi = $dash->kpi('total_collected');
     expect($kpi->value)->toBe(500_000.0)          // September only, not 700k all-time
         ->and($kpi->previous)->toBe(200_000.0)     // August (the previous month)
         ->and($kpi->hasComparison())->toBeTrue();
@@ -257,7 +198,7 @@ it('scopes the collections cash-collected KPI to the period with a real previous
 // ===========================================================================
 
 it('keeps a bounded query count that does not scale with data volume (no N+1)', function () {
-    $user = makeUser(permissions: ['reports.view', 'reports.export', 'leads.view_all']);
+    $user = makeUser(permissions: ['reports.view', 'reports.export']);
 
     hardWorld();
     $oneX = countQueries(fn () => buildAllReports($user));
@@ -289,17 +230,13 @@ it('is read-only — an export writes only its own audit row', function () {
     $before = [
         'bookings' => Booking::count(),
         'payments' => Payment::count(),
-        'installments' => DB::table('installments')->count(),
-        'allocations' => DB::table('payment_allocations')->count(),
     ];
 
-    $this->actingAs(makeUser(permissions: ['reports.view', 'reports.export', 'leads.view_all']))
+    $this->actingAs(makeUser(permissions: ['reports.view', 'reports.export']))
         ->get(route('reports.export', ['type' => 'mis', 'format' => 'xlsx', 'preset' => 'this_year']))->assertOk();
 
     expect(Booking::count())->toBe($before['bookings'])
         ->and(Payment::count())->toBe($before['payments'])
-        ->and(DB::table('installments')->count())->toBe($before['installments'])
-        ->and(DB::table('payment_allocations')->count())->toBe($before['allocations'])
         ->and(ReportExport::count())->toBe(1);
 });
 
@@ -308,7 +245,7 @@ it('is read-only — an export writes only its own audit row', function () {
 // ===========================================================================
 
 it('renders every report cleanly with zero data and leaks no internals', function (string $route) {
-    $res = $this->actingAs(makeUser(permissions: ['reports.view', 'leads.view_all']))->get(route($route))->assertOk();
+    $res = $this->actingAs(makeUser(permissions: ['reports.view']))->get(route($route))->assertOk();
     $html = $res->getContent();
     expect($html)->not->toContain('Unavailable')
         ->not->toContain('SQLSTATE')
@@ -322,10 +259,10 @@ it('renders every report cleanly with zero data and leaks no internals', functio
 
 it('hides every export control from a user without reports.export', function () {
     hardWorld();
-    $noExport = makeUser(permissions: ['reports.view', 'leads.view_all']);
-    $withExport = makeUser(permissions: ['reports.view', 'reports.export', 'leads.view_all']);
+    $noExport = makeUser(permissions: ['reports.view']);
+    $withExport = makeUser(permissions: ['reports.view', 'reports.export']);
 
-    foreach (['reports.sales', 'reports.inventory', 'reports.collections', 'reports.mis'] as $route) {
+    foreach (['reports.sales', 'reports.inventory', 'reports.mis'] as $route) {
         $hidden = $this->actingAs($noExport)->get(route($route))->assertOk()->getContent();
         expect($hidden)->not->toContain('/export/csv')
             ->not->toContain('/export/xlsx')
@@ -352,7 +289,7 @@ function hardWorld(): array
     $beta = Project::factory()->create(['name' => 'Beta Park']);
     $bBlock = Block::factory()->create(['project_id' => $beta->id]);
 
-    $mk = function (Project $p, Block $b, string $amount, string $date, array $schedule, ?array $pay = null) use ($actor) {
+    $mk = function (Project $p, Block $b, string $amount, string $date, ?array $pay = null) use ($actor) {
         $plot = Plot::factory()->create(['project_id' => $p->id, 'block_id' => $b->id, 'status' => 'booked']);
         $booking = Booking::factory()->confirmed()->forPlot($plot)->create([
             'created_by' => $actor->id, 'booking_date' => $date,
@@ -360,7 +297,6 @@ function hardWorld(): array
         ]);
         $buyer = Buyer::factory()->create(['status' => 'active']);
         BookingBuyer::factory()->create(['booking_id' => $booking->id, 'buyer_id' => $buyer->id, 'is_primary' => true, 'ownership_percentage' => 100]);
-        activePlanFor($booking->fresh(), $actor, $schedule);
         if ($pay !== null) {
             payIn($booking, $actor, $pay[0], $pay[1]);
         }
@@ -368,26 +304,11 @@ function hardWorld(): array
         return $booking;
     };
 
-    $mk($alpha, $aBlock, '1000000', '2026-09-05', [
-        ['type' => 'amount', 'value' => '500000', 'due_date' => '2026-08-25'],
-        ['type' => 'amount', 'value' => '500000', 'due_date' => '2026-10-25'],
-    ], ['300000', '2026-09-08']);
+    $mk($alpha, $aBlock, '1000000', '2026-09-05', ['300000', '2026-09-08']);
 
-    $mk($beta, $bBlock, '2000000', '2026-09-06', [
-        ['type' => 'amount', 'value' => '2000000', 'due_date' => '2026-07-01'],
-    ]);
-
-    Lead::factory()->count(3)->create(['assigned_to' => $actor->id, 'created_at' => '2026-09-03', 'status' => 'new']);
+    $mk($beta, $bBlock, '2000000', '2026-09-06');
 
     return compact('actor', 'alpha', 'beta', 'aBlock', 'bBlock');
-}
-
-function payIn(Booking $booking, User $actor, string $amount, string $date): void
-{
-    $p = app(RecordPaymentAction::class)->handle([
-        'booking_id' => $booking->id, 'payment_mode_id' => cashMode()->id, 'amount' => $amount, 'payment_date' => $date,
-    ], $actor);
-    app(VerifyPaymentAction::class)->handle($p, PaymentStatus::Success, $actor);
 }
 
 function countQueries(Closure $fn): int
@@ -407,7 +328,6 @@ function buildAllReports(User $u): void
     app(ExecutiveDashboardService::class)->build($f, $u);
     app(SalesReportService::class)->build($f, $u);
     app(InventoryReportService::class)->build($f, new InventoryFilters, $u);
-    app(CollectionReportService::class)->build($f, CollectionFilters::none(), $u);
     app(MisReportService::class)->build($f, $u);
     foreach (ReportType::cases() as $t) {
         app(ReportExportBuilder::class)->build($t, $f, $u);

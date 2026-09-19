@@ -2,14 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Actions\Collections\EnsureCollectionCaseAction;
 use App\Actions\Commission\GenerateCommissionCases;
 use App\Actions\Customers\ActivateCustomerPortal;
 use App\Actions\Customers\InviteCustomerToPortal;
 use App\Actions\Partners\AuthorizePartnerForProjectAction;
 use App\Actions\Partners\SetBookingPartnerAttribution;
-use App\Actions\Payments\ActivatePaymentPlanAction;
-use App\Actions\Payments\CreatePaymentPlanAction;
 use App\Actions\Payments\RecordPaymentAction;
 use App\Actions\Payments\VerifyPaymentAction;
 use App\Actions\Possession\InitiatePossessionCaseAction;
@@ -30,15 +27,13 @@ use App\Models\Block;
 use App\Models\Booking;
 use App\Models\BookingBuyer;
 use App\Models\Buyer;
-use App\Models\CollectionCase;
 use App\Models\CommissionCase;
 use App\Models\CommissionScheme;
 use App\Models\Document;
-use App\Models\Lead;
 use App\Models\Masters\DocumentType;
 use App\Models\Masters\PaymentMode;
 use App\Models\Partner;
-use App\Models\PaymentPlan;
+use App\Models\Payment;
 use App\Models\Plot;
 use App\Models\PossessionCase;
 use App\Models\Project;
@@ -145,26 +140,13 @@ function plotManager(): User
 }
 
 /**
- * Full leads.* + buyers.* including view-all and KYC access.
+ * Full buyers.* including archive and KYC access.
  */
-function leadManager(): User
+function buyerManager(): User
 {
     return makeUser(permissions: [
-        'leads.view', 'leads.view_all', 'leads.create', 'leads.update', 'leads.delete',
-        'leads.assign', 'leads.convert', 'leads.follow_up',
         'buyers.view', 'buyers.create', 'buyers.update', 'buyers.delete',
         'buyers.archive', 'buyers.documents',
-    ]);
-}
-
-/**
- * A scoped sales agent — sees only their own leads, no assign, no KYC.
- */
-function leadAgent(): User
-{
-    return makeUser(permissions: [
-        'leads.view', 'leads.create', 'leads.update', 'leads.convert', 'leads.follow_up',
-        'buyers.view', 'buyers.create', 'buyers.update',
     ]);
 }
 
@@ -195,26 +177,24 @@ function bookingClerk(): User
 }
 
 /**
- * Full payments.* + payment_plans.* + receipts.* (finance manager).
+ * Full payments.* + receipts.* (finance manager).
  */
 function financeManager(): User
 {
     return makeUser(permissions: [
-        'payment_plans.view', 'payment_plans.create', 'payment_plans.update', 'payment_plans.activate',
-        'payments.view', 'payments.create', 'payments.verify', 'payments.allocate', 'payments.reverse',
+        'payments.view', 'payments.create', 'payments.verify', 'payments.reverse',
         'receipts.view', 'receipts.generate',
         'bookings.view', 'buyers.view',
     ]);
 }
 
 /**
- * A cashier — records payments and views, but cannot verify, allocate or
- * reverse, and cannot touch payment plans.
+ * A cashier — records payments and views, but cannot verify or reverse.
  */
 function cashier(): User
 {
     return makeUser(permissions: [
-        'payment_plans.view', 'payments.view', 'payments.create', 'receipts.view',
+        'payments.view', 'payments.create', 'receipts.view',
         'bookings.view',
     ]);
 }
@@ -293,7 +273,7 @@ function bookingPayload(array $s, array $overrides = []): array
 
 /**
  * A CONFIRMED booking (final_amount = ₹1,000,000) with a BOOKED plot and one
- * primary buyer, plus an actor. Ready for a payment plan.
+ * primary buyer, plus an actor. Ready to record a direct payment against.
  *
  * @return array{actor: User, booking: Booking, buyer: Buyer}
  */
@@ -343,74 +323,14 @@ function chequeMode(): PaymentMode
     );
 }
 
-/**
- * Create + activate a plan with the given schedule (defaults to 4 × 25%).
- *
- * @param  list<array<string, mixed>>|null  $schedule
- */
-function activePlanFor(Booking $booking, User $actor, ?array $schedule = null): PaymentPlan
+/** Record + verify a direct CASH payment against a booking (no payment plan). */
+function payIn(Booking $booking, User $actor, string $amount, string $date): Payment
 {
-    $schedule ??= [
-        ['type' => 'percentage', 'value' => '25', 'due_date' => now()->subMonths(2)->toDateString()],
-        ['type' => 'percentage', 'value' => '25', 'due_date' => now()->subMonth()->toDateString()],
-        ['type' => 'percentage', 'value' => '25', 'due_date' => now()->addMonth()->toDateString()],
-        ['type' => 'percentage', 'value' => '25', 'due_date' => now()->addMonths(2)->toDateString()],
-    ];
+    $p = app(RecordPaymentAction::class)->handle([
+        'booking_id' => $booking->id, 'payment_mode_id' => cashMode()->id, 'amount' => $amount, 'payment_date' => $date,
+    ], $actor);
 
-    $plan = app(CreatePaymentPlanAction::class)->handle($booking, ['schedule' => $schedule], $actor);
-
-    return app(ActivatePaymentPlanAction::class)->handle($plan, $actor);
-}
-
-/*
-| ---------------------------------------------------------------------------
-| Collection helpers (M8)
-| ---------------------------------------------------------------------------
-*/
-
-/** Full collections.* + promises.* + cheques.* + penalties.* incl. view_all. */
-function collectionManager(): User
-{
-    return makeUser(permissions: [
-        'collections.view', 'collections.view_all', 'collections.create', 'collections.update',
-        'collections.assign', 'collections.follow_up', 'collections.reports',
-        'promises.view', 'promises.create', 'promises.update',
-        'cheques.view', 'cheques.update', 'cheques.bounce',
-        'penalties.view', 'penalties.assess', 'penalties.approve',
-        'bookings.view', 'buyers.view', 'payments.view', 'payment_plans.view',
-    ]);
-}
-
-/** A scoped collection executive — assigned cases only, no assign, no penalty approval. */
-function collectionExecutive(): User
-{
-    return makeUser(permissions: [
-        'collections.view', 'collections.create', 'collections.update', 'collections.follow_up',
-        'promises.view', 'promises.create', 'promises.update',
-        'cheques.view', 'penalties.view',
-        'bookings.view', 'buyers.view',
-    ]);
-}
-
-/**
- * A confirmed booking with an ACTIVE, OVERDUE plan plus an ensured collection case.
- *
- * @param  list<array<string, mixed>>|null  $schedule
- * @return array{actor: User, booking: Booking, buyer: Buyer, case: CollectionCase}
- */
-function overdueCaseScenario(string $finalAmount = '1000000', ?array $schedule = null): array
-{
-    $s = confirmedBookingScenario($finalAmount);
-
-    activePlanFor($s['booking'], $s['actor'], $schedule ?? [
-        ['type' => 'amount', 'value' => '400000', 'due_date' => now()->subDays(75)->toDateString()],
-        ['type' => 'amount', 'value' => '300000', 'due_date' => now()->subDays(20)->toDateString()],
-        ['type' => 'amount', 'value' => '300000', 'due_date' => now()->addDays(30)->toDateString()],
-    ]);
-
-    $case = app(EnsureCollectionCaseAction::class)->handle($s['booking']->fresh(), $s['actor']);
-
-    return $s + ['case' => $case];
+    return app(VerifyPaymentAction::class)->handle($p, PaymentStatus::Success, $actor);
 }
 
 /*
@@ -463,7 +383,6 @@ function registryReadyScenario(string $finalAmount = '1000000'): array
 {
     seedDocumentMasters();
     config()->set('registry.eligibility.required_paid_percent', 0);
-    config()->set('registry.eligibility.block_on_overdue', true);
 
     $s = confirmedBookingScenario($finalAmount);
 
@@ -511,7 +430,6 @@ function possessionReadyScenario(string $finalAmount = '1000000'): array
     $s = registryReadyScenario($finalAmount);
 
     config()->set('possession.eligibility.required_paid_percent', 0);
-    config()->set('possession.eligibility.block_on_overdue', true);
     // Relax the financial-clearance guard for scenario setup; the dedicated
     // "reads M7/M8 truth" test tightens it again explicitly.
     config()->set('possession.financial_clearance.max_outstanding', '100000000');
@@ -567,7 +485,6 @@ function transferReadyScenario(string $finalAmount = '1000000'): array
 {
     seedDocumentMasters();
     config()->set('transfer.financial.block_on_outstanding', false);
-    config()->set('transfer.financial.block_on_overdue', false);
 
     $s = confirmedBookingScenario($finalAmount);
     $newBuyer = Buyer::factory()->create(['status' => 'active']);
@@ -587,16 +504,13 @@ function transferReadyScenario(string $finalAmount = '1000000'): array
 */
 
 /**
- * Two projects, confirmed bookings on live plans, one partial payment, an
- * overdue installment on the second booking, and September leads (one
- * converted). Shared by the MIS and export tests.
+ * Two projects with confirmed bookings, one with a partial payment. Shared by
+ * the MIS and export tests.
  *
  *   Alpha Estate / A1 : 6 plots (4 avail, 2 booked) · booking A ₹10 L · sp Asha
- *       i1 ₹5 L due 2026-09-10  → ₹3 L paid (cash 09-12), ₹2 L overdue
- *       i2 ₹5 L due 2026-10-10  → unpaid
+ *       ₹3 L paid (cash 09-12), ₹7 L outstanding
  *   Beta Park / B1    : 4 plots (3 avail, 1 booked) · booking B ₹20 L · sp Ravi
- *       i1 ₹8 L due 2026-08-20  → unpaid, overdue
- *       i2 ₹12 L due 2026-11-01 → unpaid
+ *       unpaid, ₹20 L outstanding
  *
  * @return array<string, mixed>
  */
@@ -632,25 +546,11 @@ function misWorld(): array
     $A = $mk($alpha, $a1, '1000000', $asha, '2026-09-05', 'Aaa');
     $B = $mk($beta, $b1, '2000000', $ravi, '2026-09-08', 'Bbb');
 
-    activePlanFor($A['booking']->fresh(), $actor, [
-        ['type' => 'amount', 'value' => '500000', 'due_date' => '2026-09-10'],
-        ['type' => 'amount', 'value' => '500000', 'due_date' => '2026-10-10'],
-    ]);
     $payment = app(RecordPaymentAction::class)->handle([
         'booking_id' => $A['booking']->id, 'payment_mode_id' => cashMode()->id,
         'amount' => '300000', 'payment_date' => '2026-09-12',
     ], $actor);
     app(VerifyPaymentAction::class)->handle($payment, PaymentStatus::Success, $actor);
-
-    activePlanFor($B['booking']->fresh(), $actor, [
-        ['type' => 'amount', 'value' => '800000', 'due_date' => '2026-08-20'],
-        ['type' => 'amount', 'value' => '1200000', 'due_date' => '2026-11-01'],
-    ]);
-
-    Lead::factory()->count(2)->create(['assigned_to' => $asha->id, 'created_at' => '2026-09-03', 'status' => 'new']);
-    Lead::factory()->create(['assigned_to' => $asha->id, 'created_at' => '2026-09-03', 'status' => 'converted', 'converted_at' => '2026-09-05']);
-    Lead::factory()->count(2)->create(['assigned_to' => $ravi->id, 'created_at' => '2026-09-04', 'status' => 'new']);
-    Lead::factory()->create(['assigned_to' => $ravi->id, 'created_at' => '2026-08-10', 'status' => 'new']); // out of window
 
     return compact('actor', 'asha', 'ravi', 'alpha', 'beta', 'a1', 'b1', 'A', 'B');
 }
@@ -710,7 +610,7 @@ function activePortalBuyer(string $password = 'Portal-pw-1234', array $attrs = [
 }
 
 /**
- * A confirmed ₹10L booking (4×25% plan, ₹300k paid) whose primary buyer is an
+ * A confirmed ₹10L booking (₹300k paid directly) whose primary buyer is an
  * active portal customer. Shared by the portal bookings + payments tests.
  *
  * @return array{customer: Buyer, booking: Booking}
@@ -718,12 +618,6 @@ function activePortalBuyer(string $password = 'Portal-pw-1234', array $attrs = [
 function portalBooking(): array
 {
     $s = confirmedBookingScenario('1000000');
-    activePlanFor($s['booking'], $s['actor'], [
-        ['type' => 'amount', 'value' => '250000', 'due_date' => now()->subMonth()->toDateString()],
-        ['type' => 'amount', 'value' => '250000', 'due_date' => now()->addMonth()->toDateString()],
-        ['type' => 'amount', 'value' => '250000', 'due_date' => now()->addMonths(2)->toDateString()],
-        ['type' => 'amount', 'value' => '250000', 'due_date' => now()->addMonths(3)->toDateString()],
-    ]);
     $payment = app(RecordPaymentAction::class)->handle([
         'booking_id' => $s['booking']->id, 'payment_mode_id' => cashMode()->id,
         'amount' => '300000', 'payment_date' => now()->toDateString(),

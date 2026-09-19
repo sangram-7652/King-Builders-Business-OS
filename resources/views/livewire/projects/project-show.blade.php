@@ -108,14 +108,6 @@
                 </div>
                 <x-ui.button variant="ghost" size="sm" class="mt-3" wire:click="setTab('blocks')">Manage blocks →</x-ui.button>
             </x-ui.card>
-
-            <x-ui.card title="Primary contact" class="lg:col-span-3">
-                <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
-                    <div><dt class="text-(--content-muted)">Name</dt><dd class="mt-0.5">{{ $project->contact_name ?: '—' }}</dd></div>
-                    <div><dt class="text-(--content-muted)">Phone</dt><dd class="mt-0.5">{{ $project->contact_phone ?: '—' }}</dd></div>
-                    <div><dt class="text-(--content-muted)">Email</dt><dd class="mt-0.5">{{ $project->contact_email ?: '—' }}</dd></div>
-                </dl>
-            </x-ui.card>
         </div>
     @endif
 

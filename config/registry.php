@@ -16,9 +16,6 @@ return [
         // Minimum % of the booking's final amount that must be collected (M7).
         'required_paid_percent' => (float) env('REGISTRY_REQUIRED_PAID_PERCENT', 90),
 
-        // Whether an overdue balance (M8) blocks registry.
-        'block_on_overdue' => (bool) env('REGISTRY_BLOCK_ON_OVERDUE', true),
-
         // Whether every REQUIRED document (buyer + booking) must be VERIFIED
         // (true) or merely received (false).
         'require_documents_verified' => true,

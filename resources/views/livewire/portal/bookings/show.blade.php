@@ -1,4 +1,4 @@
-@php use App\Enums\DocumentStatus; use App\Enums\InstallmentStatus; @endphp
+@php use App\Enums\DocumentStatus; @endphp
 
 <div class="space-y-6">
     <x-ui.breadcrumb :items="[
@@ -55,7 +55,6 @@
                     <div class="flex justify-between"><dt class="text-(--content-muted)">Total</dt><dd class="tabular-nums">₹{{ number_format((float) $financials->total->store(), 2) }}</dd></div>
                     <div class="flex justify-between"><dt class="text-(--content-muted)">Paid</dt><dd class="tabular-nums">₹{{ number_format((float) $financials->paid->store(), 2) }}</dd></div>
                     <div class="flex justify-between"><dt class="text-(--content-muted)">Outstanding</dt><dd class="tabular-nums font-medium">₹{{ number_format((float) $financials->outstanding->store(), 2) }}</dd></div>
-                    <div class="flex justify-between"><dt class="text-(--content-muted)">Overdue</dt><dd class="tabular-nums font-medium text-red-600">₹{{ number_format((float) $financials->overdue->store(), 2) }}</dd></div>
                 </dl>
                 <x-ui.button variant="secondary" size="sm" class="mt-3 w-full" :href="route('portal.payments.index')" wire:navigate>All payments</x-ui.button>
             @else
@@ -64,26 +63,22 @@
         </x-ui.card>
     </div>
 
-    @if ($schedule)
-        <x-ui.card title="Payment schedule">
+    @if (! empty($schedule['rows']))
+        <x-ui.card title="Payment history">
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-(--border) text-sm">
                     <thead class="text-left text-xs font-semibold uppercase tracking-wider text-(--content-muted)">
-                        <tr><th class="py-2 pr-4">#</th><th class="py-2 pr-4">Milestone</th><th class="py-2 pr-4">Due</th>
-                            <th class="py-2 pr-4 text-right">Amount</th><th class="py-2 pr-4 text-right">Paid</th>
-                            <th class="py-2 pr-4 text-right">Outstanding</th><th class="py-2 pr-4">Status</th></tr>
+                        <tr><th class="py-2 pr-4">Payment</th><th class="py-2 pr-4">Date</th><th class="py-2 pr-4">Mode</th>
+                            <th class="py-2 pr-4 text-right">Amount</th><th class="py-2 pr-4">Receipt</th></tr>
                     </thead>
                     <tbody class="divide-y divide-(--border)">
                         @foreach ($schedule['rows'] as $row)
-                            @php $st = InstallmentStatus::from($row['status']); @endphp
                             <tr>
-                                <td class="py-2 pr-4 tabular-nums">{{ $row['number'] }}</td>
-                                <td class="py-2 pr-4">{{ $row['name'] ?: '—' }}</td>
-                                <td class="py-2 pr-4">{{ \Illuminate\Support\Carbon::parse($row['due_date'])->format('d M Y') }}</td>
+                                <td class="py-2 pr-4">{{ $row['payment_number'] }}</td>
+                                <td class="py-2 pr-4">{{ \Illuminate\Support\Carbon::parse($row['date'])->format('d M Y') }}</td>
+                                <td class="py-2 pr-4">{{ $row['mode'] }}</td>
                                 <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) $row['amount'], 2) }}</td>
-                                <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) $row['paid'], 2) }}</td>
-                                <td class="py-2 pr-4 text-right tabular-nums">₹{{ number_format((float) $row['outstanding'], 2) }}</td>
-                                <td class="py-2 pr-4"><x-ui.badge :variant="$st->color()" size="sm">{{ $st->label() }}</x-ui.badge></td>
+                                <td class="py-2 pr-4">{{ $row['receipt_number'] ?? '—' }}</td>
                             </tr>
                         @endforeach
                     </tbody>

@@ -23,7 +23,7 @@ use App\Support\Registry\EligibilityResult;
  *   - required buyer KYC documents are verified
  *   - required booking documents are verified
  *   - the agreement is at least SIGNED
- *   - financial prerequisites: no overdue balance (M8) and ≥ N% collected (M7)
+ *   - financial prerequisite: ≥ N% collected (M7)
  */
 class RegistryEligibilityService
 {
@@ -79,12 +79,6 @@ class RegistryEligibilityService
         }
 
         // --- Financial -------------------------------------------
-        $overdue = $this->ledger->bookingOverdue($booking);
-        if ($cfg['block_on_overdue']) {
-            $checks[] = $this->check('no_overdue', 'No overdue balance', ! $overdue->isPositive(),
-                $overdue->isPositive() ? "Overdue: ₹{$overdue->store()}." : null);
-        }
-
         $final = Money::of($booking->final_amount);
         $paid = $this->ledger->bookingPaid($booking);
         $percentPaid = $final->isPositive()

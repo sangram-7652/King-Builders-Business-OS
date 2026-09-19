@@ -17,7 +17,6 @@ enum ReportType: string
 {
     case Sales = 'sales';
     case Inventory = 'inventory';
-    case Collections = 'collections';
     case Mis = 'mis';
 
     public function title(): string
@@ -25,7 +24,6 @@ enum ReportType: string
         return match ($this) {
             self::Sales => 'Sales report',
             self::Inventory => 'Inventory report',
-            self::Collections => 'Collections report',
             self::Mis => 'Management MIS',
         };
     }

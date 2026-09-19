@@ -18,13 +18,13 @@ uses(RefreshDatabase::class);
 // ---------------------------------------------------------------------------
 
 dataset('authenticated GET routes', [
-    '/dashboard', '/projects', '/projects/create', '/leads', '/leads/create',
+    '/dashboard', '/projects', '/projects/create',
     '/buyers', '/buyers/create', '/bookings', '/bookings/create',
-    '/payments', '/finance', '/collections', '/collections/dashboard', '/collections/reports',
+    '/payments', '/finance',
     '/documents', '/registry', '/possession', '/transfers',
     '/users', '/users/create', '/roles', '/roles/create', '/settings/masters',
-    '/reports', '/reports/sales', '/reports/inventory', '/reports/collections',
-    '/reports/mis', '/reports/leads',
+    '/reports', '/reports/sales', '/reports/inventory',
+    '/reports/mis',
 ]);
 
 it('redirects a guest from every authenticated area to the login screen', function (string $path) {
@@ -32,7 +32,7 @@ it('redirects a guest from every authenticated area to the login screen', functi
 })->with('authenticated GET routes');
 
 it('redirects a guest from every report export to the login screen', function () {
-    foreach (['sales', 'inventory', 'collections', 'mis'] as $type) {
+    foreach (['sales', 'inventory', 'mis'] as $type) {
         foreach (['csv', 'xlsx', 'pdf', 'print'] as $format) {
             $this->get("/reports/{$type}/export/{$format}")->assertRedirect('/login');
         }
@@ -50,8 +50,8 @@ it('never serves a stored document to an anonymous caller', function () {
 it('blocks a permission-less user from every module index (403)', function () {
     $nobody = makeUser(); // authenticated, zero permissions
 
-    foreach (['/projects', '/leads', '/buyers', '/bookings', '/payments',
-        '/collections', '/documents', '/registry', '/possession', '/transfers',
+    foreach (['/projects', '/buyers', '/bookings', '/payments',
+        '/documents', '/registry', '/possession', '/transfers',
         '/users', '/roles', '/reports', '/settings/masters'] as $path) {
         $this->actingAs($nobody)->get($path)->assertForbidden();
     }

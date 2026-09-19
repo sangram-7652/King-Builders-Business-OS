@@ -40,7 +40,7 @@ class Index extends Component
         $confirmed = Booking::query()
             ->whereKey($bookingIds)
             ->where('status', 'confirmed')
-            ->with(['project:id,name', 'plot:id,plot_number', 'activePaymentPlan.installments'])
+            ->with(['project:id,name', 'plot:id,plot_number'])
             ->orderByDesc('booking_date')
             ->get();
 

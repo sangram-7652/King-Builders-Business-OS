@@ -125,9 +125,8 @@ class PartnerShow extends Component
             'state', 'city', 'createdBy', 'approvedBy',
             'projectAuthorizations.project', 'projectAuthorizations.authorizedBy', 'projectAuthorizations.revokedBy',
             'activities.causer',
-        ])->loadCount(['leads', 'bookingAttributions']);
+        ])->loadCount(['bookingAttributions']);
 
-        $recentLeads = $partner->leads()->take(5)->get(['id', 'name', 'phone', 'status']);
         $recentBookings = $partner->bookingAttributions()
             ->with('booking:id,booking_number,status,final_amount,project_id')
             ->take(5)->get();
@@ -137,7 +136,6 @@ class PartnerShow extends Component
 
         return view('livewire.partners.partner-show', [
             'partner' => $partner,
-            'recentLeads' => $recentLeads,
             'recentBookings' => $recentBookings,
             'kyc' => app(DocumentChecklistService::class)->forPartner($partner),
             'allowedTransitions' => $partner->status->allowedTransitions(),

@@ -59,17 +59,6 @@ it('is not eligible without a signed agreement (26)', function () {
     expect(app(RegistryEligibilityService::class)->evaluate($s['booking']->fresh())->eligible)->toBeFalse();
 });
 
-it('is not eligible with an overdue balance (27)', function () {
-    $s = registryReadyScenario('1000000');
-    activePlanFor($s['booking'], $s['actor'], [
-        ['type' => 'amount', 'value' => '500000', 'due_date' => now()->subDays(40)->toDateString()],
-        ['type' => 'amount', 'value' => '500000', 'due_date' => now()->addDays(40)->toDateString()],
-    ]);
-
-    $result = app(RegistryEligibilityService::class)->evaluate($s['booking']->fresh());
-    expect($result->eligible)->toBeFalse();
-});
-
 it('is not eligible below the required collected percentage', function () {
     $s = registryReadyScenario('1000000');
     config()->set('registry.eligibility.required_paid_percent', 90);

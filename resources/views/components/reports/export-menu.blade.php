@@ -1,5 +1,5 @@
 @props([
-    'report',   // report key: sales | inventory | collections | mis
+    'report',   // report key: sales | inventory | mis
     'filters',  // App\Support\Reports\ReportFilterData
     'extras' => null, // optional extra filter DTO exposing toQueryString()
 ])
@@ -7,7 +7,7 @@
 @php
     use App\Enums\ExportFormat;
 
-    $exportable = ['sales', 'inventory', 'collections', 'mis'];
+    $exportable = ['sales', 'inventory', 'mis'];
     $query = $filters->toQueryString() + ($extras?->toQueryString() ?? []);
 @endphp
 

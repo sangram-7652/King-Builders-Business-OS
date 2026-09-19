@@ -66,8 +66,7 @@ class RecordClearanceAction
             if ($category === ClearanceCategory::Financial) {
                 $case->loadMissing('booking');
                 $outstanding = $this->ledger->bookingOutstanding($case->booking);
-                $overdue = $this->ledger->bookingOverdue($case->booking);
-                $snapshot = ['outstanding' => $outstanding->store(), 'overdue' => $overdue->store()];
+                $snapshot = ['outstanding' => $outstanding->store()];
 
                 if ($target === ClearanceStatus::Cleared) {
                     $max = Money::of(config('possession.financial_clearance.max_outstanding'));

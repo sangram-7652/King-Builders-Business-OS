@@ -1,5 +1,4 @@
 @php
-    use App\Enums\LeadStatus;
     use App\Enums\PlotStatus;
     use App\Enums\BookingStatus;
     use App\Support\Reports\Kpi;
@@ -11,29 +10,23 @@
 
     $user = auth()->user();
     $can = fn (string $permission): bool => (bool) $user?->can($permission);
-    $canFinance = $can('payments.view') || $can('collections.view');
+    $canFinance = $can('payments.view');
 
     $exec = $data->exec;
     $kpi = fn (string $key): ?Kpi => $exec->kpi($key);
 
     // --- KPI grid (permission-aware) ---------------------------------------
     $kpiCards = array_values(array_filter([
-        $can('leads.view') ? ['kpi' => $kpi('total_leads'), 'icon' => 'inbox'] : null,
         $can('buyers.view') ? ['kpi' => new Kpi('active_buyers', 'Active buyers', $data->activeBuyers, 'number', hint: 'Currently active'), 'icon' => 'users'] : null,
         $can('plots.view') ? ['kpi' => $kpi('available_plots'), 'icon' => 'squares'] : null,
         $can('plots.view') ? ['kpi' => $kpi('booked_plots'), 'icon' => 'squares'] : null,
         $can('bookings.view') ? ['kpi' => $kpi('booking_value'), 'icon' => 'banknotes'] : null,
         $canFinance ? ['kpi' => $kpi('total_collected'), 'icon' => 'wallet'] : null,
         $canFinance ? ['kpi' => $kpi('outstanding'), 'icon' => 'banknotes'] : null,
-        $canFinance ? ['kpi' => $kpi('overdue'), 'icon' => 'exclamation-triangle'] : null,
     ], fn ($card) => $card !== null && $card['kpi'] !== null));
 
     // --- Attention required ----------------------------------------------
     $attention = [];
-    if ($data->followUpsVisible) {
-        $attention[] = ['key' => 'fu_today', 'label' => 'Follow-ups due today', 'count' => $data->followUp('due_today'), 'tone' => 'warning', 'error' => null, 'url' => route('follow-ups.index', ['tab' => 'today'])];
-        $attention[] = ['key' => 'fu_missed', 'label' => 'Missed follow-ups', 'count' => $data->followUp('missed'), 'tone' => 'danger', 'error' => null, 'url' => route('follow-ups.index', ['tab' => 'missed'])];
-    }
     // Only items the user is authorised to act on (ExecutiveDashboardService
     // already nulls the url when the user lacks that item's view permission) —
     // a scope-less viewer must never see another module's pending count.
@@ -54,19 +47,6 @@
             'count' => $exec->inventoryDistribution[$s->value] ?? 0,
             'color' => $s->color(),
         ])->all();
-
-    $pipelineItems = collect(LeadStatus::cases())
-        ->filter(fn (LeadStatus $s) => $s->isOpen() || $s === LeadStatus::Converted)
-        ->map(fn (LeadStatus $s) => [
-            'label' => $s->label(),
-            'count' => $data->leadPipeline[$s->value] ?? 0,
-            'color' => $s === LeadStatus::Converted ? 'success' : 'brand',
-        ])->values()->all();
-    $pipelineLost = collect(LeadStatus::negativeOutcomes())
-        ->sum(fn (LeadStatus $s) => $data->leadPipeline[$s->value] ?? 0);
-    if ($pipelineLost > 0) {
-        $pipelineItems[] = ['label' => 'Lost / dropped', 'count' => $pipelineLost, 'color' => 'danger'];
-    }
 
     $metricLabel = $metric === 'value' ? 'Booking value' : 'Bookings';
 @endphp
@@ -109,11 +89,9 @@
     {{-- Quick actions --}}
     @php
         $quickActions = array_values(array_filter([
-            $can('leads.create') ? ['label' => 'New lead', 'url' => route('leads.create')] : null,
             $can('buyers.create') ? ['label' => 'New buyer', 'url' => route('buyers.create')] : null,
             $can('bookings.create') ? ['label' => 'New booking', 'url' => route('bookings.create')] : null,
             $can('payments.create') ? ['label' => 'Record payment', 'url' => route('payments.index')] : null,
-            $can('follow_ups.create') ? ['label' => 'Add follow-up', 'url' => route('follow-ups.index')] : null,
             $can('reports.view') ? ['label' => 'Detailed reports', 'url' => route('reports.overview', $filters->toQueryString())] : null,
         ]));
     @endphp
@@ -198,15 +176,15 @@
         @endif
 
         @if ($canFinance)
-            <x-reports.section title="Collection overview"
-                subtitle="M7/M8 ledger truth — no separate calculation"
+            <x-reports.section title="Payments overview"
+                subtitle="M7 ledger truth — no separate calculation"
                 :error="$kpi('outstanding')?->error"
-                :empty="$exec->collectionOverview === []">
+                :empty="$exec->paymentsOverview === []">
                 <dl class="space-y-3">
-                    @foreach ($exec->collectionOverview as $label => $amount)
+                    @foreach ($exec->paymentsOverview as $label => $amount)
                         <div class="flex items-center justify-between text-sm">
                             <dt class="text-(--content-muted)">{{ $label }}</dt>
-                            <dd class="font-semibold tabular-nums {{ str_contains($label, 'Overdue') ? 'text-red-600' : 'text-(--content)' }}">
+                            <dd class="font-semibold tabular-nums text-(--content)">
                                 {{ ReportFormat::currencyFull($amount) }}
                             </dd>
                         </div>
@@ -228,30 +206,13 @@
         @endif
     </div>
 
-    {{-- Inventory + Lead pipeline --}}
-    <div class="grid gap-6 lg:grid-cols-2">
-        @if ($can('plots.view'))
-            <x-reports.section title="Inventory overview" subtitle="Current plot states"
-                :empty="array_sum($exec->inventoryDistribution) === 0">
-                <x-reports.distribution :items="$inventoryItems" :total="array_sum($exec->inventoryDistribution)" />
-            </x-reports.section>
-        @endif
-
-        @if ($data->leadPipelineVisible)
-            <x-reports.section title="Lead pipeline" subtitle="Leads created in the period, by stage"
-                :empty="array_sum($data->leadPipeline) === 0">
-                <x-reports.distribution :items="$pipelineItems" :total="array_sum($data->leadPipeline)" />
-                @php $convPct = $kpi('conversion_percent'); @endphp
-                @if ($convPct && $convPct->value !== null)
-                    <p class="mt-3 text-xs text-(--content-muted)">
-                        Conversion rate:
-                        <span class="font-medium text-(--content)">{{ ReportFormat::percent($convPct->value) }}</span>
-                        · {{ ReportFormat::number($kpi('converted_leads')?->value) }} converted
-                    </p>
-                @endif
-            </x-reports.section>
-        @endif
-    </div>
+    {{-- Inventory overview --}}
+    @if ($can('plots.view'))
+        <x-reports.section title="Inventory overview" subtitle="Current plot states"
+            :empty="array_sum($exec->inventoryDistribution) === 0">
+            <x-reports.distribution :items="$inventoryItems" :total="array_sum($exec->inventoryDistribution)" />
+        </x-reports.section>
+    @endif
 
     {{-- Recent bookings --}}
     @if ($can('bookings.view'))

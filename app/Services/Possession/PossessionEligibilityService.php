@@ -22,7 +22,7 @@ use App\Support\Registry\EligibilityResult;
  *   - plot is valid and active
  *   - the M9 registry case is COMPLETED
  *   - required booking documents are verified (M9)
- *   - financial prerequisites: no overdue balance (M8) and ≥ N% collected (M7)
+ *   - financial prerequisite: ≥ N% collected (M7)
  *
  * Clearances + site inspection are handled downstream by the
  * {@see PossessionChecklistService} once a case has been scheduled.
@@ -62,12 +62,6 @@ class PossessionEligibilityService
                 $bookingChecklist->isComplete(),
                 $bookingChecklist->isComplete() ? null
                     : "{$bookingChecklist->verifiedCount}/{$bookingChecklist->requiredCount} booking documents verified.");
-        }
-
-        if ($cfg['block_on_overdue']) {
-            $overdue = $this->ledger->bookingOverdue($booking);
-            $checks[] = $this->check('no_overdue', 'No overdue balance', ! $overdue->isPositive(),
-                $overdue->isPositive() ? "Overdue: ₹{$overdue->store()}." : null);
         }
 
         $final = Money::of($booking->final_amount);

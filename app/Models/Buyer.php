@@ -125,12 +125,6 @@ class Buyer extends Model implements AuthenticatableContract
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    /** Leads that converted into this buyer. @return HasMany<Lead, $this> */
-    public function leads(): HasMany
-    {
-        return $this->hasMany(Lead::class);
-    }
-
     /** Portal activation / reset tokens (M15). @return HasMany<CustomerInvitation, $this> */
     public function portalInvitations(): HasMany
     {
@@ -198,7 +192,7 @@ class Buyer extends Model implements AuthenticatableContract
      */
     protected function businessDependents(): array
     {
-        return ['leads' => $this->leads(), 'bookings' => $this->bookingBuyers()];
+        return ['bookings' => $this->bookingBuyers()];
     }
 
     // --- Scopes ------------------------------------------------------
