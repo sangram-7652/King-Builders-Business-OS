@@ -37,9 +37,18 @@
         <x-ui.card title="New transfer request">
             <form wire:submit="create" class="space-y-3">
                 <x-ui.select label="Transfer type" wire:model.live="transferType" :options="$transferTypes" />
-                <x-ui.select label="Incoming buyer" wire:model="newBuyerId" placeholder="Select buyer…"
-                    :options="$buyers->mapWithKeys(fn ($b) => [$b->id => $b->fullName().' · '.$b->customer_code])->all()"
-                    :error="$errors->first('newBuyerId')" />
+
+                @if ($transferType === 'plot_transfer')
+                    <x-ui.input label="Current plot" value="Plot {{ $booking->plot?->plot_number }}" disabled />
+                    <x-ui.select label="New plot" wire:model="newPlotId" placeholder="Select an available plot…"
+                        :options="$plots->toArray()"
+                        :error="$errors->first('newPlotId')" />
+                @else
+                    <x-ui.select label="Incoming buyer" wire:model="newBuyerId" placeholder="Select buyer…"
+                        :options="$buyers->mapWithKeys(fn ($b) => [$b->id => $b->fullName().' · '.$b->customer_code])->all()"
+                        :error="$errors->first('newBuyerId')" />
+                @endif
+
                 <x-ui.input label="Reason" wire:model="reason" :error="$errors->first('reason')" />
                 <div class="flex gap-2">
                     <x-ui.button size="sm" type="submit">Create</x-ui.button>
@@ -56,8 +65,13 @@
 
             <dl class="grid gap-3 text-sm sm:grid-cols-4">
                 <div><dt class="text-(--content-muted)">Type</dt><dd>{{ $t->transfer_type->label() }}</dd></div>
-                <div><dt class="text-(--content-muted)">From</dt><dd>{{ $t->currentBuyer?->fullName() ?? '—' }}</dd></div>
-                <div><dt class="text-(--content-muted)">To</dt><dd>{{ $t->newBuyer?->fullName() ?? '—' }}</dd></div>
+                @if ($t->transfer_type->value === 'plot_transfer')
+                    <div><dt class="text-(--content-muted)">Current plot</dt><dd>Plot {{ $t->plot?->plot_number ?? '—' }}</dd></div>
+                    <div><dt class="text-(--content-muted)">New plot</dt><dd>Plot {{ $t->newPlot?->plot_number ?? '—' }}</dd></div>
+                @else
+                    <div><dt class="text-(--content-muted)">From</dt><dd>{{ $t->currentBuyer?->fullName() ?? '—' }}</dd></div>
+                    <div><dt class="text-(--content-muted)">To</dt><dd>{{ $t->newBuyer?->fullName() ?? '—' }}</dd></div>
+                @endif
                 <div><dt class="text-(--content-muted)">Approved</dt><dd>{{ $t->approved_at?->format('d M Y') ?? '—' }}</dd></div>
             </dl>
 
@@ -89,7 +103,12 @@
                     @if ($t->status === TS::UnderReview)<x-ui.button size="sm" wire:click="approve({{ $t->id }})" wire:confirm="Approve this transfer?">Approve</x-ui.button>@endif
                 @endcan
                 @can('complete', $t)
-                    @if ($t->status === TS::Approved)<x-ui.button size="sm" wire:click="complete({{ $t->id }})" wire:confirm="Complete transfer? Ownership will move to the new buyer.">Complete transfer</x-ui.button>@endif
+                    @if ($t->status === TS::Approved)
+                        <x-ui.button size="sm" wire:click="complete({{ $t->id }})"
+                            wire:confirm="{{ $t->transfer_type->value === 'plot_transfer' ? 'Complete transfer? The booking will move to the new plot.' : 'Complete transfer? Ownership will move to the new buyer.' }}">
+                            Complete transfer
+                        </x-ui.button>
+                    @endif
                 @endcan
                 @can('update', $t)
                     @unless ($t->status->isTerminal())<x-ui.button size="sm" variant="ghost" class="text-red-600" wire:click="cancelRequest({{ $t->id }})">Cancel</x-ui.button>@endunless

@@ -8,9 +8,11 @@ use App\Enums\PossessionActivityType;
 use App\Enums\TransferRequestStatus;
 use App\Exceptions\DomainException;
 use App\Models\Plot;
+use App\Models\PossessionCase;
 use App\Models\TransferRequest;
 use App\Models\User;
 use App\Services\Ownership\PlotOwnershipService;
+use App\Services\Transfer\PlotTransferService;
 use App\Support\Concerns\RunsInTransaction;
 use App\Support\Possession\PossessionTimeline;
 use Illuminate\Support\Facades\Log;
@@ -20,19 +22,25 @@ use Illuminate\Support\Facades\Log;
  *
  * Fully transactional:
  *   1. lock the request; must be APPROVED (idempotent if already COMPLETED)
- *   2. lock the plot; reject if another transfer already completed after this
- *      one was approved
- *   3. close the active ownership period(s) and open the new one(s)
+ *   2. lock the plot(s) — both old and new for a plot transfer; reject if
+ *      another transfer already completed after this one was approved
+ *   3. apply the type-specific effect: ownership-moving types close/open the
+ *      ownership ledger; a plot transfer moves the booking to the new plot;
+ *      a nominee change touches neither
  *   4. mark the request COMPLETED + write the audit events
  *
- * Historical `booking_buyers` / buyer rows are never mutated — the plot
- * ownership ledger is the record of who owns the plot now.
+ * Historical `booking_buyers` / buyer rows are never mutated. Never creates
+ * or deletes a booking — only an ownership-moving type's owning buyer, or a
+ * plot transfer's plot association, ever changes.
  */
 class CompleteTransferAction
 {
     use RunsInTransaction;
 
-    public function __construct(private readonly PlotOwnershipService $ownership) {}
+    public function __construct(
+        private readonly PlotOwnershipService $ownership,
+        private readonly PlotTransferService $plotTransfer,
+    ) {}
 
     public function handle(TransferRequest $transfer, User $actor): TransferRequest
     {
@@ -52,8 +60,12 @@ class CompleteTransferAction
                 throw new DomainException("A {$locked->status->label()} transfer cannot be completed.");
             }
 
-            // Lock the plot so two approved transfers cannot both complete.
-            Plot::query()->whereKey($locked->plot_id)->lockForUpdate()->firstOrFail();
+            // Lock the plot(s) so two approved transfers cannot both complete
+            // against the same plot.
+            $oldPlot = Plot::query()->whereKey($locked->plot_id)->lockForUpdate()->firstOrFail();
+            $newPlot = $locked->new_plot_id !== null
+                ? Plot::query()->whereKey($locked->new_plot_id)->lockForUpdate()->firstOrFail()
+                : null;
 
             $conflict = TransferRequest::query()
                 ->where('booking_id', $locked->booking_id)
@@ -68,7 +80,19 @@ class CompleteTransferAction
 
             $locked->load('booking', 'plot', 'newBuyer');
 
-            if ($locked->transfer_type->movesOwnership()) {
+            if ($locked->transfer_type->movesPlot()) {
+                if ($newPlot === null) {
+                    throw new DomainException('No target plot is set on this transfer.');
+                }
+
+                // Re-checked here too, immediately before completion — never
+                // trust the Draft screen or the approval-time snapshot.
+                if (PossessionCase::query()->where('booking_id', $locked->booking_id)->exists()) {
+                    throw new DomainException('A possession case already exists for this booking — the plot cannot be changed anymore.');
+                }
+
+                $this->plotTransfer->applyPlotChange($locked, $oldPlot, $newPlot, $actor);
+            } elseif ($locked->transfer_type->movesOwnership()) {
                 $this->ownership->applyTransfer($locked, $actor);
             }
 
@@ -81,8 +105,12 @@ class CompleteTransferAction
             PossessionTimeline::record(
                 PossessionActivityType::TransferCompleted,
                 "Transfer {$locked->request_number} completed.",
-                $locked->booking, $locked->plot, $locked->newBuyer,
-                ['transfer_request_id' => $locked->id, 'moves_ownership' => $locked->transfer_type->movesOwnership()],
+                $locked->booking, $newPlot ?? $locked->plot, $locked->newBuyer,
+                [
+                    'transfer_request_id' => $locked->id,
+                    'moves_ownership' => $locked->transfer_type->movesOwnership(),
+                    'moves_plot' => $locked->transfer_type->movesPlot(),
+                ],
                 $actor,
             );
 

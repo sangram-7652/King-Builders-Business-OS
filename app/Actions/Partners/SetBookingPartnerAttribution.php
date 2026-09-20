@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Partners;
 
+use App\Actions\Commission\GenerateCommissionCases;
 use App\Enums\CommissionCaseStatus;
 use App\Enums\PartnerActivityType;
 use App\Exceptions\DomainException;
@@ -27,10 +28,17 @@ use Illuminate\Support\Facades\Log;
  *   - `partnerId === null` clears the promoter, marking the booking a direct sale
  *   - the promoter must be ACTIVE and (by default) authorised for the project
  *   - a CANCELLED booking is rejected; the M6 lifecycle is respected
+ *
+ * If the booking is already CONFIRMED, attaching a promoter here also
+ * auto-generates the commission case immediately (see the `isConfirmed()`
+ * branch below) — no separate manual "Generate" step is required. A failure
+ * there is logged and swallowed, never rolling back the attribution itself.
  */
 class SetBookingPartnerAttribution
 {
     use RunsInTransaction;
+
+    public function __construct(private readonly GenerateCommissionCases $generateCommissionCases) {}
 
     public function handle(Booking $booking, ?int $partnerId, User $actor, ?string $reason = null): Booking
     {
@@ -88,12 +96,31 @@ class SetBookingPartnerAttribution
                 BookingPartnerAttribution::create([
                     'booking_id' => $locked->id,
                     'partner_id' => $partner->id,
+                    // Frozen at attribution time — never re-read live; see the
+                    // model docblock for why (F-M14-ADV audit finding).
+                    'commission_percentage' => $partner->commission_percentage,
                     'status' => 'active',
                     'revision' => $revision,
                     'attributed_by' => $actor->id,
                     'attributed_at' => now(),
                     'reason' => $reason,
                 ]);
+
+                // A promoter attached to an ALREADY-CONFIRMED booking earns
+                // commission immediately — no separate manual "Generate" step.
+                // GenerateCommissionCases is idempotent (booking_id, partner_id
+                // is unique and row-locked), so this is always safe to call.
+                if ($locked->isConfirmed()) {
+                    try {
+                        $this->generateCommissionCases->handle($locked, $actor);
+                    } catch (DomainException $e) {
+                        Log::error('commission.auto_generate_failed', [
+                            'booking_id' => $locked->id,
+                            'partner_id' => $partner->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
             }
 
             $this->recordActivities($locked, $partner, $previous?->partner_id, $actor);

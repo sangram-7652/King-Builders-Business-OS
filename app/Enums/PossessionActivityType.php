@@ -40,6 +40,7 @@ enum PossessionActivityType: string
     case TransferCompleted = 'transfer_completed';
     case TransferCancelled = 'transfer_cancelled';
     case OwnershipChanged = 'ownership_changed';
+    case PlotChanged = 'plot_changed';
     case NomineeRecorded = 'nominee_recorded';
 
     public function label(): string
@@ -69,6 +70,7 @@ enum PossessionActivityType: string
             self::TransferCompleted => 'Transfer completed',
             self::TransferCancelled => 'Transfer cancelled',
             self::OwnershipChanged => 'Ownership changed',
+            self::PlotChanged => 'Plot changed',
             self::NomineeRecorded => 'Nominee recorded',
         };
     }

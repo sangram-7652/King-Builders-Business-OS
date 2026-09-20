@@ -193,10 +193,11 @@ it('marks documents past their expiry as expired (10)', function () {
 it('derives checklist counts and never stores a percentage (8)', function () {
     $s = confirmedBookingScenario();
 
+    // No document type is required, so the checklist is vacuously complete from the start.
     $result = app(DocumentChecklistService::class)->forBuyer($s['buyer']);
-    expect($result->requiredCount)->toBe(4) // AADHAAR, PAN, ADDRESS_PROOF, PHOTO
+    expect($result->requiredCount)->toBe(0)
         ->and($result->verifiedCount)->toBe(0)
-        ->and($result->isComplete())->toBeFalse();
+        ->and($result->isComplete())->toBeTrue();
 
     foreach (['AADHAAR', 'PAN', 'ADDRESS_PROOF', 'PHOTO'] as $code) {
         $doc = app(UploadDocumentAction::class)->handle($s['buyer'], docType($code), fakeDocument("$code.pdf"), $s['actor']);
@@ -226,7 +227,7 @@ it('lets a project-specific requirement override the global default', function (
         'is_active' => true,
     ]);
 
-    // BOOKING_FORM + BOOKING_AGREEMENT globally, + REGISTRY_DOC for this project
-    expect(app(DocumentChecklistService::class)->forBooking($s['booking'])->requiredCount)->toBe(3)
-        ->and(app(DocumentChecklistService::class)->forBooking($other['booking'])->requiredCount)->toBe(2);
+    // Nothing is required globally; only REGISTRY_DOC is required, and only for this project.
+    expect(app(DocumentChecklistService::class)->forBooking($s['booking'])->requiredCount)->toBe(1)
+        ->and(app(DocumentChecklistService::class)->forBooking($other['booking'])->requiredCount)->toBe(0);
 });

@@ -28,9 +28,15 @@ class CommissionEligibilityService
     public function __construct(private readonly PaymentLedger $ledger) {}
 
     /**
+     * $commissionRate is the rate that will actually be USED for the
+     * calculation — the booking attribution's frozen snapshot, falling back
+     * to the partner's live rate only for a legacy un-snapshotted row (see
+     * {@see CommissionCaseWriter}). Never the partner's live rate directly,
+     * so eligibility can't disagree with what gets calculated.
+     *
      * @return array{eligible: bool, reason: string}
      */
-    public function evaluate(Booking $booking, Partner $partner): array
+    public function evaluate(Booking $booking, Partner $partner, ?string $commissionRate): array
     {
         if (! $booking->isConfirmed()) {
             return $this->fail('The booking is not confirmed.');
@@ -40,7 +46,7 @@ class CommissionEligibilityService
             return $this->fail("The partner is {$partner->status->label()}.");
         }
 
-        if ($partner->commission_percentage === null || bccomp((string) $partner->commission_percentage, '0', 2) <= 0) {
+        if ($commissionRate === null || bccomp($commissionRate, '0', 2) <= 0) {
             return $this->fail('This promoter has no commission % configured.');
         }
 

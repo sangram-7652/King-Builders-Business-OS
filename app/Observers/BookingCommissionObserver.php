@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Actions\Commission\GenerateCommissionCases;
 use App\Enums\BookingStatus;
 use App\Enums\CommissionCaseEventType;
 use App\Enums\CommissionCaseStatus;
+use App\Exceptions\DomainException;
 use App\Models\Booking;
 use App\Models\CommissionCase;
 use App\Models\User;
@@ -15,6 +17,13 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Keeps commission cases in step with the M6 booking lifecycle (M14.4).
+ *
+ * When a booking becomes CONFIRMED:
+ *   - if it already has an active promoter attribution, the commission case
+ *     is generated automatically (see {@see autoGenerateCommission()}) — no
+ *     manual "Generate" click is required for the normal workflow. A booking
+ *     with no promoter is left untouched; confirmation is never blocked by
+ *     this.
  *
  * When a booking is cancelled:
  *   - PENDING_REVIEW / ON_HOLD cases are CANCELLED (nothing committed)
@@ -26,7 +35,17 @@ class BookingCommissionObserver
 {
     public function updated(Booking $booking): void
     {
-        if (! $booking->wasChanged('status') || $booking->status !== BookingStatus::Cancelled) {
+        if (! $booking->wasChanged('status')) {
+            return;
+        }
+
+        if ($booking->status === BookingStatus::Confirmed) {
+            $this->autoGenerateCommission($booking);
+
+            return;
+        }
+
+        if ($booking->status !== BookingStatus::Cancelled) {
             return;
         }
 
@@ -91,6 +110,41 @@ class BookingCommissionObserver
                 'cancelled_cases' => $cases->count(),
                 'auto_reversed_cases' => $approvedUnpaid->count(),
                 'cases_needing_manual_reversal' => $needsManualReversal,
+            ]);
+        }
+    }
+
+    /**
+     * Booking confirmed + already has an active promoter attribution →
+     * generate the commission case immediately. GenerateCommissionCases is
+     * idempotent (unique (booking_id, partner_id) + row locks), so this is
+     * always safe even if called more than once. A failure here is logged
+     * and swallowed — it must never roll back the booking confirmation that
+     * is already committing in the same transaction.
+     */
+    private function autoGenerateCommission(Booking $booking): void
+    {
+        $attribution = $booking->partnerAttributions()->first();
+
+        if ($attribution === null) {
+            return;
+        }
+
+        $actor = $booking->confirmed_by ? User::find($booking->confirmed_by) : null;
+
+        if ($actor === null) {
+            Log::error('commission.auto_generate_skipped_no_actor', ['booking_id' => $booking->getKey()]);
+
+            return;
+        }
+
+        try {
+            app(GenerateCommissionCases::class)->handle($booking, $actor);
+        } catch (DomainException $e) {
+            Log::error('commission.auto_generate_failed', [
+                'booking_id' => $booking->getKey(),
+                'partner_id' => $attribution->partner_id,
+                'error' => $e->getMessage(),
             ]);
         }
     }

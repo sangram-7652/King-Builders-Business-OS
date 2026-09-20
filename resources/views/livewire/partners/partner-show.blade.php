@@ -194,9 +194,10 @@
             <x-ui.card title="Promoter Advance">
                 <dl class="space-y-2 text-sm">
                     <div class="flex justify-between"><dt class="text-(--content-muted)">Commission rate</dt><dd class="font-medium">{{ $partner->commissionRateLabel() }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-(--content-muted)">Total bookings</dt><dd class="tabular-nums">{{ $stats['totalBookings'] }}</dd></div>
                     <div class="flex justify-between"><dt class="text-(--content-muted)">Total booking value</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['totalBookingValue']->store(), 2) }}</dd></div>
-                    <div class="flex justify-between"><dt class="text-(--content-muted)">Total commission earned</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['totalCommissionEarned']->store(), 2) }}</dd></div>
-                    <div class="flex justify-between"><dt class="text-(--content-muted)">Total advance given</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['totalAdvanceGiven']->store(), 2) }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-(--content-muted)">Gross commission</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['totalCommissionEarned']->store(), 2) }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-(--content-muted)">Advance received</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['totalAdvanceGiven']->store(), 2) }}</dd></div>
                     <div class="flex justify-between"><dt class="text-(--content-muted)">Advance adjusted</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['totalAdvanceAdjusted']->store(), 2) }}</dd></div>
                     <div class="flex justify-between border-t border-(--border) pt-2 font-semibold"><dt>Advance balance</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['advanceBalance']->store(), 2) }}</dd></div>
                     <div class="flex justify-between"><dt class="text-(--content-muted)">Commission payable</dt><dd class="tabular-nums">₹{{ number_format((float) $stats['totalCommissionPayable']->store(), 2) }}</dd></div>

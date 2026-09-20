@@ -50,9 +50,9 @@
                                 @can('documents.upload')
                                     <label class="cursor-pointer text-xs text-(--brand-primary) hover:underline">
                                         {{ $doc?->hasFile() ? 'Replace' : 'Upload' }}
-                                        <input type="file" class="hidden" wire:model="files.{{ $item['document_type_id'] }}"
-                                               x-on:change="$wire.upload({{ $item['document_type_id'] }})" />
+                                        <input type="file" class="hidden" wire:model="files.{{ $item['document_type_id'] }}" />
                                     </label>
+                                    <span wire:loading wire:target="files.{{ $item['document_type_id'] }}" class="text-xs text-(--content-muted)">Uploading…</span>
                                     @error('files.'.$item['document_type_id']) <span class="text-xs text-red-600">{{ $message }}</span> @enderror
                                 @endcan
                                 @if ($doc && $status === \App\Enums\DocumentStatus::Uploaded)

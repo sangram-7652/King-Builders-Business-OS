@@ -30,6 +30,7 @@ final class Branding implements Htmlable
         public readonly ?string $qrPath = null,
         public readonly ?string $signaturePath = null,
         public readonly ?string $stampPath = null,
+        public readonly ?string $watermarkPath = null,
     ) {}
 
     public static function fromConfig(): self
@@ -43,6 +44,7 @@ final class Branding implements Htmlable
             qrPath: $config['qr_path'] ?? null,
             signaturePath: $config['signature_path'] ?? null,
             stampPath: $config['stamp_path'] ?? null,
+            watermarkPath: $config['watermark_path'] ?? null,
             colors: [
                 'primary' => (string) data_get($config, 'colors.primary', '#2563eb'),
                 'primary_fg' => (string) data_get($config, 'colors.primary_fg', '#ffffff'),

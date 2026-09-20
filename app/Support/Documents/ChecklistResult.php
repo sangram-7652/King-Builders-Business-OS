@@ -22,9 +22,16 @@ final class ChecklistResult
         public readonly int $pendingCount,
     ) {}
 
+    /**
+     * True when every REQUIRED item is verified. Checked item-by-item (not by
+     * comparing verifiedCount to requiredCount): verifiedCount now counts every
+     * verified document, required or not, so a count comparison could be
+     * satisfied by unrelated optional documents while a specific required item
+     * is still unverified.
+     */
     public function isComplete(): bool
     {
-        return $this->requiredCount > 0 && $this->verifiedCount >= $this->requiredCount;
+        return $this->missing() === [];
     }
 
     /** @return list<array<string, mixed>> */

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Transfer;
 
+use App\Actions\Bookings\Concerns\ValidatesBookingConsistency;
 use App\Enums\PossessionActivityType;
 use App\Enums\TransferRequestStatus;
 use App\Enums\TransferType;
 use App\Exceptions\DomainException;
 use App\Models\Booking;
+use App\Models\Plot;
 use App\Models\TransferRequest;
 use App\Models\User;
 use App\Services\Ownership\PlotOwnershipService;
@@ -25,6 +27,7 @@ use Illuminate\Support\Facades\Log;
 class CreateTransferRequestAction
 {
     use RunsInTransaction;
+    use ValidatesBookingConsistency;
 
     public function __construct(
         private readonly SequenceGenerator $sequences,
@@ -32,7 +35,7 @@ class CreateTransferRequestAction
     ) {}
 
     /**
-     * @param  array{new_buyer_id?: int|null, reason?: string|null, notes?: string|null}  $data
+     * @param  array{new_buyer_id?: int|null, new_plot_id?: int|null, reason?: string|null, notes?: string|null}  $data
      */
     public function handle(Booking $booking, TransferType $type, array $data, User $actor): TransferRequest
     {
@@ -60,7 +63,28 @@ class CreateTransferRequestAction
             }
         }
 
-        return $this->transaction(function () use ($booking, $type, $data, $actor): TransferRequest {
+        $newPlot = null;
+        if ($type->movesPlot()) {
+            $newPlotId = $data['new_plot_id'] ?? null;
+            if ($newPlotId === null) {
+                throw new DomainException('A new plot is required for a plot transfer.');
+            }
+
+            $newPlot = Plot::query()->find($newPlotId);
+            if ($newPlot === null) {
+                throw new DomainException('The selected plot no longer exists.');
+            }
+            if ($newPlot->id === $booking->plot_id) {
+                throw new DomainException('The new plot must be different from the current plot.');
+            }
+            if ($newPlot->project_id !== $booking->project_id) {
+                throw new DomainException('The new plot must belong to the same project as the current booking.');
+            }
+            $this->assertPlotBookable($newPlot);
+            $this->assertNoLiveBooking($newPlot->id);
+        }
+
+        return $this->transaction(function () use ($booking, $type, $data, $actor, $newPlot): TransferRequest {
             $this->ownership->ensureAllotment($booking, $actor);
             $currentPrimary = $this->ownership->currentOwners($booking)->firstWhere('is_primary', true)
                 ?? $this->ownership->currentOwners($booking)->first();
@@ -73,6 +97,7 @@ class CreateTransferRequestAction
                 'request_number' => TransferRequest::formatCode($this->sequences->next(TransferRequest::SEQUENCE_KEY)),
                 'booking_id' => $booking->id,
                 'plot_id' => $booking->plot_id,
+                'new_plot_id' => $newPlot?->id,
                 'transfer_type' => $type,
                 'status' => TransferRequestStatus::Draft,
                 'current_buyer_id' => $currentPrimary?->buyer_id,

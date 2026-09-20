@@ -98,6 +98,34 @@ it('renders the receipt as a tenant-branded PDF (32)', function () {
 });
 
 /**
+ * F-RCPT-PAGINATE — the receipt must always fit on exactly one A4 page, even
+ * in the worst realistic case: a large payment (long "amount in words") and
+ * a long remark, both of which wrap onto multiple lines in the Payment
+ * Details grid. Counts raw `/Type /Page` (not `/Pages`) object markers in
+ * the PDF bytes — a lightweight, dependency-free page-count check.
+ */
+it('always fits on exactly one A4 page, even with a long amount-in-words and a long remark', function () {
+    $s = confirmedBookingScenario('100000000');
+    $p = app(\App\Actions\Payments\RecordPaymentAction::class)->handle([
+        'booking_id' => $s['booking']->id, 'payment_mode_id' => cashMode()->id,
+        'amount' => '39999977.53', 'reference_number' => 'REF-LONG',
+        'notes' => 'Kindly note that this partial payment reflects a negotiated discount adjustment credited against the buyer\'s outstanding ledger balance as per the mutually agreed settlement terms.',
+    ], $s['actor']);
+    $payment = app(VerifyPaymentAction::class)->handle($p, PaymentStatus::Success, $s['actor']);
+    $receipt = $payment->receipt->load(['payment.paymentMode', 'booking.project', 'issuedBy']);
+
+    $bytes = Pdf::loadView('receipts.pdf', [
+        'receipt' => $receipt,
+        'brand' => Branding::fromConfig(),
+        'extra' => ReceiptPdfData::build($receipt),
+    ])->output();
+
+    $pageCount = preg_match_all('#/Type\s*/Page(?!s)#', $bytes);
+
+    expect($pageCount)->toBe(1);
+});
+
+/**
  * F-RCPT-1 — the receipt template must show real booking/plot/buyer/payment
  * ledger data, never a hardcoded or fabricated figure. Renders the Blade
  * directly to HTML (the exact markup dompdf turns into the PDF) so every

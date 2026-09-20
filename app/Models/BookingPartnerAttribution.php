@@ -13,11 +13,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * `active` row (at most one per booking) is the current promoter; `superseded`
  * rows are previous attributions kept for history and commission-snapshot
  * reproducibility.
+ *
+ * `commission_percentage` is a SNAPSHOT of the promoter's rate taken the
+ * moment they were attached to this booking (see SetBookingPartnerAttribution) —
+ * commission for this booking always uses this frozen rate, never the
+ * promoter's current master rate, so a later change to the promoter's profile
+ * can never silently drift an already-attributed booking's commission.
+ * Nullable only for rows written before this snapshot existed.
  */
 class BookingPartnerAttribution extends Model
 {
     protected $fillable = [
-        'booking_id', 'partner_id', 'status', 'revision',
+        'booking_id', 'partner_id', 'commission_percentage', 'status', 'revision',
         'attributed_by', 'attributed_at', 'ended_at', 'reason', 'notes',
     ];
 
@@ -26,6 +33,7 @@ class BookingPartnerAttribution extends Model
         return [
             'booking_id' => 'integer',
             'partner_id' => 'integer',
+            'commission_percentage' => 'decimal:2',
             'revision' => 'integer',
             'attributed_by' => 'integer',
             'attributed_at' => 'datetime',

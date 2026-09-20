@@ -14,12 +14,15 @@ use App\Support\Concerns\RunsInTransaction;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Recomputes a single commission case against live M6/M7 figures (M14.4).
- * Only a PENDING_REVIEW / ON_HOLD case can be recalculated — once approved or
- * paid the snapshot is locked. A new immutable calculation row is appended;
- * the previous ones stay untouched. The promoter's advance adjustment is
- * reversed and reapplied against the fresh gross figure (never double-consumed
- * — see {@see \App\Services\Commission\PromoterLedgerService::applyCommission()}).
+ * Recomputes a single commission case against the booking's live final_amount
+ * (M14.4) — but NOT against the promoter's live commission rate, which stays
+ * pinned to whatever was snapshotted onto the attribution when the promoter
+ * was attached to this booking (see CommissionCaseWriter). Only a
+ * PENDING_REVIEW / ON_HOLD case can be recalculated — once approved or paid
+ * the snapshot is locked. A new immutable calculation row is appended; the
+ * previous ones stay untouched. The promoter's advance adjustment is reversed
+ * and reapplied against the fresh gross figure (never double-consumed — see
+ * {@see \App\Services\Commission\PromoterLedgerService::applyCommission()}).
  */
 class RecalculateCommissionCase
 {
@@ -47,7 +50,8 @@ class RecalculateCommissionCase
                 throw new DomainException('The booking attribution this case was generated from is no longer active. Regenerate from the booking.');
             }
 
-            $eval = $this->eligibility->evaluate($locked->booking, $locked->partner);
+            $rate = (string) ($attribution->commission_percentage ?? $locked->partner->commission_percentage ?? '');
+            $eval = $this->eligibility->evaluate($locked->booking, $locked->partner, $rate !== '' ? $rate : null);
 
             $locked->forceFill([
                 'is_eligible' => $eval['eligible'],
@@ -59,7 +63,7 @@ class RecalculateCommissionCase
                 throw new DomainException("Not eligible — {$eval['reason']}");
             }
 
-            $calc = $this->writer->write($locked, $locked->partner, $locked->booking, $actor);
+            $calc = $this->writer->write($locked, $locked->partner, $locked->booking, $attribution, $actor);
 
             $locked->recordEvent(
                 CommissionCaseEventType::Recalculated,

@@ -11,22 +11,24 @@ $logoFile = $brand->logoPath ? public_path($brand->logoPath) : null;
 $qrFile = $brand->qrPath ? public_path($brand->qrPath) : null;
 $signatureFile = $brand->signaturePath ? public_path($brand->signaturePath) : null;
 $stampFile = $brand->stampPath ? public_path($brand->stampPath) : null;
+$watermarkFile = $brand->watermarkPath ? public_path($brand->watermarkPath) : null;
 ?>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <style>
+        @page { margin: 0; }
         * { font-family: DejaVu Sans, sans-serif; }
         body { margin: 0; color: #1a1a1a; font-size: 11px; }
-        .wrap { padding: 26px 34px; }
-        .void { color: #b91c1c; font-weight: bold; border: 2px dashed #b91c1c; padding: 6px 12px; display: inline-block; margin-bottom: 14px; }
+        .wrap { padding: 16px 34px; }
+        .void { color: #b91c1c; font-weight: bold; border: 2px dashed #b91c1c; padding: 6px 12px; display: inline-block; margin-bottom: 10px; }
 
         table.head { width: 100%; border-collapse: collapse; }
         table.head td { vertical-align: top; }
         .qr { width: 72px; height: auto; display: block; }
-        .qr-caption { width: 108px; font-size: 7px; color: #444; text-align: left; margin-top: 3px; line-height: 1.25; }
-        .logo { height: 72px; margin-bottom: 4px; }
+        .qr-caption { width: 108px; font-size: 7px; color: #444; text-align: left; margin-top: 3px; line-height: 1.2; }
+        .logo { height: 60px; margin-bottom: 2px; }
         .company-name { font-size: 17px; font-weight: bold; color: #111; letter-spacing: .3px; white-space: nowrap; }
         .company-contact { font-size: 9.5px; color: #444; margin-top: 3px; }
         .company-contact .nowrap { white-space: nowrap; }
@@ -34,36 +36,43 @@ $stampFile = $brand->stampPath ? public_path($brand->stampPath) : null;
         table.meta td { padding: 1px 0; font-size: 10px; }
         table.meta td.lbl { font-weight: bold; padding-right: 4px; white-space: nowrap; }
         table.meta td.val { font-weight: bold; text-align: right; }
-        .rule { border-bottom: 2px solid {{ $primary }}; margin: 10px 0 16px; }
-        .rule-lt { border-bottom: 1px solid #333; margin: 10px 0; }
+        .rule { border-bottom: 2px solid {{ $primary }}; margin: 6px 0 10px; }
+        .rule-lt { border-bottom: 1px solid #333; margin: 6px 0; }
 
         .customer-id { font-size: 10px; font-weight: bold; }
         .customer-name { font-size: 15px; font-weight: bold; margin-top: 2px; }
         .customer-line { font-size: 10.5px; color: #333; margin-top: 1px; }
 
         .section-title { font-size: 11.5px; font-weight: bold; text-transform: uppercase; letter-spacing: .5px;
-            color: #111; border-bottom: 1px solid #111; padding-bottom: 4px; margin: 16px 0 8px; }
+            color: #111; border-bottom: 1px solid #111; padding-bottom: 3px; margin: 8px 0 5px; }
 
         table.grid { width: 100%; border-collapse: collapse; }
-        table.grid td { padding: 3px 6px 3px 0; font-size: 10.5px; vertical-align: top; }
-        table.grid td.lbl { color: #444; width: 22%; white-space: nowrap; }
-        table.grid td.val { width: 28%; font-weight: bold; color: #111; }
+        table.grid td { padding: 2px 6px 2px 0; font-size: 10.5px; vertical-align: top; line-height: 1.25; }
+        table.grid td.lbl { color: #444; width: 19%; white-space: nowrap; }
+        table.grid td.val { width: 31%; font-weight: bold; color: #111; }
 
-        .welcome { margin-top: 16px; font-size: 11px; font-weight: bold; color: #111; }
-        .notes { margin-top: 6px; }
+        .welcome { margin-top: 8px; font-size: 11px; font-weight: bold; color: #111; }
+        .notes { margin-top: 4px; }
         .notes .heading { font-size: 10.5px; font-weight: bold; }
-        .notes ol { margin: 4px 0 0 16px; padding: 0; }
-        .notes li { margin-bottom: 4px; font-size: 9px; color: #333; text-align: justify; }
+        .notes ol { margin: 3px 0 0 16px; padding: 0; }
+        .notes li { margin-bottom: 2.5px; font-size: 9px; line-height: 1.15; color: #333; text-align: justify; }
 
-        .sign { margin-top: 0; text-align: right; }
+        .sign-block { page-break-inside: avoid; }
+        .sign { margin-top: 4px; text-align: right; }
         .sign .stamp-img { height: 20px; width: auto; }
         .sign .signature-img { height: 36px; width: auto; margin-top: -10px; margin-bottom: -8px; margin-right: 6px; }
         .sign .line { display: inline-block; border-top: 1px solid #111; padding-top: 4px; font-size: 10px; font-weight: bold; }
 
-        .footer { margin-top: 18px; border-top: 2px solid {{ $primary }}; padding-top: 10px; font-size: 9.5px; color: #333; text-align: center; }
+        .footer { margin-top: 10px; border-top: 2px solid {{ $primary }}; padding-top: 6px; font-size: 9.5px; color: #333; text-align: center; }
+
+        .watermark { position: fixed; top: 0; left: 0; width: 100%; text-align: center; z-index: -1000; }
+        .watermark img { width: 280px; margin-top: 340px; opacity: 0.9; }
     </style>
 </head>
 <body>
+    @if ($watermarkFile && file_exists($watermarkFile))
+        <div class="watermark"><img src="{{ $watermarkFile }}"></div>
+    @endif
 <div class="wrap">
 
     @if ($receipt->isVoided())
@@ -203,25 +212,27 @@ $stampFile = $brand->stampPath ? public_path($brand->stampPath) : null;
         </ol>
     </div>
 
-    <div class="sign">
-        @if ($stampFile && file_exists($stampFile))
-            <img class="stamp-img" src="{{ $stampFile }}"><br>
-        @endif
-        @if ($signatureFile && file_exists($signatureFile))
-            <img class="signature-img" src="{{ $signatureFile }}"><br>
-        @endif
-        <div class="line">(AUTHORISED SIGNATORY)</div>
-    </div>
+    <div class="sign-block">
+        <div class="sign">
+            @if ($stampFile && file_exists($stampFile))
+                <img class="stamp-img" src="{{ $stampFile }}"><br>
+            @endif
+            @if ($signatureFile && file_exists($signatureFile))
+                <img class="signature-img" src="{{ $signatureFile }}"><br>
+            @endif
+            <div class="line">(AUTHORISED SIGNATORY)</div>
+        </div>
 
-    <div class="footer">
-        @if ($brand->contact['head_office_address'])
-            Head Office:- {{ $brand->contact['head_office_address'] }}<br>
-        @endif
-        @if ($brand->contact['email'] || $brand->contact['website'])
-            @if ($brand->contact['email']) Email:- {{ $brand->contact['email'] }} @endif
-            @if ($brand->contact['email'] && $brand->contact['website']) , @endif
-            @if ($brand->contact['website']) Website:- {{ $brand->contact['website'] }} @endif
-        @endif
+        <div class="footer">
+            @if ($brand->contact['head_office_address'])
+                Head Office:- {{ $brand->contact['head_office_address'] }}<br>
+            @endif
+            @if ($brand->contact['email'] || $brand->contact['website'])
+                @if ($brand->contact['email']) Email:- {{ $brand->contact['email'] }} @endif
+                @if ($brand->contact['email'] && $brand->contact['website']) , @endif
+                @if ($brand->contact['website']) Website:- {{ $brand->contact['website'] }} @endif
+            @endif
+        </div>
     </div>
 </div>
 </body>

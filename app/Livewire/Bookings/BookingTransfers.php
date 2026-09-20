@@ -7,10 +7,12 @@ namespace App\Livewire\Bookings;
 use App\Actions\Transfer\CompleteTransferAction;
 use App\Actions\Transfer\CreateTransferRequestAction;
 use App\Actions\Transfer\TransferWorkflowAction;
+use App\Enums\PlotStatus;
 use App\Enums\TransferType;
 use App\Exceptions\DomainException;
 use App\Models\Booking;
 use App\Models\Buyer;
+use App\Models\Plot;
 use App\Models\TransferRequest;
 use App\Services\Ownership\PlotOwnershipService;
 use App\Services\Transfer\TransferEligibilityService;
@@ -29,6 +31,8 @@ class BookingTransfers extends Component
 
     public string $newBuyerId = '';
 
+    public string $newPlotId = '';
+
     public string $reason = '';
 
     public ?int $reviewingId = null;
@@ -42,7 +46,7 @@ class BookingTransfers extends Component
         $this->authorize('viewAny', TransferRequest::class);
         $this->authorize('view', $booking);
         abort_unless($booking->isConfirmed(), 404);
-        $this->booking = $booking;
+        $this->booking = $booking->loadMissing('plot:id,plot_number,project_id,block_id');
     }
 
     private function find(int $id): TransferRequest
@@ -66,14 +70,16 @@ class BookingTransfers extends Component
         $type = TransferType::from($this->transferType);
         $this->validate([
             'newBuyerId' => [$type->movesOwnership() ? 'required' : 'nullable', 'integer', 'exists:buyers,id'],
+            'newPlotId' => [$type->movesPlot() ? 'required' : 'nullable', 'integer', 'exists:plots,id'],
             'reason' => ['nullable', 'string', 'max:255'],
         ]);
         $this->run(function () use ($type): void {
             app(CreateTransferRequestAction::class)->handle($this->booking, $type, [
                 'new_buyer_id' => $this->newBuyerId !== '' ? (int) $this->newBuyerId : null,
+                'new_plot_id' => $this->newPlotId !== '' ? (int) $this->newPlotId : null,
                 'reason' => $this->reason ?: null,
             ], auth()->user());
-            $this->reset('showCreate', 'newBuyerId', 'reason');
+            $this->reset('showCreate', 'newBuyerId', 'newPlotId', 'reason');
         }, 'Transfer request created.');
     }
 
@@ -143,7 +149,10 @@ class BookingTransfers extends Component
     public function render(): View
     {
         $transfers = $this->booking->transferRequests()
-            ->with(['currentBuyer:id,first_name,middle_name,last_name,customer_code', 'newBuyer:id,first_name,middle_name,last_name,customer_code', 'approvedBy:id,name'])
+            ->with([
+                'currentBuyer:id,first_name,middle_name,last_name,customer_code', 'newBuyer:id,first_name,middle_name,last_name,customer_code',
+                'plot:id,plot_number', 'newPlot:id,plot_number', 'approvedBy:id,name',
+            ])
             ->get();
 
         $eligibilityByTransfer = $transfers->mapWithKeys(fn (TransferRequest $t) => [
@@ -152,6 +161,16 @@ class BookingTransfers extends Component
 
         $owners = app(PlotOwnershipService::class)->currentOwners($this->booking);
 
+        // Plot-transfer target picker: active, available/held plots in the
+        // SAME project as the booking's current plot, excluding it.
+        $plots = Plot::query()
+            ->where('project_id', $this->booking->project_id)
+            ->where('is_active', true)
+            ->whereIn('status', [PlotStatus::Available->value, PlotStatus::Hold->value])
+            ->whereKeyNot($this->booking->plot_id)
+            ->orderBy('plot_number')
+            ->get(['id', 'plot_number', 'block_id']);
+
         return view('livewire.bookings.booking-transfers', [
             'booking' => $this->booking,
             'transfers' => $transfers,
@@ -159,6 +178,7 @@ class BookingTransfers extends Component
             'owners' => $owners->load('buyer:id,first_name,middle_name,last_name,customer_code'),
             'transferTypes' => TransferType::options(),
             'buyers' => Buyer::query()->where('status', 'active')->orderBy('first_name')->get(['id', 'first_name', 'middle_name', 'last_name', 'customer_code']),
+            'plots' => $plots->mapWithKeys(fn (Plot $p) => [$p->id => "Plot {$p->plot_number}"]),
         ])->title("Transfers · {$this->booking->booking_number}");
     }
 }

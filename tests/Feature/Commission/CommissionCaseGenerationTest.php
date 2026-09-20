@@ -57,6 +57,9 @@ it('generates one case for the booking promoter with an immutable snapshot', fun
 });
 
 it('is idempotent — re-running generation reuses the case and adds a fresh calculation only', function () {
+    // commissionWorld() itself already auto-generates calculation #1 (the
+    // promoter is attributed to an already-confirmed booking) — see
+    // SetBookingPartnerAttribution's automatic-generation wiring.
     ['actor' => $actor, 'booking' => $booking] = commissionWorld();
 
     $first = app(GenerateCommissionCases::class)->handle($booking, $actor)->first();
@@ -64,18 +67,18 @@ it('is idempotent — re-running generation reuses the case and adds a fresh cal
 
     expect($again->id)->toBe($first->id)
         ->and(CommissionCase::count())->toBe(1)
-        ->and($again->calculations()->count())->toBe(2)
+        ->and($again->calculations()->count())->toBe(3) // auto-generated + 2 explicit re-runs
         ->and((string) $again->commission_amount)->toBe('100000.00');
 });
 
 it('does not touch an approved case on regeneration', function () {
-    ['actor' => $actor, 'booking' => $booking] = commissionWorld();
-    $case = app(GenerateCommissionCases::class)->handle($booking, $actor)->first();
+    ['actor' => $actor, 'booking' => $booking] = commissionWorld(); // auto-generates calculation #1
+    $case = app(GenerateCommissionCases::class)->handle($booking, $actor)->first(); // calculation #2
     $case->forceFill(['status' => CommissionCaseStatus::Approved])->save();
 
     app(GenerateCommissionCases::class)->handle($booking->fresh(), $actor);
 
-    expect($case->fresh()->calculations()->count())->toBe(1)
+    expect($case->fresh()->calculations()->count())->toBe(2)
         ->and($case->fresh()->status)->toBe(CommissionCaseStatus::Approved);
 });
 
@@ -148,15 +151,26 @@ it('refuses to recalculate an approved case', function () {
         ->toThrow(DomainException::class);
 });
 
-it('recalculates an open case against the current booking figures', function () {
+it('recalculates an open case against the current booking final amount', function () {
+    ['actor' => $actor, 'booking' => $booking] = commissionWorld(); // auto-generates calculation #1
+    $case = app(GenerateCommissionCases::class)->handle($booking, $actor)->first(); // calculation #2
+
+    // A legitimate booking-value correction while the case is still pending.
+    $booking->forceFill(['final_amount' => '6000000'])->save();
+    app(RecalculateCommissionCase::class)->handle($case->fresh(), $actor);
+
+    expect((string) $case->fresh()->commission_amount)->toBe('120000.00') // 2% of 60L
+        ->and($case->fresh()->calculations()->count())->toBe(3);
+});
+
+it('does NOT pick up a promoter master commission-rate change on recalculation — the rate is frozen at attribution time', function () {
     ['actor' => $actor, 'booking' => $booking, 'partner' => $partner] = commissionWorld();
     $case = app(GenerateCommissionCases::class)->handle($booking, $actor)->first();
 
     $partner->forceFill(['commission_percentage' => '4'])->save();
     app(RecalculateCommissionCase::class)->handle($case->fresh(), $actor);
 
-    expect((string) $case->fresh()->commission_amount)->toBe('200000.00') // 4% of 50L
-        ->and($case->fresh()->calculations()->count())->toBe(2);
+    expect((string) $case->fresh()->commission_amount)->toBe('100000.00'); // still 2% of 50L, not 4%
 });
 
 it('refuses generation for a non-confirmed booking', function () {

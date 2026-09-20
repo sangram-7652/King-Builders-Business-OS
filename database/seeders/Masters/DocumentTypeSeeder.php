@@ -14,14 +14,14 @@ class DocumentTypeSeeder extends Seeder
     {
         $rows = [
             // Buyer KYC
-            ['code' => 'AADHAAR', 'name' => 'Aadhaar', 'applies_to' => DocumentScope::Buyer, 'default_required' => true, 'supports_expiry' => false],
-            ['code' => 'PAN', 'name' => 'PAN', 'applies_to' => DocumentScope::Buyer, 'default_required' => true, 'supports_expiry' => false],
-            ['code' => 'ADDRESS_PROOF', 'name' => 'Address Proof', 'applies_to' => DocumentScope::Buyer, 'default_required' => true, 'supports_expiry' => true],
-            ['code' => 'PHOTO', 'name' => 'Photograph', 'applies_to' => DocumentScope::Buyer, 'default_required' => true, 'supports_expiry' => false],
+            ['code' => 'AADHAAR', 'name' => 'Aadhaar', 'applies_to' => DocumentScope::Buyer, 'default_required' => false, 'supports_expiry' => false],
+            ['code' => 'PAN', 'name' => 'PAN', 'applies_to' => DocumentScope::Buyer, 'default_required' => false, 'supports_expiry' => false],
+            ['code' => 'ADDRESS_PROOF', 'name' => 'Address Proof', 'applies_to' => DocumentScope::Buyer, 'default_required' => false, 'supports_expiry' => true],
+            ['code' => 'PHOTO', 'name' => 'Photograph', 'applies_to' => DocumentScope::Buyer, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'BANK_PROOF', 'name' => 'Bank Proof', 'applies_to' => DocumentScope::Buyer, 'default_required' => false, 'supports_expiry' => false],
             // Booking
-            ['code' => 'BOOKING_FORM', 'name' => 'Booking Form', 'applies_to' => DocumentScope::Booking, 'default_required' => true, 'supports_expiry' => false],
-            ['code' => 'BOOKING_AGREEMENT', 'name' => 'Booking Agreement', 'applies_to' => DocumentScope::Booking, 'default_required' => true, 'supports_expiry' => false],
+            ['code' => 'BOOKING_FORM', 'name' => 'Booking Form', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
+            ['code' => 'BOOKING_AGREEMENT', 'name' => 'Booking Agreement', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'PAYMENT_PROOF', 'name' => 'Payment Document', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'REGISTRY_DOC', 'name' => 'Registry Document', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'REGISTERED_DEED', 'name' => 'Registered Deed', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
@@ -36,10 +36,10 @@ class DocumentTypeSeeder extends Seeder
             ['code' => 'TRANSFER_CONSENT', 'name' => 'Transfer Consent', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'TRANSFER_ID_PROOF', 'name' => 'Transfer ID Proof', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             // Channel partner KYC (M14)
-            ['code' => 'PARTNER_PAN', 'name' => 'Partner PAN Card', 'applies_to' => DocumentScope::Partner, 'default_required' => true, 'supports_expiry' => false],
-            ['code' => 'PARTNER_ADDRESS_PROOF', 'name' => 'Partner Address Proof', 'applies_to' => DocumentScope::Partner, 'default_required' => true, 'supports_expiry' => true],
-            ['code' => 'PARTNER_BANK_PROOF', 'name' => 'Partner Bank Proof / Cancelled Cheque', 'applies_to' => DocumentScope::Partner, 'default_required' => true, 'supports_expiry' => false],
-            ['code' => 'PARTNER_AGREEMENT', 'name' => 'Channel Partner Agreement', 'applies_to' => DocumentScope::Partner, 'default_required' => true, 'supports_expiry' => true],
+            ['code' => 'PARTNER_PAN', 'name' => 'Partner PAN Card', 'applies_to' => DocumentScope::Partner, 'default_required' => false, 'supports_expiry' => false],
+            ['code' => 'PARTNER_ADDRESS_PROOF', 'name' => 'Partner Address Proof', 'applies_to' => DocumentScope::Partner, 'default_required' => false, 'supports_expiry' => true],
+            ['code' => 'PARTNER_BANK_PROOF', 'name' => 'Partner Bank Proof / Cancelled Cheque', 'applies_to' => DocumentScope::Partner, 'default_required' => false, 'supports_expiry' => false],
+            ['code' => 'PARTNER_AGREEMENT', 'name' => 'Channel Partner Agreement', 'applies_to' => DocumentScope::Partner, 'default_required' => false, 'supports_expiry' => true],
             ['code' => 'PARTNER_RERA_CERTIFICATE', 'name' => 'Partner RERA Certificate', 'applies_to' => DocumentScope::Partner, 'default_required' => false, 'supports_expiry' => true],
             ['code' => 'PARTNER_GST_CERTIFICATE', 'name' => 'Partner Registration Certificate', 'applies_to' => DocumentScope::Partner, 'default_required' => false, 'supports_expiry' => false],
         ];

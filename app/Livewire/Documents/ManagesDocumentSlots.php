@@ -53,6 +53,20 @@ trait ManagesDocumentSlots
         ];
     }
 
+    /**
+     * Fires once Livewire has actually finished the file's own async upload
+     * cycle and set `files.{$key}` (see WithFileUploads::_finishUpload() —
+     * that's the only point `$this->files[...]` is guaranteed populated).
+     * Triggering the upload from the blade's own `change` event instead races
+     * that cycle and reaches {@see upload()} before the file is ready.
+     */
+    public function updatedFiles(mixed $value, string $key): void
+    {
+        if ($value instanceof UploadedFile && ctype_digit($key)) {
+            $this->upload((int) $key);
+        }
+    }
+
     public function upload(int $documentTypeId): void
     {
         $file = $this->files[$documentTypeId] ?? null;

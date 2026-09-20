@@ -28,7 +28,7 @@ class TransferRequest extends Model
     public const SEQUENCE_KEY = 'transfer_request';
 
     protected $fillable = [
-        'request_number', 'booking_id', 'plot_id', 'transfer_type', 'status',
+        'request_number', 'booking_id', 'plot_id', 'new_plot_id', 'transfer_type', 'status',
         'current_buyer_id', 'new_buyer_id', 'reason', 'financial_snapshot', 'financial_waiver_reason',
         'requested_at', 'requested_by', 'submitted_at', 'review_started_at',
         'approved_at', 'approved_by', 'rejected_at', 'rejected_by', 'rejection_reason',
@@ -41,6 +41,7 @@ class TransferRequest extends Model
         return [
             'booking_id' => 'integer',
             'plot_id' => 'integer',
+            'new_plot_id' => 'integer',
             'transfer_type' => TransferType::class,
             'status' => TransferRequestStatus::class,
             'current_buyer_id' => 'integer',
@@ -72,10 +73,16 @@ class TransferRequest extends Model
         return $this->belongsTo(Booking::class);
     }
 
-    /** @return BelongsTo<Plot, $this> */
+    /** The plot at request time — the OLD plot for a plot transfer, unchanged for every other type. @return BelongsTo<Plot, $this> */
     public function plot(): BelongsTo
     {
         return $this->belongsTo(Plot::class);
+    }
+
+    /** The target plot — only set for a PLOT_TRANSFER. @return BelongsTo<Plot, $this> */
+    public function newPlot(): BelongsTo
+    {
+        return $this->belongsTo(Plot::class, 'new_plot_id');
     }
 
     /** @return BelongsTo<Buyer, $this> */
@@ -100,6 +107,12 @@ class TransferRequest extends Model
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function completedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'completed_by');
     }
 
     /** @param  Builder<TransferRequest>  $query */

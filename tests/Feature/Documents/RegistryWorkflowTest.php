@@ -42,14 +42,23 @@ it('reports a booking as eligible when every prerequisite is met (24)', function
         ->and($result->reasons())->toBe([]);
 });
 
-it('is not eligible while required documents are unverified (25)', function () {
+it('stays eligible when buyer documents are unverified or missing, since no document type is required (25)', function () {
     $s = registryReadyScenario();
     $s['buyer']->documents()->update(['status' => 'uploaded']);
 
     $result = app(RegistryEligibilityService::class)->evaluate($s['booking']->fresh());
 
-    expect($result->eligible)->toBeFalse()
-        ->and($result->reasons())->not->toBe([]);
+    expect($result->eligible)->toBeTrue()
+        ->and($result->reasons())->toBe([]);
+
+    // Missing entirely (never uploaded) is equally fine.
+    $s['buyer']->documents()->delete();
+    $s['booking']->documents()->delete();
+
+    $result = app(RegistryEligibilityService::class)->evaluate($s['booking']->fresh());
+
+    expect($result->eligible)->toBeTrue()
+        ->and($result->reasons())->toBe([]);
 });
 
 it('is not eligible without a signed agreement (26)', function () {

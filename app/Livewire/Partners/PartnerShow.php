@@ -206,6 +206,7 @@ class PartnerShow extends Component
         }
 
         return [
+            'totalBookings' => $openCases->count(),
             'totalBookingValue' => $totalBookingValue,
             'totalCommissionEarned' => $totalCommissionEarned,
             'totalAdvanceGiven' => $advanceGiven,

@@ -91,7 +91,6 @@ it('uploads a document through the buyer Livewire screen', function () {
     Livewire\Livewire::actingAs(registryOfficer())
         ->test(BuyerDocuments::class, ['buyer' => $s['buyer']])
         ->set('files.'.docType('AADHAAR')->id, fakeDocument('aadhaar.pdf'))
-        ->call('upload', docType('AADHAAR')->id)
         ->assertHasNoErrors();
 
     expect($s['buyer']->documents()->count())->toBe(1);

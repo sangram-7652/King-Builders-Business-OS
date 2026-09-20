@@ -192,7 +192,65 @@ Once confirmed, the booking's page is the hub for everything downstream:
 
 → Full technical detail: [`docs/BOOKINGS-PRICING.md`](BOOKINGS-PRICING.md)
 
-## 7. Module-by-module walkthrough
+## 7. How to transfer a booking's ownership
+
+A **Transfer Request** records a change in who owns a plot after the
+original booking — resale, a gift to family, inheritance, a legal transfer,
+or simply updating a nominee — without rewriting the original booking or
+its payment history. The booking must already be **Confirmed**.
+
+```
+Draft ──▶ Submitted ──▶ Under review ──▶ Approved ──▶ Completed
+                              │   ▲
+                              ▼   │
+                        Documents pending
+```
+From **Under review** the reviewer can also **Reject** it (with a reason).
+Any request that hasn't reached a final state (Draft through Approved) can
+be **Cancelled**.
+
+Raising and submitting a request needs `transfer.create` (Sales Manager and
+Possession Manager have it by default). Reviewing, approving, and
+completing needs `transfer.review` / `transfer.approve` / `transfer.complete`
+— Possession Manager has all three by default; Sales Manager can raise a
+request but not take it further.
+
+1. **Raise the request.** Open the booking, go to its **Transfers** tab
+   (`/bookings/{id}/transfers`), and click **New transfer**.
+   - **Transfer type** — *Owner change*, *Family transfer*, *Sale transfer*,
+     *Legal transfer*, or *Other* all move ownership to a new buyer.
+     *Nominee change* is the exception — it only updates the buyer's
+     nominee record and never moves ownership.
+   - **Incoming buyer** — required for every type except Nominee change.
+     Must be an existing, active buyer and different from the current
+     owner (add them from **Buyers** first if they're new to the system).
+   - **Reason** — optional free text.
+   - Save — this creates it as **Draft**. Only one open transfer request is
+     allowed per booking at a time.
+2. **Submit it.** From Draft, click **Submit** to move it to **Submitted**.
+3. **Review it** (Possession Manager). Click **Start review**. If
+   supporting paperwork isn't ready yet, **Request documents** parks it in
+   **Documents pending**; once the paperwork is uploaded and verified on
+   the booking's **Documents** tab, **Documents received** puts it back
+   Under review. From Under review, either **Approve** or **Reject** it.
+4. **Approve it.** Approval re-checks eligibility live:
+   - the booking is still confirmed and no other transfer on it is open;
+   - **financial clearance** — the booking's outstanding balance must be
+     ₹0 (configurable) unless you give a **Financial waiver reason**;
+   - for an ownership-moving type, three transfer documents — Transfer
+     Application, Transfer Consent, and ID Proof — must be **Verified** on
+     the booking's Documents tab first.
+   Approve is blocked until every unwaived check passes.
+5. **Complete it.** Once Approved, click **Complete transfer**. This is the
+   one step that actually moves ownership: it closes the current owner's
+   entry and opens a new one on the plot's append-only ownership ledger —
+   the original booking and its payment history are never rewritten.
+   Completing is safe to retry (idempotent) and is blocked if a different
+   transfer on the same booking already completed first.
+
+→ Full technical detail: [`docs/POSSESSION-TRANSFER.md`](POSSESSION-TRANSFER.md)
+
+## 8. Module-by-module walkthrough
 
 ### Dashboard (`/dashboard`)
 Landing page after login. Summarizes what's relevant to your role.
@@ -288,7 +346,7 @@ read-mostly view scoped to that one buyer's own records.
   master modules rather than a bespoke CRUD per list.
   → [`docs/MASTER-DATA.md`](MASTER-DATA.md)
 
-## 8. Quick reference — "how do I…"
+## 9. Quick reference — "how do I…"
 
 | Task | Where |
 |---|---|
@@ -299,13 +357,13 @@ read-mostly view scoped to that one buyer's own records.
 | Upload/verify a KYC or sale document | Buyer/Booking → Documents |
 | Check if a booking can go to registry | Registry → Eligibility (on the booking's registry tab) |
 | Hand over a plot after registration | Possession → the booking's possession case |
-| Move ownership to someone else | Transfers → New Transfer Request |
+| Move ownership to someone else | Booking → Transfers tab → New transfer |
 | Pay out a broker | Commissions → the commission case → Approve → Payout |
 | Invite a customer to the portal | Buyer → Portal → Send Invitation |
 | Add/edit a dropdown list (states, charge types, …) | Settings → Master Data |
 | Give someone access to a screen | Administration → Users (assign role) or Roles & Permissions (edit what a role can do) |
 
-## 9. Where to go deeper
+## 10. Where to go deeper
 
 Every module above has a matching technical doc under `docs/` describing
 the actual data model, invariants, and Actions/state machines enforcing

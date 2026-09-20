@@ -210,6 +210,25 @@
         </x-ui.card>
     @endif
 
+    {{-- Plot transfer history (M10 extension) --}}
+    @if ($plotTransferHistory->isNotEmpty())
+        <x-ui.card title="Plot Transfer History">
+            <ul class="space-y-3">
+                @foreach ($plotTransferHistory as $pt)
+                    <li class="border-b border-(--border) pb-3 last:border-0 last:pb-0 text-sm">
+                        <p class="font-medium">Plot {{ $pt->plot?->plot_number ?? '—' }} → Plot {{ $pt->newPlot?->plot_number ?? '—' }}</p>
+                        <dl class="mt-1 grid gap-x-6 gap-y-1 text-xs text-(--content-muted) sm:grid-cols-2">
+                            <div><span class="font-medium text-(--content)">Status:</span> {{ $pt->status->label() }}</div>
+                            <div><span class="font-medium text-(--content)">Reason:</span> {{ $pt->reason ?: '—' }}</div>
+                            <div><span class="font-medium text-(--content)">Completed:</span> {{ $pt->completed_at?->format('d M Y') ?? '—' }}</div>
+                            <div><span class="font-medium text-(--content)">By:</span> {{ $pt->completedBy?->name ?? '—' }}</div>
+                        </dl>
+                    </li>
+                @endforeach
+            </ul>
+        </x-ui.card>
+    @endif
+
     @if ($booking->isCancelled())
         <x-ui.card title="Cancellation">
             <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">

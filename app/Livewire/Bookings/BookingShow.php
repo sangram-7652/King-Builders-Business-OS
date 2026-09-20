@@ -9,6 +9,8 @@ use App\Actions\Bookings\ConfirmBookingAction;
 use App\Actions\Bookings\DeleteBookingAction;
 use App\Actions\Bookings\OverrideBookingPriceAction;
 use App\Actions\Bookings\SubmitBookingAction;
+use App\Enums\TransferRequestStatus;
+use App\Enums\TransferType;
 use App\Exceptions\DomainException;
 use App\Models\Booking;
 use App\Services\Payments\PaymentLedger;
@@ -159,7 +161,16 @@ class BookingShow extends Component
             ? app(PaymentLedger::class)->summary($this->booking)
             : null;
 
-        return view('livewire.bookings.booking-show', ['financials' => $summary])
-            ->title($this->booking->booking_number);
+        $plotTransferHistory = $this->booking->transferRequests()
+            ->where('transfer_type', TransferType::PlotTransfer->value)
+            ->where('status', TransferRequestStatus::Completed->value)
+            ->with(['plot:id,plot_number', 'newPlot:id,plot_number', 'completedBy:id,name'])
+            ->orderByDesc('completed_at')
+            ->get();
+
+        return view('livewire.bookings.booking-show', [
+            'financials' => $summary,
+            'plotTransferHistory' => $plotTransferHistory,
+        ])->title($this->booking->booking_number);
     }
 }

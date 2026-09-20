@@ -108,7 +108,8 @@ class GenerateCommissionCases
                     ]);
                 }
 
-                $eval = $this->eligibility->evaluate($locked, $partner);
+                $rate = (string) ($attribution->commission_percentage ?? $partner->commission_percentage ?? '');
+                $eval = $this->eligibility->evaluate($locked, $partner, $rate !== '' ? $rate : null);
 
                 $case->forceFill([
                     'booking_partner_attribution_id' => $attribution->id,
@@ -118,7 +119,7 @@ class GenerateCommissionCases
                 ])->save();
 
                 if ($eval['eligible']) {
-                    $calc = $this->writer->write($case, $partner, $locked, $actor);
+                    $calc = $this->writer->write($case, $partner, $locked, $attribution, $actor);
 
                     $case->recordEvent(
                         $isNew ? CommissionCaseEventType::Generated : CommissionCaseEventType::Recalculated,

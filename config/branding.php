@@ -29,6 +29,11 @@ return [
     'stamp_path' => env('BRAND_STAMP_PATH'),
     'signature_path' => env('BRAND_SIGNATURE_PATH'),
 
+    // Faint background watermark printed behind the receipt content.
+    // Relative to public/, same convention as logo_path. Left empty by
+    // default — the receipt only prints the watermark when this is set.
+    'watermark_path' => env('BRAND_WATERMARK_PATH'),
+
     // Any CSS colour value (hex, rgb, hsl, color-mix, ...).
     'colors' => [
         'primary' => env('BRAND_PRIMARY', '#2563eb'),

@@ -39,9 +39,10 @@ it('creates every M9 table with its key columns', function () {
 });
 
 it('tags document types with a scope and default-required flag', function () {
+    // No document type is required by default (CRM-wide policy: every document is optional).
     expect(Schema::hasColumns('document_types', ['applies_to', 'default_required', 'supports_expiry']))->toBeTrue()
         ->and(docType('AADHAAR')->applies_to->value)->toBe('buyer')
-        ->and(docType('AADHAAR')->default_required)->toBeTrue()
+        ->and(docType('AADHAAR')->default_required)->toBeFalse()
         ->and(docType('BANK_PROOF')->default_required)->toBeFalse();
 });
 

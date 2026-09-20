@@ -496,6 +496,26 @@ function transferReadyScenario(string $finalAmount = '1000000'): array
     return $s + ['newBuyer' => $newBuyer];
 }
 
+/**
+ * A confirmed booking ready for a PLOT_TRANSFER: a second AVAILABLE plot
+ * exists in the SAME project as the booking's current plot.
+ *
+ * @return array{actor: User, booking: Booking, buyer: Buyer, oldPlot: Plot, newPlot: Plot}
+ */
+function plotTransferReadyScenario(string $finalAmount = '1000000'): array
+{
+    $s = confirmedBookingScenario($finalAmount);
+
+    $oldPlot = Plot::query()->findOrFail($s['booking']->plot_id);
+    $newPlot = Plot::factory()->create([
+        'project_id' => $oldPlot->project_id,
+        'block_id' => $oldPlot->block_id,
+        'status' => PlotStatus::Available->value,
+    ]);
+
+    return $s + ['oldPlot' => $oldPlot, 'newPlot' => $newPlot];
+}
+
 /*
 | ---------------------------------------------------------------------------
 | Reporting — MIS + export helpers (M11.5)

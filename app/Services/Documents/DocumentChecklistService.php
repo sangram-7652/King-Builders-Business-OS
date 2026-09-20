@@ -81,13 +81,16 @@ class DocumentChecklistService
 
             if ($isRequired) {
                 $required++;
-                if ($hasFile) {
-                    $received++;
-                }
+            }
+            // Received/verified/rejected/pending reflect every document actually on
+            // file (required or optional) — an untouched, never-uploaded optional
+            // slot is not "pending" (nothing is expected of it).
+            if ($hasFile) {
+                $received++;
                 match ($status) {
                     DocumentStatus::Verified => $verified++,
                     DocumentStatus::Rejected, DocumentStatus::Expired => $rejected++,
-                    default => $pending++,
+                    default => $pending++, // Uploaded / UnderReview: awaiting a decision.
                 };
             }
 
