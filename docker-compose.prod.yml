@@ -118,7 +118,7 @@ services:
       - "--maxmemory-policy"
       - "noeviction"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
     deploy:
       resources:
         limits:

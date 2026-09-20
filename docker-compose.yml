@@ -85,13 +85,22 @@ services:
   redis:
     image: redis:7-alpine
     container_name: king-builders-redis
-    command: redis-server --appendonly yes
+    # --requirepass is read from REDIS_PASSWORD (.env) at container start, not
+    # baked into this file. Compose's `:?` fails the run with a clear error
+    # instead of silently starting Redis with no auth — Laravel always sends
+    # AUTH per REDIS_PASSWORD, so the two must match.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - "${REDIS_PASSWORD:?REDIS_PASSWORD is required in .env}"
     ports:
       - "${REDIS_HOST_PORT:-16379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
       interval: 5s
       timeout: 3s
       retries: 20
