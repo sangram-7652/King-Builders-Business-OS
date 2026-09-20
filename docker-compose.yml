@@ -25,6 +25,11 @@ x-php-build: &php-build
   image: king-builders/app:local
   volumes:
     - ./:/var/www/html:cached
+    # Named volume so vendor/ (baked into the image by docker/php/Dockerfile)
+    # isn't shadowed by the source bind mount above on a host with no local
+    # vendor/ checked out. Docker populates it from the image on first
+    # creation, and app/queue/scheduler share it via this anchor.
+    - vendor:/var/www/html/vendor
   environment:
     - APP_BOOTSTRAP=false
   depends_on:
@@ -139,3 +144,4 @@ networks:
 volumes:
   mysql-data:
   redis-data:
+  vendor:
