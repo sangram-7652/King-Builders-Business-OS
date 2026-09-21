@@ -1,4 +1,3 @@
-@php use App\Enums\AgreementStatus; @endphp
 <div class="space-y-6">
     <x-ui.breadcrumb :items="[
         ['label' => 'Bookings', 'url' => route('bookings.index')],
@@ -7,7 +6,7 @@
     ]" />
 
     <x-ui.page-header :title="'Documents — '.$booking->booking_number"
-        description="Booking document checklist and the agreement workflow.">
+        description="Booking Form, Payment Documents, Registry Documents and the Plot KYC Receipt.">
         <x-slot:actions>
             @can('registry.view')
                 <x-ui.button variant="secondary" size="sm" :href="route('registry.booking', $booking)" wire:navigate>Registry</x-ui.button>
@@ -15,84 +14,51 @@
         </x-slot:actions>
     </x-ui.page-header>
 
-    <x-ui.card title="Document checklist">
+    {{-- Booking Form — single-slot upload/replace/version. The reject dialog
+         rendered inside this component is shared by the Payment/Registry
+         Documents cards below (they call the same underlying verify/reject/
+         delete methods, keyed by document id, not by which card they sit in). --}}
+    <x-ui.card title="Booking Form">
         <x-documents.checklist :checklist="$checklist" :documents="$documents" :rejecting-id="$rejectingId" component-id="booking" />
     </x-ui.card>
 
-    {{-- Agreement --}}
-    <x-ui.card title="Agreement">
+    {{-- Payment Documents — multiple independent files, each its own record. --}}
+    <x-ui.card title="Payment Documents" subtitle="Cheque scans, NEFT/UPI receipts, or any other payment proof. Uploading another file never replaces an earlier one.">
         <x-slot:actions>
-            @if (! $agreement)
-                @can('create', App\Models\Agreement::class)
-                    <x-ui.button size="sm" wire:click="createAgreement">Create agreement</x-ui.button>
-                @endcan
-            @else
-                <x-ui.badge :variant="$agreement->status->color()">{{ $agreement->status->label() }}</x-ui.badge>
-            @endif
+            @can('documents.upload')
+                <label class="cursor-pointer text-sm text-(--brand-primary) hover:underline">
+                    Add file
+                    <input type="file" class="hidden" wire:model="newDocuments.PAYMENT_PROOF" />
+                </label>
+                <span wire:loading wire:target="newDocuments.PAYMENT_PROOF" class="ml-2 text-xs text-(--content-muted)">Uploading…</span>
+            @endcan
         </x-slot:actions>
+        @error('newDocuments.PAYMENT_PROOF') <p class="mb-2 text-xs text-red-600">{{ $message }}</p> @enderror
 
-        @if (! $agreement)
-            <x-ui.empty-state icon="inbox" title="No agreement yet" description="Create the agreement to begin preparation." />
+        @if ($paymentDocuments->isEmpty())
+            <x-ui.empty-state icon="inbox" title="No payment documents yet" description="Add a file once a payment proof is available." />
         @else
-            <dl class="grid gap-3 text-sm sm:grid-cols-3">
-                <div><dt class="text-(--content-muted)">Number</dt><dd class="mt-0.5">{{ $agreement->agreement_number }}</dd></div>
-                <div><dt class="text-(--content-muted)">Type</dt><dd class="mt-0.5">{{ $agreement->type->label() }}</dd></div>
-                <div><dt class="text-(--content-muted)">Prepared</dt><dd class="mt-0.5">{{ $agreement->prepared_at?->format('d M Y H:i') ?? '—' }}</dd></div>
-                <div><dt class="text-(--content-muted)">Sent</dt><dd class="mt-0.5">{{ $agreement->sent_at?->format('d M Y') ?? '—' }}</dd></div>
-                <div><dt class="text-(--content-muted)">Signed</dt><dd class="mt-0.5">{{ $agreement->signed_at?->format('d M Y') ?? '—' }} {{ $agreement->signed_by ? '· '.$agreement->signed_by : '' }}</dd></div>
-                <div><dt class="text-(--content-muted)">Approved</dt><dd class="mt-0.5">{{ $agreement->approved_at?->format('d M Y') ?? '—' }}</dd></div>
-            </dl>
+            <x-documents.multi-list :documents="$paymentDocuments" />
+        @endif
+    </x-ui.card>
 
-            @if ($agreement->document && $agreement->document->versions->isNotEmpty())
-                <div class="mt-4">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Versions</p>
-                    <ul class="mt-1 space-y-1 text-sm">
-                        @foreach ($agreement->document->versions->sortByDesc('version') as $v)
-                            <li>
-                                v{{ $v->version }} — {{ $v->original_filename }} ({{ $v->humanSize() }})
-                                @can('download', $agreement->document)
-                                    <a href="{{ route('documents.download', ['document' => $agreement->document->id, 'version' => $v->id]) }}" target="_blank" class="ml-1 text-(--brand-primary) hover:underline">download</a>
-                                @endcan
-                            </li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
+    {{-- Registry Documents — multiple independent files, each its own record. --}}
+    <x-ui.card title="Registry Documents" subtitle="Any document related to the registry process. Uploading another file never replaces an earlier one.">
+        <x-slot:actions>
+            @can('documents.upload')
+                <label class="cursor-pointer text-sm text-(--brand-primary) hover:underline">
+                    Add file
+                    <input type="file" class="hidden" wire:model="newDocuments.REGISTRY_DOC" />
+                </label>
+                <span wire:loading wire:target="newDocuments.REGISTRY_DOC" class="ml-2 text-xs text-(--content-muted)">Uploading…</span>
+            @endcan
+        </x-slot:actions>
+        @error('newDocuments.REGISTRY_DOC') <p class="mb-2 text-xs text-red-600">{{ $message }}</p> @enderror
 
-            <div class="mt-4 flex flex-wrap gap-2">
-                @can('update', $agreement)
-                    @if (in_array($agreement->status, [AgreementStatus::Draft, AgreementStatus::Prepared], true))
-                        <x-ui.button size="sm" wire:click="prepareAgreement">{{ $agreement->status === AgreementStatus::Draft ? 'Prepare' : 'Re-prepare' }}</x-ui.button>
-                    @endif
-                    @if ($agreement->status === AgreementStatus::Prepared)
-                        <x-ui.button size="sm" variant="secondary" wire:click="sendAgreement">Mark sent</x-ui.button>
-                    @endif
-                    @if (in_array($agreement->status, [AgreementStatus::Prepared, AgreementStatus::Sent], true))
-                        <x-ui.button size="sm" wire:click="$toggle('showSign')">Record signed</x-ui.button>
-                    @endif
-                @endcan
-                @can('approve', $agreement)
-                    <x-ui.button size="sm" wire:click="approveAgreement" wire:confirm="Approve this agreement? It becomes final.">Approve</x-ui.button>
-                @endcan
-                @can('cancel', $agreement)
-                    <x-ui.button size="sm" variant="ghost" class="text-red-600" wire:click="cancelAgreement" wire:confirm="Cancel this agreement?">Cancel</x-ui.button>
-                @endcan
-            </div>
-
-            @if ($showSign)
-                <form wire:submit="signAgreement" class="mt-4 space-y-3 rounded-lg border border-(--border) p-4">
-                    <x-ui.input label="Signed by (party name)" wire:model="signedBy" :error="$errors->first('signedBy')" />
-                    <div>
-                        <label class="text-sm">Signed scan (PDF / image)</label>
-                        <input type="file" wire:model="signedFile" class="mt-1 block text-sm" />
-                        @error('signedFile') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                    </div>
-                    <div class="flex justify-end gap-2">
-                        <x-ui.button type="button" variant="secondary" wire:click="$set('showSign', false)">Cancel</x-ui.button>
-                        <x-ui.button type="submit">Record signed</x-ui.button>
-                    </div>
-                </form>
-            @endif
+        @if ($registryDocuments->isEmpty())
+            <x-ui.empty-state icon="inbox" title="No registry documents yet" description="Add a file once a registry document is available." />
+        @else
+            <x-documents.multi-list :documents="$registryDocuments" />
         @endif
     </x-ui.card>
 
@@ -123,6 +89,25 @@
 
         @if ($showPlotKyc)
             <form wire:submit="generatePlotKycReceipt" class="mt-4 space-y-4 rounded-lg border border-(--border) p-4">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Land records</p>
+                    <p class="text-xs text-(--content-muted)">Prefilled from the plot when already on file — otherwise fill it in here; it is saved back to the plot.</p>
+                    <div class="mt-2 grid gap-4 sm:grid-cols-2">
+                        <x-ui.input label="Village name" wire:model="villageName" :error="$errors->first('villageName')" />
+                        <x-ui.input label="Gata No." wire:model="gataNumber" :error="$errors->first('gataNumber')" />
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Plot Chauhaddi (boundary)</p>
+                    <div class="mt-2 grid gap-4 sm:grid-cols-2">
+                        <x-ui.input label="East" wire:model="boundaryEast" :error="$errors->first('boundaryEast')" />
+                        <x-ui.input label="West" wire:model="boundaryWest" :error="$errors->first('boundaryWest')" />
+                        <x-ui.input label="North" wire:model="boundaryNorth" :error="$errors->first('boundaryNorth')" />
+                        <x-ui.input label="South" wire:model="boundarySouth" :error="$errors->first('boundarySouth')" />
+                    </div>
+                </div>
+
                 <x-ui.input type="number" step="0.01" label="Vikray Muly (declared registry sale value)" wire:model="vikrayMulyAmount"
                     :error="$errors->first('vikrayMulyAmount')" hint="Optional — leave blank if not yet declared." />
 

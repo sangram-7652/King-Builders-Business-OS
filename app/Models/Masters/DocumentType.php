@@ -17,7 +17,7 @@ class DocumentType extends MasterModel
     /** @use HasFactory<DocumentTypeFactory> */
     use HasFactory, HasSystemFlag;
 
-    protected $fillable = ['name', 'code', 'applies_to', 'default_required', 'supports_expiry', 'description', 'is_active', 'is_system', 'sort_order'];
+    protected $fillable = ['name', 'code', 'applies_to', 'default_required', 'allows_multiple', 'supports_expiry', 'description', 'is_active', 'is_system', 'sort_order'];
 
     protected array $searchable = ['name', 'code', 'description'];
 
@@ -26,6 +26,7 @@ class DocumentType extends MasterModel
         return array_merge(parent::casts(), [
             'applies_to' => DocumentScope::class,
             'default_required' => 'boolean',
+            'allows_multiple' => 'boolean',
             'supports_expiry' => 'boolean',
             'is_system' => 'boolean',
         ]);

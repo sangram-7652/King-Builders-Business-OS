@@ -20,8 +20,14 @@ return [
         // (true) or merely received (false).
         'require_documents_verified' => true,
 
-        // Whether the agreement must be at least SIGNED.
-        'require_agreement_signed' => true,
+        // Whether the agreement must be at least SIGNED. The dedicated
+        // Agreement workflow (Prepare/Send/Record Signed/Approve) has been
+        // removed — no code path can create or sign a NEW agreement any
+        // more, so this stays false to avoid a permanently-unsatisfiable
+        // eligibility gate. Historical Agreement rows/data are untouched and
+        // still readable (App\Models\Agreement, Booking::agreement()); this
+        // flag only controls whether RegistryEligibilityService checks them.
+        'require_agreement_signed' => false,
     ],
 
     // Upload constraints (also enforced in the Livewire validation rules).

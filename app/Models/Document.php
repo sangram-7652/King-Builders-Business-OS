@@ -28,7 +28,7 @@ class Document extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'documentable_type', 'documentable_id', 'document_type_id', 'title', 'status',
+        'documentable_type', 'documentable_id', 'document_type_id', 'sequence', 'title', 'status',
         'current_version_id', 'verified_by', 'verified_at', 'rejected_by', 'rejected_at',
         'rejection_reason', 'expires_at', 'notes', 'created_by',
     ];
@@ -37,6 +37,7 @@ class Document extends Model
     {
         return [
             'document_type_id' => 'integer',
+            'sequence' => 'integer',
             'status' => DocumentStatus::class,
             'current_version_id' => 'integer',
             'verified_by' => 'integer',

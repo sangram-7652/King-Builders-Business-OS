@@ -61,11 +61,22 @@ it('stays eligible when buyer documents are unverified or missing, since no docu
         ->and($result->reasons())->toBe([]);
 });
 
-it('is not eligible without a signed agreement (26)', function () {
+it('ignores agreement status by default — the dedicated Agreement workflow was removed, so require_agreement_signed defaults to false (26)', function () {
+    $s = registryReadyScenario();
+    $s['booking']->agreement()->update(['status' => 'draft']);
+
+    expect(app(RegistryEligibilityService::class)->evaluate($s['booking']->fresh())->eligible)->toBeTrue();
+});
+
+it('still honours the agreement-signed gate when an operator explicitly re-enables it (26b)', function () {
+    config()->set('registry.eligibility.require_agreement_signed', true);
     $s = registryReadyScenario();
     $s['booking']->agreement()->update(['status' => 'draft']);
 
     expect(app(RegistryEligibilityService::class)->evaluate($s['booking']->fresh())->eligible)->toBeFalse();
+
+    $s['booking']->agreement()->update(['status' => 'signed']);
+    expect(app(RegistryEligibilityService::class)->evaluate($s['booking']->fresh())->eligible)->toBeTrue();
 });
 
 it('is not eligible below the required collected percentage', function () {

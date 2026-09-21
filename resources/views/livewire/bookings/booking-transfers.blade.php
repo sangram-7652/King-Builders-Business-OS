@@ -33,6 +33,90 @@
         @endif
     </x-ui.card>
 
+    {{-- Transfer documents — the 3 required-for-approval types (not shown on
+         the Booking Documents screen; that screen shows only Booking Form /
+         Payment Documents / Registry Documents). --}}
+    <x-ui.card title="Transfer Documents" subtitle="Required to approve an ownership-moving transfer.">
+        <table class="min-w-full divide-y divide-(--border) text-sm">
+            <thead class="text-left text-xs font-semibold uppercase tracking-wider text-(--content-muted)">
+                <tr>
+                    <th class="py-2 pr-4">Document</th>
+                    <th class="py-2 pr-4">Status</th>
+                    <th class="py-2 pr-4">File</th>
+                    <th class="py-2 pr-4 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-(--border)">
+                @foreach ($transferDocChecklist->items as $item)
+                    @php
+                        $doc = $transferDocuments->get($item['document_type_id']);
+                        $status = \App\Enums\DocumentStatus::from($item['status']);
+                    @endphp
+                    <tr wire:key="transfer-doc-{{ $item['document_type_id'] }}">
+                        <td class="py-2 pr-4 font-medium text-(--content)">{{ $item['name'] }}</td>
+                        <td class="py-2 pr-4"><x-ui.badge :variant="$status->color()">{{ $status->label() }}</x-ui.badge></td>
+                        <td class="py-2 pr-4 text-(--content-muted)">
+                            @if ($doc?->currentVersion)
+                                {{ $doc->currentVersion->original_filename }} ({{ $doc->currentVersion->humanSize() }})
+                                @can('download', $doc)
+                                    <a href="{{ route('documents.download', ['document' => $doc->id, 'version' => $doc->currentVersion->id]) }}"
+                                       target="_blank" class="ml-1 text-(--brand-primary) hover:underline">download</a>
+                                @endcan
+                            @else — @endif
+                            @if ($doc?->rejection_reason && $status === \App\Enums\DocumentStatus::Rejected)
+                                <div class="text-xs text-red-600">{{ $doc->rejection_reason }}</div>
+                            @endif
+                        </td>
+                        <td class="py-2 pr-4">
+                            <div class="flex flex-wrap items-center justify-end gap-1">
+                                @can('documents.upload')
+                                    <label class="cursor-pointer text-xs text-(--brand-primary) hover:underline">
+                                        {{ $doc?->hasFile() ? 'Replace' : 'Upload' }}
+                                        <input type="file" class="hidden" wire:model="transferFiles.{{ $item['document_type_id'] }}" />
+                                    </label>
+                                    <span wire:loading wire:target="transferFiles.{{ $item['document_type_id'] }}" class="text-xs text-(--content-muted)">Uploading…</span>
+                                    @error('transferFiles.'.$item['document_type_id']) <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                                @endcan
+                                @if ($doc && $status === \App\Enums\DocumentStatus::Uploaded)
+                                    <x-ui.button size="sm" variant="ghost" wire:click="submitTransferDocumentForReview({{ $doc->id }})">Send to review</x-ui.button>
+                                @endif
+                                @if ($doc && in_array($status, [\App\Enums\DocumentStatus::Uploaded, \App\Enums\DocumentStatus::UnderReview], true))
+                                    @can('verify', $doc)
+                                        <x-ui.button size="sm" variant="ghost" wire:click="verifyTransferDocument({{ $doc->id }})" wire:confirm="Verify {{ $item['name'] }}?">Verify</x-ui.button>
+                                    @endcan
+                                    @can('reject', $doc)
+                                        <x-ui.button size="sm" variant="ghost" class="text-red-600" wire:click="openRejectTransferDocument({{ $doc->id }})">Reject</x-ui.button>
+                                    @endcan
+                                @endif
+                                @if ($doc && ! $doc->isProtected())
+                                    @can('delete', $doc)
+                                        <x-ui.button size="sm" variant="ghost" class="text-red-600" wire:click="deleteTransferDocument({{ $doc->id }})" wire:confirm="Remove this document?">✕</x-ui.button>
+                                    @endcan
+                                @endif
+                            </div>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        @if ($transferDocRejectingId)
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-4" wire:key="transfer-doc-reject-dialog">
+                <div class="absolute inset-0 bg-slate-900/50" wire:click="$set('transferDocRejectingId', null)"></div>
+                <div class="relative w-full max-w-md rounded-xl border border-(--border) bg-(--surface) shadow-xl">
+                    <div class="border-b border-(--border) px-5 py-4"><h3 class="text-sm font-semibold">Reject document</h3></div>
+                    <form wire:submit="rejectTransferDocument" class="space-y-4 px-5 py-4">
+                        <x-ui.textarea label="Reason (required)" wire:model="transferDocRejectReason" rows="2" :error="$errors->first('transferDocRejectReason')" />
+                        <div class="flex justify-end gap-2">
+                            <x-ui.button type="button" variant="secondary" wire:click="$set('transferDocRejectingId', null)">Cancel</x-ui.button>
+                            <x-ui.button type="submit" variant="danger">Reject</x-ui.button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
+    </x-ui.card>
+
     @if ($showCreate)
         <x-ui.card title="New transfer request">
             <form wire:submit="create" class="space-y-3">

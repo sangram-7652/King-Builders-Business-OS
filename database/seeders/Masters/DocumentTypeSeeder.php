@@ -22,8 +22,8 @@ class DocumentTypeSeeder extends Seeder
             // Booking
             ['code' => 'BOOKING_FORM', 'name' => 'Booking Form', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'BOOKING_AGREEMENT', 'name' => 'Booking Agreement', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
-            ['code' => 'PAYMENT_PROOF', 'name' => 'Payment Document', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
-            ['code' => 'REGISTRY_DOC', 'name' => 'Registry Document', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
+            ['code' => 'PAYMENT_PROOF', 'name' => 'Payment Document', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false, 'allows_multiple' => true],
+            ['code' => 'REGISTRY_DOC', 'name' => 'Registry Document', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false, 'allows_multiple' => true],
             ['code' => 'REGISTERED_DEED', 'name' => 'Registered Deed', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'PLOT_KYC_RECEIPT', 'name' => 'Plot KYC Receipt', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'HANDOVER_ACK', 'name' => 'Handover Acknowledgement', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
@@ -52,6 +52,7 @@ class DocumentTypeSeeder extends Seeder
                     'code' => $row['code'],
                     'applies_to' => $row['applies_to'],
                     'default_required' => $row['default_required'],
+                    'allows_multiple' => $row['allows_multiple'] ?? false,
                     'supports_expiry' => $row['supports_expiry'],
                     'is_system' => true,
                     'sort_order' => $i,

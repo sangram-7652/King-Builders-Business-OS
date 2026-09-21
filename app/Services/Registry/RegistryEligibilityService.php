@@ -22,7 +22,10 @@ use App\Support\Registry\EligibilityResult;
  *   - plot is valid, active and BOOKED
  *   - required buyer KYC documents are verified
  *   - required booking documents are verified
- *   - the agreement is at least SIGNED
+ *   - the agreement is at least SIGNED, only if `registry.eligibility.
+ *     require_agreement_signed` is enabled — off by default since the
+ *     dedicated Agreement workflow was removed; historical Agreement rows
+ *     are still read here when the flag is on
  *   - financial prerequisite: ≥ N% collected (M7)
  */
 class RegistryEligibilityService

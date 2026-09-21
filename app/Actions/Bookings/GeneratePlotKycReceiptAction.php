@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Bookings;
 
-use App\Actions\Agreements\PrepareAgreementAction;
 use App\Actions\Documents\UploadDocumentAction;
 use App\Actions\Possession\GeneratePossessionCertificateAction;
 use App\Enums\DocumentActivityType;
@@ -13,6 +12,7 @@ use App\Models\Booking;
 use App\Models\BookingWitness;
 use App\Models\Document;
 use App\Models\Masters\DocumentType;
+use App\Models\Plot;
 use App\Models\User;
 use App\Services\Documents\PlotKycReceiptPdfService;
 use App\Support\Concerns\RunsInTransaction;
@@ -22,20 +22,28 @@ use Illuminate\Support\Facades\Log;
 /**
  * Generates the Plot KYC / Registry KYC Receipt for a confirmed booking.
  * Reuses the exact M9 architecture already proven by
- * {@see PrepareAgreementAction} and
- * {@see GeneratePossessionCertificateAction}: the
- * receipt is a versioned `PLOT_KYC_RECEIPT` document on the booking, stored
- * through {@see UploadDocumentAction} — no second document or payment system.
+ * {@see GeneratePossessionCertificateAction}: the receipt is a versioned
+ * `PLOT_KYC_RECEIPT` document on the booking, stored through
+ * {@see UploadDocumentAction} — no second document or payment system.
  *
  * Optionally accepts the transaction-specific details this receipt needs that
  * nothing else in the system captures (Vikray Muly declared value, up to two
- * witnesses) and persists them on the booking before rendering. Both are
- * optional — omitting or blanking them never blocks generation.
+ * witnesses, and the plot's own land-record fields when the Plot doesn't
+ * already have them) and persists them before rendering. All of it is
+ * optional — omitting or blanking any of it never blocks generation.
+ *
+ * The six land-record fields (`village_name`, `gata_number`, four
+ * `boundary_*`) live on `plots` — the SAME columns the Plot create/edit form
+ * writes to (`App\Actions\Plots\UpdatePlot`). This action does not add a
+ * second land-record store: it fills gaps on the existing Plot record so a
+ * later receipt (or the Plot screen itself) sees the same value. A field the
+ * Plot already had is left alone unless the caller explicitly supplies a
+ * different value for it (the form always submits the Plot's current value
+ * back, so "unless explicitly edited" falls out naturally).
  *
  * Calling this again on an already-generated receipt does not create a new
  * `Document` row — it appends a new `DocumentVersion` to the existing one
- * (old versions are kept; see {@see UploadDocumentAction}), the same
- * re-prepare semantics as the Agreement.
+ * (old versions are kept; see {@see UploadDocumentAction}).
  */
 class GeneratePlotKycReceiptAction
 {
@@ -47,7 +55,7 @@ class GeneratePlotKycReceiptAction
     ) {}
 
     /**
-     * @param  array{vikray_muly_amount?: string|null, witnesses?: list<array{name?: string|null, address?: string|null, mobile?: string|null}>}  $details  already-validated
+     * @param  array{vikray_muly_amount?: string|null, witnesses?: list<array{name?: string|null, address?: string|null, mobile?: string|null}>, plot?: array{village_name?: string|null, gata_number?: string|null, boundary_east?: string|null, boundary_west?: string|null, boundary_north?: string|null, boundary_south?: string|null}}  $details  already-validated
      */
     public function handle(Booking $booking, User $actor, array $details = []): Document
     {
@@ -74,6 +82,10 @@ class GeneratePlotKycReceiptAction
 
             if (array_key_exists('witnesses', $details)) {
                 $this->syncWitnesses($locked, $details['witnesses']);
+            }
+
+            if (array_key_exists('plot', $details)) {
+                $this->syncPlotLandRecords($locked->plot, $details['plot']);
             }
 
             $type = DocumentType::query()->where('code', 'PLOT_KYC_RECEIPT')->firstOrFail();
@@ -134,5 +146,28 @@ class GeneratePlotKycReceiptAction
                 ],
             );
         }
+    }
+
+    /**
+     * Fills the plot's own land-record columns — the SAME `plots.village_name`
+     * / `gata_number` / `boundary_*` columns the Plot form writes to, never a
+     * second store. The Generate/Regenerate form always submits the plot's
+     * current value for a field it didn't touch, so a plain overwrite here
+     * already satisfies "preserve unless explicitly edited" — no
+     * touched/untouched tracking is needed. `Eloquent::save()` issues no
+     * UPDATE at all when nothing is actually dirty.
+     *
+     * @param  array{village_name?: string|null, gata_number?: string|null, boundary_east?: string|null, boundary_west?: string|null, boundary_north?: string|null, boundary_south?: string|null}  $fields
+     */
+    private function syncPlotLandRecords(Plot $plot, array $fields): void
+    {
+        $plot->forceFill([
+            'village_name' => ($fields['village_name'] ?? null) ?: null,
+            'gata_number' => ($fields['gata_number'] ?? null) ?: null,
+            'boundary_east' => ($fields['boundary_east'] ?? null) ?: null,
+            'boundary_west' => ($fields['boundary_west'] ?? null) ?: null,
+            'boundary_north' => ($fields['boundary_north'] ?? null) ?: null,
+            'boundary_south' => ($fields['boundary_south'] ?? null) ?: null,
+        ])->save();
     }
 }

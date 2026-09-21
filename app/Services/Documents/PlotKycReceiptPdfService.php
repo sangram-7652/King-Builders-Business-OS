@@ -15,8 +15,7 @@ use Illuminate\Http\UploadedFile;
 /**
  * Renders the Plot KYC / Registry KYC Receipt to a PDF using the shared M7/M9
  * dompdf + {@see Branding} document architecture — the same library and
- * pattern as {@see AgreementPdfService} and
- * {@see PossessionCertificateService}. Returns an
+ * pattern as {@see PossessionCertificateService}. Returns an
  * {@see UploadedFile} so the result flows through the normal M9
  * document-versioning pipeline ({@see UploadDocumentAction}).
  */

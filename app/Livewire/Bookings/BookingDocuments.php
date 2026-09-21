@@ -4,37 +4,49 @@ declare(strict_types=1);
 
 namespace App\Livewire\Bookings;
 
-use App\Actions\Agreements\CreateAgreementAction;
-use App\Actions\Agreements\PrepareAgreementAction;
-use App\Actions\Agreements\TransitionAgreementAction;
 use App\Actions\Bookings\GeneratePlotKycReceiptAction;
-use App\Enums\AgreementType;
+use App\Actions\Documents\AddDocumentAction;
 use App\Exceptions\DomainException;
 use App\Livewire\Documents\ManagesDocumentSlots;
-use App\Models\Agreement;
 use App\Models\Booking;
 use App\Models\Document;
 use App\Models\Masters\DocumentType;
 use App\Services\Documents\DocumentChecklistService;
+use App\Support\Bookings\BookingCancellationGuard;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+/**
+ * Booking Documents (M9). Shows exactly four document categories — Booking
+ * Form (single-slot: upload/replace/version, via {@see ManagesDocumentSlots}),
+ * Payment Documents and Registry Documents (multi-file: every upload stays
+ * its own independent {@see Document} row, via {@see AddDocumentAction}), and
+ * the generated Plot KYC Receipt. Every other Booking-scope document type
+ * (registry/possession/transfer artefacts generated or uploaded by their own
+ * dedicated workflow screens) is intentionally not listed here; hiding a type
+ * from this screen never touches its data or its own upload path elsewhere.
+ *
+ * The dedicated Booking Agreement workflow (create/prepare/send/record
+ * signed/approve/cancel) has been removed from this screen entirely — a
+ * client product decision. `App\Models\Agreement`, its migration/table, the
+ * `AgreementStatus`/`AgreementType` enums and `Booking::agreement()`/
+ * `agreements()` are all kept intact: historical Agreement rows stay fully
+ * readable (portal booking page, the documents dashboard) and two OTHER
+ * modules still read them — {@see BookingCancellationGuard}
+ * (blocks cancelling a booking with a signed agreement) and
+ * `RegistryEligibilityService` (its `require_agreement_signed` config gate is
+ * now off, since no code path can create/sign a NEW agreement any more).
+ */
 #[Layout('components.layouts.app')]
 class BookingDocuments extends Component
 {
     use ManagesDocumentSlots;
 
     public Booking $booking;
-
-    public bool $showSign = false;
-
-    public string $signedBy = '';
-
-    /** @var UploadedFile|null */
-    public $signedFile = null;
 
     // --- Plot KYC Receipt ------------------------------------------
 
@@ -54,6 +66,26 @@ class BookingDocuments extends Component
 
     public string $witness2Mobile = '';
 
+    // Land records — same plots.village_name/gata_number/boundary_* columns
+    // the Plot form writes to; prefilled from the Plot when present, blank
+    // and editable otherwise (see openPlotKyc()).
+    public string $villageName = '';
+
+    public string $gataNumber = '';
+
+    public string $boundaryEast = '';
+
+    public string $boundaryWest = '';
+
+    public string $boundaryNorth = '';
+
+    public string $boundarySouth = '';
+
+    // --- Multi-file categories (Payment Documents / Registry Documents) --
+
+    /** @var array<string, UploadedFile> keyed by document type code */
+    public array $newDocuments = [];
+
     public function mount(Booking $booking): void
     {
         $this->authorize('view', $booking);
@@ -67,95 +99,71 @@ class BookingDocuments extends Component
         return $this->booking;
     }
 
-    // --- Agreement -----------------------------------------------
+    // --- Payment Documents / Registry Documents (multi-file) ---------
 
-    public function createAgreement(): void
+    /**
+     * Fires once Livewire finishes the file's own async upload cycle and
+     * sets `newDocuments.{$key}` — same timing guarantee documented on
+     * {@see ManagesDocumentSlots::updatedFiles()}, keyed by document type
+     * code instead of id since a code (not an id) selects which of the two
+     * multi-file categories this upload belongs to.
+     */
+    public function updatedNewDocuments(mixed $value, string $key): void
     {
-        $this->authorize('create', Agreement::class);
-
-        try {
-            app(CreateAgreementAction::class)->handle($this->booking, AgreementType::BookingAgreement, auth()->user());
-            $this->dispatch('toast', message: 'Agreement created.', variant: 'success');
-        } catch (DomainException $e) {
-            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
+        if ($value instanceof UploadedFile) {
+            $this->addDocument($key);
         }
     }
 
-    public function prepareAgreement(): void
+    public function addDocument(string $code): void
     {
-        $agreement = $this->booking->agreement()->firstOrFail();
-        $this->authorize('update', $agreement);
+        $file = $this->newDocuments[$code] ?? null;
 
-        try {
-            app(PrepareAgreementAction::class)->handle($agreement, auth()->user());
-            $this->dispatch('toast', message: 'Agreement prepared.', variant: 'success');
-        } catch (DomainException $e) {
-            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
+        if (! $file instanceof UploadedFile) {
+            return;
         }
-    }
 
-    public function sendAgreement(): void
-    {
-        $agreement = $this->booking->agreement()->firstOrFail();
-        $this->authorize('update', $agreement);
-
-        try {
-            app(TransitionAgreementAction::class)->send($agreement, auth()->user());
-            $this->dispatch('toast', message: 'Agreement marked as sent.', variant: 'success');
-        } catch (DomainException $e) {
-            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
-        }
-    }
-
-    public function signAgreement(): void
-    {
-        $agreement = $this->booking->agreement()->firstOrFail();
-        $this->authorize('update', $agreement);
         $this->validate([
-            'signedBy' => ['required', 'string', 'max:255'],
-            'signedFile' => ['required', 'file', 'max:'.config('registry.uploads.max_kb'), 'mimes:'.implode(',', config('registry.uploads.mimes'))],
+            'newDocuments.'.$code => ['required', 'file', 'max:'.config('registry.uploads.max_kb'), 'mimes:'.implode(',', config('registry.uploads.mimes'))],
+        ], [], ['newDocuments.'.$code => 'file']);
+
+        $type = DocumentType::query()->where('code', $code)->where('allows_multiple', true)->firstOrFail();
+        $booking = $this->booking;
+
+        $probe = Document::firstOrNew([
+            'documentable_type' => $booking->getMorphClass(),
+            'documentable_id' => $booking->getKey(),
+            'document_type_id' => $type->id,
         ]);
+        $probe->setRelation('documentable', $booking);
+        $this->authorize('upload', $probe->exists ? $probe : $probe->fill(['status' => 'pending']));
 
         try {
-            app(TransitionAgreementAction::class)->sign($agreement, $this->signedBy, $this->signedFile, auth()->user());
-            $this->reset('showSign', 'signedBy', 'signedFile');
-            $this->dispatch('toast', message: 'Signed agreement recorded.', variant: 'success');
+            app(AddDocumentAction::class)->handle($booking, $type, $file, auth()->user());
+            unset($this->newDocuments[$code]);
+            $this->dispatch('toast', message: "{$type->name} added.", variant: 'success');
         } catch (DomainException $e) {
             $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
         }
     }
 
-    public function approveAgreement(): void
+    /** @return Collection<int, Document> */
+    private function multiDocuments(string $code): Collection
     {
-        $agreement = $this->booking->agreement()->firstOrFail();
-        $this->authorize('approve', $agreement);
-
-        try {
-            app(TransitionAgreementAction::class)->approve($agreement, auth()->user());
-            $this->dispatch('toast', message: 'Agreement approved.', variant: 'success');
-        } catch (DomainException $e) {
-            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
-        }
-    }
-
-    public function cancelAgreement(): void
-    {
-        $agreement = $this->booking->agreement()->firstOrFail();
-        $this->authorize('cancel', $agreement);
-
-        try {
-            app(TransitionAgreementAction::class)->cancel($agreement, auth()->user(), 'Cancelled from booking documents');
-            $this->dispatch('toast', message: 'Agreement cancelled.', variant: 'success');
-        } catch (DomainException $e) {
-            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
-        }
+        return Document::query()
+            ->where('documentable_type', $this->booking->getMorphClass())
+            ->where('documentable_id', $this->booking->id)
+            ->whereHas('documentType', fn ($q) => $q->where('code', $code))
+            ->with(['currentVersion'])
+            ->orderBy('sequence')
+            ->get();
     }
 
     // --- Plot KYC Receipt --------------------------------------------
 
     public function openPlotKyc(): void
     {
-        $this->booking->loadMissing('witnesses');
+        $this->booking->loadMissing(['witnesses', 'plot']);
 
         $this->vikrayMulyAmount = $this->booking->vikray_muly_amount !== null
             ? (string) $this->booking->vikray_muly_amount
@@ -168,6 +176,17 @@ class BookingDocuments extends Component
         $this->witness2Name = (string) ($byNumber->get(2)?->name ?? '');
         $this->witness2Address = (string) ($byNumber->get(2)?->address ?? '');
         $this->witness2Mobile = (string) ($byNumber->get(2)?->mobile ?? '');
+
+        // Prefill from the Plot's own land-record columns when present —
+        // blank (editable) otherwise. Nothing forces the operator to leave
+        // this page to fix the Plot first.
+        $plot = $this->booking->plot;
+        $this->villageName = (string) ($plot?->village_name ?? '');
+        $this->gataNumber = (string) ($plot?->gata_number ?? '');
+        $this->boundaryEast = (string) ($plot?->boundary_east ?? '');
+        $this->boundaryWest = (string) ($plot?->boundary_west ?? '');
+        $this->boundaryNorth = (string) ($plot?->boundary_north ?? '');
+        $this->boundarySouth = (string) ($plot?->boundary_south ?? '');
 
         $this->showPlotKyc = true;
     }
@@ -187,6 +206,12 @@ class BookingDocuments extends Component
             'witness2Name' => ['nullable', 'string', 'max:255'],
             'witness2Address' => ['nullable', 'string', 'max:255'],
             'witness2Mobile' => $mobile,
+            'villageName' => ['nullable', 'string', 'max:255'],
+            'gataNumber' => ['nullable', 'string', 'max:64'],
+            'boundaryEast' => ['nullable', 'string', 'max:255'],
+            'boundaryWest' => ['nullable', 'string', 'max:255'],
+            'boundaryNorth' => ['nullable', 'string', 'max:255'],
+            'boundarySouth' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -211,6 +236,14 @@ class BookingDocuments extends Component
                     ['name' => $data['witness1Name'], 'address' => $data['witness1Address'], 'mobile' => $data['witness1Mobile']],
                     ['name' => $data['witness2Name'], 'address' => $data['witness2Address'], 'mobile' => $data['witness2Mobile']],
                 ],
+                'plot' => [
+                    'village_name' => $data['villageName'],
+                    'gata_number' => $data['gataNumber'],
+                    'boundary_east' => $data['boundaryEast'],
+                    'boundary_west' => $data['boundaryWest'],
+                    'boundary_north' => $data['boundaryNorth'],
+                    'boundary_south' => $data['boundarySouth'],
+                ],
             ]);
 
             $this->showPlotKyc = false;
@@ -223,7 +256,12 @@ class BookingDocuments extends Component
     public function render(): View
     {
         $booking = $this->booking;
-        $checklist = app(DocumentChecklistService::class)->forBooking($booking);
+
+        // This screen shows exactly one checklist row — Booking Form. Every
+        // other Booking-scope type either has its own dedicated card below
+        // (Plot KYC Receipt) or its own dedicated screen entirely (Registry,
+        // Possession, Transfers) — see the class docblock.
+        $checklist = app(DocumentChecklistService::class)->forBooking($booking, ['BOOKING_FORM']);
 
         $documents = Document::query()
             ->where('documentable_type', $booking->getMorphClass())
@@ -232,8 +270,6 @@ class BookingDocuments extends Component
             ->get()
             ->keyBy('document_type_id');
 
-        $agreement = $booking->agreement()->with(['document.versions', 'preparedBy', 'approvedBy'])->first();
-
         $plotKycType = DocumentType::query()->where('code', 'PLOT_KYC_RECEIPT')->first();
         $plotKycDocument = $plotKycType !== null ? $documents->get($plotKycType->id) : null;
 
@@ -241,8 +277,9 @@ class BookingDocuments extends Component
             'booking' => $booking,
             'checklist' => $checklist,
             'documents' => $documents,
-            'agreement' => $agreement,
             'plotKycDocument' => $plotKycDocument,
+            'paymentDocuments' => $this->multiDocuments('PAYMENT_PROOF'),
+            'registryDocuments' => $this->multiDocuments('REGISTRY_DOC'),
         ])->title("Documents · {$booking->booking_number}");
     }
 }

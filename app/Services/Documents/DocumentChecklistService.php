@@ -31,9 +31,19 @@ class DocumentChecklistService
         return $this->build($buyer, DocumentScope::Buyer, null);
     }
 
-    public function forBooking(Booking $booking): ChecklistResult
+    /**
+     * @param  list<string>|null  $onlyCodes  restrict the checklist to these
+     *                                        document type codes (e.g. a
+     *                                        screen that shows only a subset
+     *                                        of Booking-scope types); null
+     *                                        (the default) keeps the full,
+     *                                        unfiltered checklist every other
+     *                                        caller (eligibility services)
+     *                                        relies on.
+     */
+    public function forBooking(Booking $booking, ?array $onlyCodes = null): ChecklistResult
     {
-        return $this->build($booking, DocumentScope::Booking, $booking->project_id);
+        return $this->build($booking, DocumentScope::Booking, $booking->project_id, $onlyCodes);
     }
 
     public function forPartner(Partner $partner): ChecklistResult
@@ -41,12 +51,16 @@ class DocumentChecklistService
         return $this->build($partner, DocumentScope::Partner, null);
     }
 
-    private function build(Model $documentable, DocumentScope $scope, ?int $projectId): ChecklistResult
+    /**
+     * @param  list<string>|null  $onlyCodes
+     */
+    private function build(Model $documentable, DocumentScope $scope, ?int $projectId, ?array $onlyCodes = null): ChecklistResult
     {
         /** @var Collection<int, DocumentType> $types */
         $types = DocumentType::query()
             ->where('applies_to', $scope->value)
             ->where('is_active', true)
+            ->when($onlyCodes !== null, fn ($q) => $q->whereIn('code', $onlyCodes))
             ->orderBy('sort_order')
             ->get();
 
