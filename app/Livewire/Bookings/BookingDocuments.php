@@ -81,6 +81,15 @@ class BookingDocuments extends Component
 
     public string $boundarySouth = '';
 
+    // Seller / Company — Director Name and PAN are the only two fields with
+    // no other source; prefilled from config/branding.php when present,
+    // blank and editable otherwise (see openPlotKyc()). Company Name,
+    // Address and Mobile stay exactly as they are today (read straight from
+    // Branding in the Blade — no form field, never editable here).
+    public string $directorName = '';
+
+    public string $panNumber = '';
+
     // --- Multi-file categories (Payment Documents / Registry Documents) --
 
     /** @var array<string, UploadedFile> keyed by document type code */
@@ -188,6 +197,13 @@ class BookingDocuments extends Component
         $this->boundaryNorth = (string) ($plot?->boundary_north ?? '');
         $this->boundarySouth = (string) ($plot?->boundary_south ?? '');
 
+        // Seller / Company — Director Name and PAN, prefilled from Branding
+        // config when present, blank (editable) otherwise. Company Name /
+        // Address / Mobile are shown read-only in the Blade straight from
+        // Branding — no property needed for them.
+        $this->directorName = (string) (config('branding.contact.director_name') ?? '');
+        $this->panNumber = (string) (config('branding.contact.pan_number') ?? '');
+
         $this->showPlotKyc = true;
     }
 
@@ -212,6 +228,8 @@ class BookingDocuments extends Component
             'boundaryWest' => ['nullable', 'string', 'max:255'],
             'boundaryNorth' => ['nullable', 'string', 'max:255'],
             'boundarySouth' => ['nullable', 'string', 'max:255'],
+            'directorName' => ['nullable', 'string', 'max:255'],
+            'panNumber' => ['nullable', 'string', 'max:20'],
         ];
     }
 
@@ -243,6 +261,10 @@ class BookingDocuments extends Component
                     'boundary_west' => $data['boundaryWest'],
                     'boundary_north' => $data['boundaryNorth'],
                     'boundary_south' => $data['boundarySouth'],
+                ],
+                'seller' => [
+                    'director_name' => $data['directorName'],
+                    'pan_number' => $data['panNumber'],
                 ],
             ]);
 

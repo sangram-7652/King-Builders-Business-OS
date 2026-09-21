@@ -108,6 +108,27 @@
                     </div>
                 </div>
 
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Seller / Company</p>
+                    <p class="text-xs text-(--content-muted)">Company Name, Address and Mobile come from branding settings and cannot be edited here. Director Name and PAN are prefilled when already configured — otherwise fill them in here; they are saved back to branding settings.</p>
+                    <div class="mt-2 grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <p class="text-sm text-(--content-muted)">Company Name</p>
+                            <p class="text-sm font-medium">{{ $branding->name ?: '—' }}</p>
+                        </div>
+                        <x-ui.input label="Director Name" wire:model="directorName" :error="$errors->first('directorName')" />
+                        <div class="sm:col-span-2">
+                            <p class="text-sm text-(--content-muted)">Address</p>
+                            <p class="text-sm font-medium">{{ $branding->contact['head_office_address'] ?: '—' }}</p>
+                        </div>
+                        <x-ui.input label="PAN" wire:model="panNumber" :error="$errors->first('panNumber')" />
+                        <div>
+                            <p class="text-sm text-(--content-muted)">Mobile</p>
+                            <p class="text-sm font-medium">{{ $branding->contact['phone'] ?: '—' }}</p>
+                        </div>
+                    </div>
+                </div>
+
                 <x-ui.input type="number" step="0.01" label="Vikray Muly (declared registry sale value)" wire:model="vikrayMulyAmount"
                     :error="$errors->first('vikrayMulyAmount')" hint="Optional — leave blank if not yet declared." />
 

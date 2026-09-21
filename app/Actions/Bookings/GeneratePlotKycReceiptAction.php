@@ -15,9 +15,12 @@ use App\Models\Masters\DocumentType;
 use App\Models\Plot;
 use App\Models\User;
 use App\Services\Documents\PlotKycReceiptPdfService;
+use App\Support\Branding;
+use App\Support\BrandingConfigWriter;
 use App\Support\Concerns\RunsInTransaction;
 use App\Support\Documents\DocumentTimeline;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Generates the Plot KYC / Registry KYC Receipt for a confirmed booking.
@@ -28,9 +31,9 @@ use Illuminate\Support\Facades\Log;
  *
  * Optionally accepts the transaction-specific details this receipt needs that
  * nothing else in the system captures (Vikray Muly declared value, up to two
- * witnesses, and the plot's own land-record fields when the Plot doesn't
- * already have them) and persists them before rendering. All of it is
- * optional — omitting or blanking any of it never blocks generation.
+ * witnesses, the plot's own land-record fields, and the seller's Director
+ * Name / PAN) and persists them before rendering. All of it is optional —
+ * omitting or blanking any of it never blocks generation.
  *
  * The six land-record fields (`village_name`, `gata_number`, four
  * `boundary_*`) live on `plots` — the SAME columns the Plot create/edit form
@@ -39,7 +42,10 @@ use Illuminate\Support\Facades\Log;
  * later receipt (or the Plot screen itself) sees the same value. A field the
  * Plot already had is left alone unless the caller explicitly supplies a
  * different value for it (the form always submits the Plot's current value
- * back, so "unless explicitly edited" falls out naturally).
+ * back, so "unless explicitly edited" falls out naturally). Seller Director
+ * Name / PAN work the same way but through {@see Branding} / `.env`
+ * ({@see BrandingConfigWriter}) instead of a database column — there is no
+ * database-backed settings store for branding config.
  *
  * Calling this again on an already-generated receipt does not create a new
  * `Document` row — it appends a new `DocumentVersion` to the existing one
@@ -50,12 +56,12 @@ class GeneratePlotKycReceiptAction
     use RunsInTransaction;
 
     public function __construct(
-        private readonly PlotKycReceiptPdfService $pdf,
         private readonly UploadDocumentAction $upload,
+        private readonly BrandingConfigWriter $brandingWriter,
     ) {}
 
     /**
-     * @param  array{vikray_muly_amount?: string|null, witnesses?: list<array{name?: string|null, address?: string|null, mobile?: string|null}>, plot?: array{village_name?: string|null, gata_number?: string|null, boundary_east?: string|null, boundary_west?: string|null, boundary_north?: string|null, boundary_south?: string|null}}  $details  already-validated
+     * @param  array{vikray_muly_amount?: string|null, witnesses?: list<array{name?: string|null, address?: string|null, mobile?: string|null}>, plot?: array{village_name?: string|null, gata_number?: string|null, boundary_east?: string|null, boundary_west?: string|null, boundary_north?: string|null, boundary_south?: string|null}, seller?: array{director_name?: string|null, pan_number?: string|null}}  $details  already-validated
      */
     public function handle(Booking $booking, User $actor, array $details = []): Document
     {
@@ -88,6 +94,10 @@ class GeneratePlotKycReceiptAction
                 $this->syncPlotLandRecords($locked->plot, $details['plot']);
             }
 
+            if (array_key_exists('seller', $details)) {
+                $this->syncSellerConfig($details['seller']);
+            }
+
             $type = DocumentType::query()->where('code', 'PLOT_KYC_RECEIPT')->firstOrFail();
 
             $fresh = $locked->fresh([
@@ -95,10 +105,19 @@ class GeneratePlotKycReceiptAction
                 'bookingBuyers.buyer.city', 'witnesses', 'payments',
             ]);
 
+            // Resolved fresh, never constructor-injected: Branding is a
+            // request-wide singleton already resolved — with whatever config
+            // held BEFORE syncSellerConfig() ran above — the moment this
+            // request booted (AppServiceProvider::boot() shares it to every
+            // view). Forgetting + re-resolving it here is the only way this
+            // SAME render can reflect a seller value just persisted above.
+            app()->forgetInstance(Branding::class);
+            $pdf = app(PlotKycReceiptPdfService::class);
+
             $document = $this->upload->handle(
                 $locked,
                 $type,
-                $this->pdf->renderAsUpload($fresh),
+                $pdf->renderAsUpload($fresh),
                 $actor,
                 ['title' => "Plot KYC Receipt — {$locked->booking_number}"],
             );
@@ -169,5 +188,55 @@ class GeneratePlotKycReceiptAction
             'boundary_north' => ($fields['boundary_north'] ?? null) ?: null,
             'boundary_south' => ($fields['boundary_south'] ?? null) ?: null,
         ])->save();
+    }
+
+    /**
+     * Fills the seller's Director Name / PAN — the SAME `branding.contact.
+     * director_name` / `pan_number` config keys (backed by `BRAND_DIRECTOR_NAME`
+     * / `BRAND_PAN_NUMBER` in `.env`) every other Plot KYC Receipt seller field
+     * already reads, never a second config system or table.
+     *
+     * The in-memory `config()` value is updated immediately — regardless of
+     * whether the `.env` write below succeeds — so the operator's entered
+     * value is never silently missing from the receipt being generated right
+     * now. The `.env` write itself is best-effort and failing it (e.g. a
+     * read-only filesystem in some deployments) only means the NEXT
+     * Generate/Regenerate won't see it prefilled; it must never block this
+     * one.
+     *
+     * @param  array{director_name?: string|null, pan_number?: string|null}  $seller
+     */
+    private function syncSellerConfig(array $seller): void
+    {
+        $map = ['director_name' => 'BRAND_DIRECTOR_NAME', 'pan_number' => 'BRAND_PAN_NUMBER'];
+        $updates = [];
+
+        foreach ($map as $field => $envKey) {
+            if (! array_key_exists($field, $seller)) {
+                continue;
+            }
+
+            $new = trim((string) ($seller[$field] ?? ''));
+            $current = trim((string) (config("branding.contact.{$field}") ?? ''));
+
+            if ($new !== $current) {
+                $updates[$envKey] = $new;
+            }
+        }
+
+        if ($updates === []) {
+            return;
+        }
+
+        foreach ($updates as $envKey => $value) {
+            $field = array_search($envKey, $map, true);
+            config(["branding.contact.{$field}" => $value !== '' ? $value : null]);
+        }
+
+        try {
+            $this->brandingWriter->update($updates);
+        } catch (Throwable $e) {
+            Log::warning('plot_kyc_receipt.seller_config_persist_failed', ['error' => $e->getMessage()]);
+        }
     }
 }

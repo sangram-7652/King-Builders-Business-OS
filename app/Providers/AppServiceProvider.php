@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Observers\BookingCommissionObserver;
 use App\Policies\MasterDataPolicy;
 use App\Support\Branding;
+use App\Support\BrandingConfigWriter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
@@ -24,6 +25,20 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(Branding::class, static fn (): Branding => Branding::fromConfig());
         $this->app->singleton(CommunicationManager::class);
+
+        // Safety net, independent of any individual test remembering to
+        // fake it: in the `testing` environment, BrandingConfigWriter (used
+        // by GeneratePlotKycReceiptAction to persist the Plot KYC Receipt's
+        // Director Name / PAN) NEVER defaults to the real .env. A test that
+        // needs to assert on the written content still binds its own
+        // throwaway path; this only stops an omission from ever reaching
+        // the project's real .env.
+        if ($this->app->environment('testing')) {
+            $this->app->singleton(
+                BrandingConfigWriter::class,
+                static fn (): BrandingConfigWriter => new BrandingConfigWriter(storage_path('framework/testing/branding.env')),
+            );
+        }
     }
 
     public function boot(): void
