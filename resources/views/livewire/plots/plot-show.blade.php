@@ -76,8 +76,21 @@
                 <div><dt class="text-(--content-muted)">Dimension</dt><dd class="mt-0.5">{{ $plot->dimension?->display_name ?? '—' }}</dd></div>
                 <div><dt class="text-(--content-muted)">Facing</dt><dd class="mt-0.5">{{ $plot->facing?->label() ?? '—' }}</dd></div>
                 <div><dt class="text-(--content-muted)">Status</dt><dd class="mt-0.5">{{ $plot->status->label() }}</dd></div>
+                <div><dt class="text-(--content-muted)">Village</dt><dd class="mt-0.5">{{ $plot->village_name ?: '—' }}</dd></div>
+                <div><dt class="text-(--content-muted)">Gata No.</dt><dd class="mt-0.5">{{ $plot->gata_number ?: '—' }}</dd></div>
             </dl>
         </x-ui.card>
+
+        @if ($plot->boundary_east || $plot->boundary_west || $plot->boundary_north || $plot->boundary_south)
+            <x-ui.card title="Plot boundary (Chauhaddi)">
+                <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                    <div><dt class="text-(--content-muted)">East</dt><dd class="mt-0.5">{{ $plot->boundary_east ?: '—' }}</dd></div>
+                    <div><dt class="text-(--content-muted)">West</dt><dd class="mt-0.5">{{ $plot->boundary_west ?: '—' }}</dd></div>
+                    <div><dt class="text-(--content-muted)">North</dt><dd class="mt-0.5">{{ $plot->boundary_north ?: '—' }}</dd></div>
+                    <div><dt class="text-(--content-muted)">South</dt><dd class="mt-0.5">{{ $plot->boundary_south ?: '—' }}</dd></div>
+                </dl>
+            </x-ui.card>
+        @endif
 
         <x-ui.card title="Hold">
             @if ($plot->status === PlotStatus::Hold)

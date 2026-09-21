@@ -30,6 +30,8 @@ enum DocumentActivityType: string
     case AgreementApproved = 'agreement_approved';
     case AgreementCancelled = 'agreement_cancelled';
 
+    case PlotKycReceiptGenerated = 'plot_kyc_receipt_generated';
+
     case RegistryInitiated = 'registry_initiated';
     case RegistryEligibilityChanged = 'registry_eligibility_changed';
     case RegistryScheduled = 'registry_scheduled';
@@ -63,6 +65,7 @@ enum DocumentActivityType: string
             self::AgreementSigned => 'Agreement signed',
             self::AgreementApproved => 'Agreement approved',
             self::AgreementCancelled => 'Agreement cancelled',
+            self::PlotKycReceiptGenerated => 'Plot KYC receipt generated',
             self::RegistryInitiated => 'Registry case initiated',
             self::RegistryEligibilityChanged => 'Registry eligibility changed',
             self::RegistryScheduled => 'Registry appointment scheduled',
@@ -86,6 +89,7 @@ enum DocumentActivityType: string
         return match (true) {
             str_starts_with($this->value, 'document_') => 'inbox',
             str_starts_with($this->value, 'agreement_') => 'inbox',
+            $this === self::PlotKycReceiptGenerated => 'inbox',
             str_starts_with($this->value, 'registry_') => 'building',
             default => 'clock',
         };

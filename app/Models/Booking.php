@@ -34,7 +34,7 @@ class Booking extends Model
         'booking_date', 'status',
         'base_area', 'base_rate', 'base_amount',
         'plc_amount', 'charge_amount', 'subtotal',
-        'discount_amount', 'tax_amount', 'final_amount',
+        'discount_amount', 'tax_amount', 'final_amount', 'vikray_muly_amount',
         'pricing_snapshot', 'notes',
         'created_by', 'confirmed_at', 'confirmed_by',
         'cancelled_at', 'cancelled_by', 'cancellation_reason',
@@ -58,6 +58,7 @@ class Booking extends Model
             'discount_amount' => 'decimal:2',
             'tax_amount' => 'decimal:2',
             'final_amount' => 'decimal:2',
+            'vikray_muly_amount' => 'decimal:2',
             'pricing_snapshot' => 'array',
             'created_by' => 'integer',
             'confirmed_at' => 'datetime',
@@ -168,6 +169,12 @@ class Booking extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /** Witness 1 / Witness 2 for the Plot KYC Receipt (registry KYC). @return HasMany<BookingWitness, $this> */
+    public function witnesses(): HasMany
+    {
+        return $this->hasMany(BookingWitness::class)->orderBy('witness_number');
     }
 
     /** Booking-level documents (M9). @return \Illuminate\Database\Eloquent\Relations\MorphMany<Document, $this> */

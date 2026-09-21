@@ -45,6 +45,18 @@ class PlotForm extends Component
 
     public string $facing = '';
 
+    public string $village_name = '';
+
+    public string $gata_number = '';
+
+    public string $boundary_east = '';
+
+    public string $boundary_west = '';
+
+    public string $boundary_north = '';
+
+    public string $boundary_south = '';
+
     public bool $is_active = true;
 
     public function mount(Project $project, Block $block, ?Plot $plot = null): void
@@ -62,6 +74,12 @@ class PlotForm extends Component
             $this->area = (string) $plot->area;
             $this->area_unit = $plot->area_unit->value;
             $this->facing = $plot->facing?->value ?? '';
+            $this->village_name = $plot->village_name ?? '';
+            $this->gata_number = $plot->gata_number ?? '';
+            $this->boundary_east = $plot->boundary_east ?? '';
+            $this->boundary_west = $plot->boundary_west ?? '';
+            $this->boundary_north = $plot->boundary_north ?? '';
+            $this->boundary_south = $plot->boundary_south ?? '';
             $this->is_active = $plot->is_active;
         } else {
             $this->authorize('create', Plot::class);
@@ -112,6 +130,12 @@ class PlotForm extends Component
             'area' => ['required', 'numeric', 'min:0.01', 'max:9999999999.99'],
             'area_unit' => ['required', new Enum(AreaUnit::class)],
             'facing' => ['nullable', new Enum(PlotFacing::class)],
+            'village_name' => ['nullable', 'string', 'max:255'],
+            'gata_number' => ['nullable', 'string', 'max:64'],
+            'boundary_east' => ['nullable', 'string', 'max:255'],
+            'boundary_west' => ['nullable', 'string', 'max:255'],
+            'boundary_north' => ['nullable', 'string', 'max:255'],
+            'boundary_south' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
         ];
     }

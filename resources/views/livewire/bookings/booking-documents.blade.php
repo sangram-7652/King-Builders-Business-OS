@@ -95,4 +95,57 @@
             @endif
         @endif
     </x-ui.card>
+
+    {{-- Plot KYC Receipt --}}
+    <x-ui.card title="Plot KYC Receipt" subtitle="Registry KYC Part-1 — village / plot / seller / buyer / witness / payment details.">
+        <x-slot:actions>
+            @can('documents.upload')
+                <x-ui.button size="sm" wire:click="openPlotKyc">{{ $plotKycDocument ? 'Regenerate' : 'Generate' }}</x-ui.button>
+            @endcan
+        </x-slot:actions>
+
+        @if (! $plotKycDocument || $plotKycDocument->versions->isEmpty())
+            <x-ui.empty-state icon="inbox" title="Not generated yet" description="Generate the Plot KYC Receipt once the booking's registry KYC details are ready." />
+        @else
+            <p class="text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Versions</p>
+            <ul class="mt-1 space-y-1 text-sm">
+                @foreach ($plotKycDocument->versions->sortByDesc('version') as $v)
+                    <li>
+                        v{{ $v->version }} — {{ $v->original_filename }} ({{ $v->humanSize() }})
+                        · {{ $v->uploaded_at?->format('d M Y H:i') }}
+                        @can('download', $plotKycDocument)
+                            <a href="{{ route('documents.download', ['document' => $plotKycDocument->id, 'version' => $v->id]) }}" target="_blank" class="ml-1 text-(--brand-primary) hover:underline">view / download</a>
+                        @endcan
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+
+        @if ($showPlotKyc)
+            <form wire:submit="generatePlotKycReceipt" class="mt-4 space-y-4 rounded-lg border border-(--border) p-4">
+                <x-ui.input type="number" step="0.01" label="Vikray Muly (declared registry sale value)" wire:model="vikrayMulyAmount"
+                    :error="$errors->first('vikrayMulyAmount')" hint="Optional — leave blank if not yet declared." />
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="space-y-2">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Witness 1 (optional)</p>
+                        <x-ui.input label="Name" wire:model="witness1Name" :error="$errors->first('witness1Name')" />
+                        <x-ui.input label="Address" wire:model="witness1Address" :error="$errors->first('witness1Address')" />
+                        <x-ui.input label="Mobile" wire:model="witness1Mobile" :error="$errors->first('witness1Mobile')" />
+                    </div>
+                    <div class="space-y-2">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Witness 2 (optional)</p>
+                        <x-ui.input label="Name" wire:model="witness2Name" :error="$errors->first('witness2Name')" />
+                        <x-ui.input label="Address" wire:model="witness2Address" :error="$errors->first('witness2Address')" />
+                        <x-ui.input label="Mobile" wire:model="witness2Mobile" :error="$errors->first('witness2Mobile')" />
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <x-ui.button type="button" variant="secondary" wire:click="$set('showPlotKyc', false)">Cancel</x-ui.button>
+                    <x-ui.button type="submit">{{ $plotKycDocument ? 'Regenerate receipt' : 'Generate receipt' }}</x-ui.button>
+                </div>
+            </form>
+        @endif
+    </x-ui.card>
 </div>

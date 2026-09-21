@@ -20,10 +20,26 @@
             <div class="grid gap-5 sm:grid-cols-2">
                 <x-ui.select label="Category" wire:model="plot_category_id" placeholder="—" :options="$categories->toArray()" :error="$errors->first('plot_category_id')" />
                 <x-ui.select label="Size" wire:model.live="plot_size_id" placeholder="—" :options="$sizes->toArray()" :error="$errors->first('plot_size_id')" hint="Picking a size prefills the area below." />
-                <x-ui.select label="Dimension" wire:model="plot_dimension_id" placeholder="—" :options="$dimensions->toArray()" :error="$errors->first('plot_dimension_id')" />
+                <x-ui.select label="Dimension" wire:model="plot_dimension_id" placeholder="—" :options="$dimensions->toArray()" :error="$errors->first('plot_dimension_id')" hint="Width/Length — printed as Front/Depth on the Plot KYC Receipt." />
                 <x-ui.select label="Facing" wire:model="facing" placeholder="—" :options="$facings" :error="$errors->first('facing')" />
                 <x-ui.input type="number" step="0.01" label="Area" wire:model="area" required :error="$errors->first('area')" />
                 <x-ui.select label="Area unit" wire:model="area_unit" :options="$areaUnits" :error="$errors->first('area_unit')" />
+            </div>
+        </x-ui.card>
+
+        <x-ui.card title="Land records" subtitle="Optional — used on the Plot KYC / Registry KYC Receipt.">
+            <div class="grid gap-5 sm:grid-cols-2">
+                <x-ui.input label="Village name" wire:model="village_name" :error="$errors->first('village_name')" />
+                <x-ui.input label="Gata No." wire:model="gata_number" :error="$errors->first('gata_number')" />
+            </div>
+        </x-ui.card>
+
+        <x-ui.card title="Plot boundary (Chauhaddi)" subtitle="Optional — the four-side boundary description for the Plot KYC Receipt.">
+            <div class="grid gap-5 sm:grid-cols-2">
+                <x-ui.input label="East" wire:model="boundary_east" :error="$errors->first('boundary_east')" />
+                <x-ui.input label="West" wire:model="boundary_west" :error="$errors->first('boundary_west')" />
+                <x-ui.input label="North" wire:model="boundary_north" :error="$errors->first('boundary_north')" />
+                <x-ui.input label="South" wire:model="boundary_south" :error="$errors->first('boundary_south')" />
             </div>
         </x-ui.card>
 

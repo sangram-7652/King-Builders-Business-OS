@@ -48,6 +48,13 @@ return [
         'phone' => env('BRAND_PHONE'),
         'website' => env('BRAND_WEBSITE'),
         'head_office_address' => env('BRAND_HEAD_OFFICE_ADDRESS'),
+
+        // Seller / company identity for the Plot KYC Receipt ("Seller /
+        // Company" section). Company name is `name` above, address is
+        // `head_office_address` above, and mobile is `phone` above — only
+        // the director's name and the company PAN are genuinely new.
+        'director_name' => env('BRAND_DIRECTOR_NAME'),
+        'pan_number' => env('BRAND_PAN_NUMBER'),
     ],
 
     // Official bank account to print on receipts, if the business has

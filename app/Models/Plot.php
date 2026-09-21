@@ -36,6 +36,8 @@ class Plot extends Model
         'project_id', 'block_id', 'plot_number',
         'plot_category_id', 'plot_size_id', 'plot_dimension_id',
         'area', 'area_unit', 'facing',
+        'village_name', 'gata_number',
+        'boundary_east', 'boundary_west', 'boundary_north', 'boundary_south',
         'status', 'is_active',
         'held_at', 'hold_expires_at', 'hold_reason', 'held_by',
     ];

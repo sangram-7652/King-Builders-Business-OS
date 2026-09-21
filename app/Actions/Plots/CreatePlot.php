@@ -37,6 +37,12 @@ class CreatePlot
                 'area' => $snapshot['area'],
                 'area_unit' => $snapshot['area_unit'],
                 'facing' => $data['facing'] ?: null,
+                'village_name' => ($data['village_name'] ?? null) ?: null,
+                'gata_number' => ($data['gata_number'] ?? null) ?: null,
+                'boundary_east' => ($data['boundary_east'] ?? null) ?: null,
+                'boundary_west' => ($data['boundary_west'] ?? null) ?: null,
+                'boundary_north' => ($data['boundary_north'] ?? null) ?: null,
+                'boundary_south' => ($data['boundary_south'] ?? null) ?: null,
                 'status' => PlotStatus::Available,
                 'is_active' => $data['is_active'] ?? true,
             ]);

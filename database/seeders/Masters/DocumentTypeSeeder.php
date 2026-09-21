@@ -25,6 +25,7 @@ class DocumentTypeSeeder extends Seeder
             ['code' => 'PAYMENT_PROOF', 'name' => 'Payment Document', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'REGISTRY_DOC', 'name' => 'Registry Document', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'REGISTERED_DEED', 'name' => 'Registered Deed', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
+            ['code' => 'PLOT_KYC_RECEIPT', 'name' => 'Plot KYC Receipt', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'HANDOVER_ACK', 'name' => 'Handover Acknowledgement', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'POSSESSION_LETTER', 'name' => 'Possession Letter', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => false],
             ['code' => 'NOC', 'name' => 'NOC', 'applies_to' => DocumentScope::Booking, 'default_required' => false, 'supports_expiry' => true],

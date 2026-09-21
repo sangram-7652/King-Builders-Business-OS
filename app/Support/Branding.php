@@ -18,14 +18,14 @@ final class Branding implements Htmlable
 {
     /**
      * @param  array{primary:string,primary_fg:string,primary_hover:string,accent:string}  $colors
-     * @param  array{email:?string,phone:?string,website:?string,head_office_address:?string}  $contact
+     * @param  array{email:?string,phone:?string,website:?string,head_office_address:?string,director_name:?string,pan_number:?string}  $contact
      * @param  array{name:?string,account_name:?string,account_number:?string,ifsc:?string,branch:?string}  $bank
      */
     public function __construct(
         public readonly string $name,
         public readonly ?string $logoPath,
         public readonly array $colors,
-        public readonly array $contact = ['email' => null, 'phone' => null, 'website' => null, 'head_office_address' => null],
+        public readonly array $contact = ['email' => null, 'phone' => null, 'website' => null, 'head_office_address' => null, 'director_name' => null, 'pan_number' => null],
         public readonly array $bank = ['name' => null, 'account_name' => null, 'account_number' => null, 'ifsc' => null, 'branch' => null],
         public readonly ?string $qrPath = null,
         public readonly ?string $signaturePath = null,
@@ -56,6 +56,8 @@ final class Branding implements Htmlable
                 'phone' => data_get($config, 'contact.phone'),
                 'website' => data_get($config, 'contact.website'),
                 'head_office_address' => data_get($config, 'contact.head_office_address'),
+                'director_name' => data_get($config, 'contact.director_name'),
+                'pan_number' => data_get($config, 'contact.pan_number'),
             ],
             bank: [
                 'name' => data_get($config, 'bank.name'),
