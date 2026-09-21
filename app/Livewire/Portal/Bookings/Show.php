@@ -27,7 +27,10 @@ class Show extends Component
 
     public function render(): View
     {
-        $booking = $this->booking->load(['priceLines', 'registryCase', 'possessionCase', 'agreement']);
+        $booking = $this->booking->load([
+            'priceLines', 'registryCase', 'possessionCase', 'agreement',
+            'documents' => fn ($q) => $q->whereNotNull('current_version_id')->with(['documentType', 'currentVersion']),
+        ]);
 
         $transfer = $booking->transferRequests()
             ->latest('id')->first(['id', 'request_number', 'status', 'transfer_type', 'submitted_at']);

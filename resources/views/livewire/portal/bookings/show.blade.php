@@ -1,5 +1,3 @@
-@php use App\Enums\DocumentStatus; @endphp
-
 <div class="space-y-6">
     <x-ui.breadcrumb :items="[
         ['label' => 'My bookings', 'url' => route('portal.bookings.index')],
@@ -84,6 +82,27 @@
                     </tbody>
                 </table>
             </div>
+        </x-ui.card>
+    @endif
+
+    @if ($booking->documents->isNotEmpty())
+        <x-ui.card title="Documents">
+            <ul class="divide-y divide-(--border)">
+                @foreach ($booking->documents as $document)
+                    <li class="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+                        <div>
+                            <span class="font-medium">{{ $document->documentType?->name ?? $document->title ?? 'Document' }}</span>
+                            <x-ui.badge size="sm" :variant="$document->status->color()" class="ml-1.5">{{ $document->status->label() }}</x-ui.badge>
+                            <div class="text-xs text-(--content-muted)">
+                                {{ $document->currentVersion?->original_filename }}
+                                @if ($document->currentVersion) · {{ $document->currentVersion->humanSize() }} · {{ $document->currentVersion->uploaded_at?->format('d M Y') }} @endif
+                            </div>
+                        </div>
+                        <a href="{{ route('portal.documents.download', ['document' => $document->id, 'version' => $document->current_version_id]) }}"
+                            target="_blank" class="text-(--brand-primary) hover:underline">Download</a>
+                    </li>
+                @endforeach
+            </ul>
         </x-ui.card>
     @endif
 </div>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\Permission;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\DocumentDownloadController;
+use App\Http\Controllers\Portal\DocumentDownloadController as PortalDocumentDownload;
 use App\Http\Controllers\Portal\LogoutController as PortalLogoutController;
 use App\Http\Controllers\Portal\ReceiptDownloadController as PortalReceiptDownload;
 use App\Http\Controllers\ReceiptPdfController;
@@ -52,6 +53,7 @@ use App\Livewire\Portal\Auth\Login as PortalLogin;
 use App\Livewire\Portal\Bookings\Index as PortalBookingIndex;
 use App\Livewire\Portal\Bookings\Show as PortalBookingShow;
 use App\Livewire\Portal\Dashboard as PortalDashboard;
+use App\Livewire\Portal\Documents\Index as PortalDocumentIndex;
 use App\Livewire\Portal\Payments\Index as PortalPaymentIndex;
 use App\Livewire\Portal\Payments\Show as PortalPaymentShow;
 use App\Livewire\Portal\Profile as PortalProfile;
@@ -371,5 +373,11 @@ Route::prefix('portal')->name('portal.')->group(function (): void {
         Route::get('/payments', PortalPaymentIndex::class)->name('payments.index');
         Route::get('/payments/{payment}', PortalPaymentShow::class)->whereNumber('payment')->name('payments.show');
         Route::get('/receipts/{receipt}/pdf', PortalReceiptDownload::class)->whereNumber('receipt')->name('receipts.pdf');
+
+        // --- My documents (M15.2) --------------------------------------
+        Route::get('/documents', PortalDocumentIndex::class)->name('documents.index');
+        Route::get('/documents/{document}/versions/{version}/download', PortalDocumentDownload::class)
+            ->whereNumber(['document', 'version'])
+            ->name('documents.download');
     });
 });
