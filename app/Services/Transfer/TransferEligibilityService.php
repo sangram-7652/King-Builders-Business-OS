@@ -12,7 +12,6 @@ use App\Models\Booking;
 use App\Models\Document;
 use App\Models\Masters\DocumentType;
 use App\Models\Plot;
-use App\Models\PossessionCase;
 use App\Models\TransferRequest;
 use App\Services\Payments\PaymentLedger;
 use App\Support\Money;
@@ -33,8 +32,12 @@ use App\Support\Registry\EligibilityResult;
  *   - booking is CONFIRMED and still sits on the plot the request was raised for
  *   - there is no OTHER active transfer on the same booking, or on the target plot
  *   - the target plot is still active, AVAILABLE/HOLD, and has no live booking
- *   - no possession case exists yet for this booking (real physical work would
- *     be tied to the old plot — see CompleteTransferAction)
+ *   - Possession is not yet DONE for this booking (booking-level
+ *     PossessionStatus — real physical work would be tied to the old plot;
+ *     see CompleteTransferAction)
+ *   - Registry is not yet DONE for this booking (booking-level RegistryStatus
+ *     — Registry Done means the CURRENT plot is already legally SOLD; see
+ *     CompleteTransferAction)
  *   - financial clearance and transfer-document checks never apply
  */
 class TransferEligibilityService
@@ -137,6 +140,10 @@ class TransferEligibilityService
         if ($newPlot === null) {
             $checks[] = $this->check('target_plot_set', 'A target plot is set', false, 'No target plot is set on this request.');
         } else {
+            $sameProject = $booking !== null && $newPlot->project_id === $booking->project_id;
+            $checks[] = $this->check('target_plot_same_project', 'Target plot belongs to the same project', $sameProject,
+                $sameProject ? null : 'The target plot must belong to the same project as the current booking.');
+
             $targetConflict = TransferRequest::query()
                 ->where('new_plot_id', $newPlot->id)
                 ->whereKeyNot($transfer->getKey())
@@ -150,7 +157,7 @@ class TransferEligibilityService
             $checks[] = $this->check('no_conflicting_target', 'No other open transfer already targets this plot', ! $targetConflict,
                 $targetConflict ? 'Another open transfer already targets this plot.' : null);
 
-            $available = $newPlot->is_active && in_array($newPlot->status, [PlotStatus::Available, PlotStatus::Hold], true);
+            $available = $newPlot->is_active && $newPlot->status === PlotStatus::Available;
             $checks[] = $this->check('target_plot_available', 'Target plot is available', $available,
                 $available ? null : "Target plot is {$newPlot->status->label()}.");
 
@@ -162,9 +169,19 @@ class TransferEligibilityService
                 $liveBooking ? 'Target plot already has a live booking.' : null);
         }
 
-        $noPossession = $booking === null || ! PossessionCase::query()->where('booking_id', $booking->id)->exists();
-        $checks[] = $this->check('no_possession_case', 'No possession case exists yet for this booking', $noPossession,
-            $noPossession ? null : 'A possession case already exists for this booking — the plot cannot be changed anymore.');
+        $noPossession = $booking === null || ! $booking->isPossessionDone();
+        $checks[] = $this->check('no_possession_case', 'Possession is not yet Done for this booking', $noPossession,
+            $noPossession ? null : 'Possession is already Done for this booking — the plot cannot be changed anymore.');
+
+        // Registry Done means the CURRENT plot has already been legally
+        // registered/sold (Plot status SOLD — see MarkRegistryDoneAction).
+        // Swapping the booking onto a different physical plot after that
+        // would leave the registry pointing at a plot the booking no longer
+        // sits on — a real legal inconsistency, not something this workflow
+        // can safely paper over. Same reasoning as the Possession check above.
+        $noRegistry = $booking === null || ! $booking->isRegistryDone();
+        $checks[] = $this->check('registry_not_done', 'Registry is not yet Done for this booking', $noRegistry,
+            $noRegistry ? null : 'Registry is already Done for this booking — the plot cannot be changed anymore.');
 
         $eligible = ! in_array(false, array_column($checks, 'passed'), true);
 

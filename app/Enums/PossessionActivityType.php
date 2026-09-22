@@ -29,6 +29,7 @@ enum PossessionActivityType: string
     case PossessionOnHold = 'possession_on_hold';
     case PossessionResumed = 'possession_resumed';
     case PossessionCancelled = 'possession_cancelled';
+    case PossessionStatusChanged = 'possession_status_changed';
 
     case TransferRequested = 'transfer_requested';
     case TransferSubmitted = 'transfer_submitted';
@@ -60,6 +61,7 @@ enum PossessionActivityType: string
             self::PossessionOnHold => 'Possession put on hold',
             self::PossessionResumed => 'Possession resumed',
             self::PossessionCancelled => 'Possession cancelled',
+            self::PossessionStatusChanged => 'Possession status changed',
             self::TransferRequested => 'Transfer requested',
             self::TransferSubmitted => 'Transfer submitted',
             self::TransferUnderReview => 'Transfer under review',

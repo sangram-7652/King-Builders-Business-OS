@@ -6,7 +6,7 @@ namespace App\Services\Reports;
 
 use App\Enums\BookingStatus;
 use App\Enums\DocumentStatus;
-use App\Enums\PossessionCaseStatus;
+use App\Enums\PossessionStatus;
 use App\Enums\RegistryStatus;
 use App\Enums\TransferRequestStatus;
 use App\Queries\Reports\ReportFilterScope;
@@ -44,11 +44,22 @@ class OperationsAnalytics
         return $query->count();
     }
 
+    /**
+     * Confirmed bookings still at Possession = PENDING (the simplified,
+     * booking-level Possession status — see App\Enums\PossessionStatus). The
+     * legacy `possession_cases` table is no longer the source of truth for
+     * this count; it only ever holds historical data now.
+     */
     public function possessionPending(ReportFilterData $filters): int
     {
-        return $this->bookingLinked('possession_cases', $filters)
-            ->whereNotIn('possession_cases.status', $this->terminal(PossessionCaseStatus::cases()))
-            ->count();
+        $query = DB::table('bookings')
+            ->whereNull('bookings.deleted_at')
+            ->where('bookings.status', BookingStatus::Confirmed->value)
+            ->where('bookings.possession_status', PossessionStatus::Pending->value);
+        ReportFilterScope::project($query, $filters, 'bookings.project_id');
+        ReportFilterScope::salesperson($query, $filters, 'bookings.created_by');
+
+        return $query->count();
     }
 
     /** Open transfers (submitted → approved) — the ones that block a new transfer. */
@@ -92,17 +103,5 @@ class OperationsAnalytics
         ReportFilterScope::salesperson($query, $filters, 'bookings.created_by');
 
         return $query;
-    }
-
-    /**
-     * @param  list<PossessionCaseStatus>  $cases
-     * @return list<string>
-     */
-    private function terminal(array $cases): array
-    {
-        return array_values(array_map(
-            fn ($s) => $s->value,
-            array_filter($cases, fn ($s) => $s->isTerminal()),
-        ));
     }
 }

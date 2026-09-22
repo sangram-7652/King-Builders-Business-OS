@@ -10,7 +10,7 @@ use App\Actions\Transfer\TransferWorkflowAction;
 use App\Enums\OwnershipType;
 use App\Enums\PaymentStatus;
 use App\Enums\PlotStatus;
-use App\Enums\PossessionCaseStatus;
+use App\Enums\PossessionStatus;
 use App\Enums\TransferRequestStatus;
 use App\Enums\TransferType;
 use App\Exceptions\DomainException;
@@ -20,7 +20,6 @@ use App\Models\Document;
 use App\Models\Payment;
 use App\Models\Plot;
 use App\Models\PlotOwnershipHistory;
-use App\Models\PossessionCase;
 use App\Models\Project;
 use App\Models\TransferRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -304,11 +303,9 @@ it('17: retrying a completed plot transfer is idempotent — no duplicate histor
 
 // --- possession guard (F-M10-PLOT) ------------------------------------------
 
-it('blocks approval and completion once a possession case already exists for the booking', function () {
+it('blocks approval and completion once Possession is already Done for the booking', function () {
     $s = plotTransferReadyScenario();
-    PossessionCase::factory()->create([
-        'booking_id' => $s['booking']->id, 'plot_id' => $s['oldPlot']->id, 'status' => PossessionCaseStatus::NotStarted->value,
-    ]);
+    $s['booking']->forceFill(['possession_status' => PossessionStatus::Done])->save();
 
     $t = plotTransferInReview($s);
 

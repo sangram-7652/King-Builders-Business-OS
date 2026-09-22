@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\BookingStatus;
+use App\Enums\PossessionStatus;
 use App\Enums\RegistryStatus;
 use App\Models\Concerns\GuardsAgainstDestructiveDelete;
 use Database\Factories\BookingFactory;
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 /**
  * @property BookingStatus $status
  * @property RegistryStatus $registry_status
+ * @property PossessionStatus $possession_status
  * @property bool $price_overridden
  */
 class Booking extends Model
@@ -38,7 +40,7 @@ class Booking extends Model
         'plc_amount', 'charge_amount', 'subtotal',
         'discount_amount', 'tax_amount', 'final_amount', 'vikray_muly_amount',
         'registry_buyer_name', 'registry_buyer_mobile', 'registry_buyer_address', 'registry_buyer_pan',
-        'registry_status',
+        'registry_status', 'possession_status',
         'pricing_snapshot', 'notes',
         'created_by', 'confirmed_at', 'confirmed_by',
         'cancelled_at', 'cancelled_by', 'cancellation_reason',
@@ -64,6 +66,7 @@ class Booking extends Model
             'final_amount' => 'decimal:2',
             'vikray_muly_amount' => 'decimal:2',
             'registry_status' => RegistryStatus::class,
+            'possession_status' => PossessionStatus::class,
             'pricing_snapshot' => 'array',
             'created_by' => 'integer',
             'confirmed_at' => 'datetime',
@@ -293,6 +296,11 @@ class Booking extends Model
     public function isRegistryDone(): bool
     {
         return $this->registry_status === RegistryStatus::Done;
+    }
+
+    public function isPossessionDone(): bool
+    {
+        return $this->possession_status === PossessionStatus::Done;
     }
 
     /** Editable (pricing + buyers) only before confirmation. */

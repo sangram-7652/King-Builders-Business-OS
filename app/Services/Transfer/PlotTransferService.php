@@ -45,7 +45,7 @@ class PlotTransferService
             throw new DomainException('The new plot must be different from the current plot.');
         }
 
-        if (! $newPlot->is_active || ! in_array($newPlot->status, [PlotStatus::Available, PlotStatus::Hold], true)) {
+        if (! $newPlot->is_active || $newPlot->status !== PlotStatus::Available) {
             throw new DomainException("The target plot is {$newPlot->status->label()} and is no longer available.");
         }
 

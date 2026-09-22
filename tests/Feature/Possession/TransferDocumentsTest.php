@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Documents\RejectDocumentAction;
 use App\Actions\Documents\UploadDocumentAction;
 use App\Actions\Documents\VerifyDocumentAction;
 use App\Actions\Transfer\CreateTransferRequestAction;
@@ -33,16 +34,24 @@ function draftSaleTransfer(array $s): TransferRequest
     ], possessionOfficer());
 }
 
-it('shows the three transfer documents on the Transfers screen, not on Booking Documents', function () {
+/*
+| The Transfers screen no longer has an upload UI for Transfer Application /
+| Consent / ID Proof (product requirement: Plot Transfer only, no transfer
+| documents). The underlying document types, TransferEligibilityService's
+| ownership-transfer document check, and any already-uploaded document rows
+| are all left completely intact — see BookingTransfers's class docblock.
+*/
+
+it('no longer shows Transfer Application / Consent / ID Proof anywhere on the simplified Transfers screen', function () {
     $s = confirmedBookingScenario();
     draftSaleTransfer($s);
 
     Livewire::actingAs(possessionOfficer())
         ->test(BookingTransfers::class, ['booking' => $s['booking']->fresh()])
         ->assertOk()
-        ->assertSee('Transfer Application')
-        ->assertSee('Transfer Consent')
-        ->assertSee('Transfer ID Proof');
+        ->assertDontSee('Transfer Application')
+        ->assertDontSee('Transfer Consent')
+        ->assertDontSee('Transfer ID Proof');
 
     Livewire::actingAs(possessionOfficer())
         ->test(BookingDocuments::class, ['booking' => $s['booking']->fresh()])
@@ -52,23 +61,28 @@ it('shows the three transfer documents on the Transfers screen, not on Booking D
         ->assertDontSee('Transfer ID Proof');
 });
 
-it('uploads a transfer document from the Transfers screen', function () {
+it('the Transfers screen no longer exposes any transfer-document upload/reject/delete methods', function () {
     $s = confirmedBookingScenario();
     draftSaleTransfer($s);
 
-    Livewire::actingAs(possessionOfficer())
-        ->test(BookingTransfers::class, ['booking' => $s['booking']])
-        ->set('transferFiles.'.docType('TRANSFER_APPLICATION')->id, fakeDocument('application.pdf'))
-        ->assertHasNoErrors();
-
-    $doc = Document::query()->where('documentable_id', $s['booking']->id)
-        ->where('document_type_id', docType('TRANSFER_APPLICATION')->id)
-        ->firstOrFail();
-
-    expect($doc->currentVersion)->not->toBeNull();
+    expect(method_exists(BookingTransfers::class, 'uploadTransferDocument'))->toBeFalse()
+        ->and(method_exists(BookingTransfers::class, 'rejectTransferDocument'))->toBeFalse()
+        ->and(method_exists(BookingTransfers::class, 'deleteTransferDocument'))->toBeFalse()
+        ->and(in_array(Livewire\WithFileUploads::class, class_uses(BookingTransfers::class), true))->toBeFalse();
 });
 
-it('verifying all three transfer documents satisfies TransferEligibilityService\'s document check', function () {
+it('a pre-existing transfer document is preserved untouched even though the UI no longer manages it', function () {
+    $s = confirmedBookingScenario();
+    draftSaleTransfer($s);
+    $officer = possessionOfficer();
+
+    $doc = app(UploadDocumentAction::class)->handle($s['booking'], docType('TRANSFER_APPLICATION'), fakeDocument(), $officer);
+
+    expect(Document::find($doc->id))->not->toBeNull()
+        ->and(Document::find($doc->id)->currentVersion)->not->toBeNull();
+});
+
+it('verifying all three transfer documents satisfies TransferEligibilityService\'s document check (old ownership-transfer flow, unchanged)', function () {
     $s = confirmedBookingScenario();
     $transfer = draftSaleTransfer($s);
     $officer = possessionOfficer();
@@ -84,7 +98,7 @@ it('verifying all three transfer documents satisfies TransferEligibilityService\
     expect($docCheck['passed'])->toBeTrue();
 });
 
-it('rejecting a transfer document keeps TransferEligibilityService\'s document check failing', function () {
+it('rejecting a transfer document keeps TransferEligibilityService\'s document check failing (old ownership-transfer flow, unchanged)', function () {
     $s = confirmedBookingScenario();
     $transfer = draftSaleTransfer($s);
     $officer = possessionOfficer();
@@ -94,47 +108,11 @@ it('rejecting a transfer document keeps TransferEligibilityService\'s document c
     ]);
 
     $doc = app(UploadDocumentAction::class)->handle($s['booking'], docType('TRANSFER_APPLICATION'), fakeDocument(), $officer);
-
-    Livewire::actingAs($rejecter)
-        ->test(BookingTransfers::class, ['booking' => $s['booking']->fresh()])
-        ->call('openRejectTransferDocument', $doc->id)
-        ->set('transferDocRejectReason', 'Wrong form')
-        ->call('rejectTransferDocument')
-        ->assertHasNoErrors();
+    app(RejectDocumentAction::class)->handle($doc, 'Wrong form', $rejecter);
 
     expect($doc->fresh()->status->value)->toBe('rejected');
 
     $result = app(TransferEligibilityService::class)->evaluate($transfer->fresh());
     $docCheck = collect($result->checks)->firstWhere('key', 'documents_verified');
     expect($docCheck['passed'])->toBeFalse();
-});
-
-it('deletes an unverified transfer document', function () {
-    $s = confirmedBookingScenario();
-    draftSaleTransfer($s);
-    $officer = possessionOfficer();
-    $deleter = makeUser(permissions: [
-        'transfer.view', 'transfer.create', 'documents.view', 'documents.upload', 'documents.delete', 'bookings.view',
-    ]);
-
-    $doc = app(UploadDocumentAction::class)->handle($s['booking'], docType('TRANSFER_CONSENT'), fakeDocument(), $officer);
-
-    Livewire::actingAs($deleter)
-        ->test(BookingTransfers::class, ['booking' => $s['booking']->fresh()])
-        ->call('deleteTransferDocument', $doc->id);
-
-    expect(Document::find($doc->id))->toBeNull();
-});
-
-it('requires documents.upload to add a transfer document', function () {
-    $s = confirmedBookingScenario();
-    draftSaleTransfer($s);
-    $noUpload = makeUser(permissions: ['transfer.view', 'transfer.create', 'documents.view', 'bookings.view']);
-
-    Livewire::actingAs($noUpload)
-        ->test(BookingTransfers::class, ['booking' => $s['booking']])
-        ->set('transferFiles.'.docType('TRANSFER_APPLICATION')->id, fakeDocument());
-
-    expect(Document::query()->where('documentable_id', $s['booking']->id)
-        ->where('document_type_id', docType('TRANSFER_APPLICATION')->id)->exists())->toBeFalse();
 });

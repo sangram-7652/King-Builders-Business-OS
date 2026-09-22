@@ -8,7 +8,6 @@ use App\Enums\PossessionActivityType;
 use App\Enums\TransferRequestStatus;
 use App\Exceptions\DomainException;
 use App\Models\Plot;
-use App\Models\PossessionCase;
 use App\Models\TransferRequest;
 use App\Models\User;
 use App\Services\Ownership\PlotOwnershipService;
@@ -87,8 +86,12 @@ class CompleteTransferAction
 
                 // Re-checked here too, immediately before completion — never
                 // trust the Draft screen or the approval-time snapshot.
-                if (PossessionCase::query()->where('booking_id', $locked->booking_id)->exists()) {
-                    throw new DomainException('A possession case already exists for this booking — the plot cannot be changed anymore.');
+                if ($locked->booking->isPossessionDone()) {
+                    throw new DomainException('Possession is already Done for this booking — the plot cannot be changed anymore.');
+                }
+
+                if ($locked->booking->isRegistryDone()) {
+                    throw new DomainException('Registry is already Done for this booking — the plot cannot be changed anymore.');
                 }
 
                 $this->plotTransfer->applyPlotChange($locked, $oldPlot, $newPlot, $actor);
