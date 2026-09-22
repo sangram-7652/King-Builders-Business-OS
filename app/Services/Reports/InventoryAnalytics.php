@@ -7,7 +7,7 @@ namespace App\Services\Reports;
 use App\Enums\AgingBucket;
 use App\Enums\BookingStatus;
 use App\Enums\PlotStatus;
-use App\Enums\RegistryCaseStatus;
+use App\Enums\RegistryStatus;
 use App\Models\Plot;
 use App\Models\Project;
 use App\Queries\Reports\ReportFilterScope;
@@ -310,7 +310,10 @@ class InventoryAnalytics
     }
 
     /**
-     * Plots whose confirmed booking has a COMPLETED registry case (M9).
+     * Plots whose confirmed booking has Registry = DONE (the simplified,
+     * booking-level Registry status — see App\Enums\RegistryStatus). The
+     * legacy `registry_cases` table is no longer the source of truth for
+     * this metric; it only ever holds historical data now.
      *
      * @return Builder
      */
@@ -322,8 +325,7 @@ class InventoryAnalytics
                     ->whereNull('bookings.deleted_at')
                     ->where('bookings.status', '=', BookingStatus::Confirmed->value);
             })
-            ->join('registry_cases', 'registry_cases.booking_id', '=', 'bookings.id')
-            ->where('registry_cases.status', RegistryCaseStatus::Completed->value);
+            ->where('bookings.registry_status', RegistryStatus::Done->value);
 
         return $query;
     }

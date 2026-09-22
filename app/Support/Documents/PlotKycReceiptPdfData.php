@@ -26,6 +26,13 @@ use Illuminate\Support\Collection;
  *    `booking_witnesses`).
  *  - Seller / Company / Director — tenant-wide, sourced from {@see Branding}
  *    (config/branding.php), never stored per-booking.
+ *  - Registry Buyer (name/mobile/address/PAN shown on THIS document) —
+ *    BOOKING-level, receipt-specific (`bookings.registry_buyer_*`). Applied
+ *    ONLY to the primary buyer's displayed identity, per field, when that
+ *    field is set; every other co-owner (and any unset field) still shows
+ *    the buyer's own real data. The booking's actual buyer/ownership record
+ *    (`booking_buyers`, `Buyer`) is never modified by this override — see
+ *    `GeneratePlotKycReceiptAction::syncRegistryBuyer()`.
  *  - Financial figures — reuse {@see PaymentLedger}
  *    exclusively; no payment math is duplicated here. "Paid PLC" / "Balance
  *    PLC" are deliberately left untracked (null) — payments are not itemised
@@ -91,13 +98,17 @@ final class PlotKycReceiptPdfData
                 'mobile' => $this->branding->contact['phone'] ?? null,
             ],
 
-            'buyers' => $booking->bookingBuyers->map(fn ($bb) => [
-                'name' => $bb->buyer?->fullName() ?? '—',
-                'address' => $bb->buyer?->address,
-                'pan' => $bb->buyer?->pan_number,
-                'mobile' => $bb->buyer?->phone,
-                'isPrimary' => (bool) $bb->is_primary,
-            ])->all(),
+            'buyers' => $booking->bookingBuyers->map(function ($bb) use ($booking) {
+                $isPrimary = (bool) $bb->is_primary;
+
+                return [
+                    'name' => self::registryOverride($isPrimary, $booking->registry_buyer_name) ?? $bb->buyer?->fullName() ?? '—',
+                    'address' => self::registryOverride($isPrimary, $booking->registry_buyer_address) ?? $bb->buyer?->address,
+                    'pan' => self::registryOverride($isPrimary, $booking->registry_buyer_pan) ?? $bb->buyer?->pan_number,
+                    'mobile' => self::registryOverride($isPrimary, $booking->registry_buyer_mobile) ?? $bb->buyer?->phone,
+                    'isPrimary' => $isPrimary,
+                ];
+            })->all(),
 
             'witnesses' => self::witnessSlots($booking->witnesses),
 
@@ -138,6 +149,12 @@ final class PlotKycReceiptPdfData
             'address' => $byNumber->get($n)?->address,
             'mobile' => $byNumber->get($n)?->mobile,
         ])->all();
+    }
+
+    /** A registry-buyer override only ever applies to the primary buyer, and only when actually set. */
+    private static function registryOverride(bool $isPrimary, ?string $value): ?string
+    {
+        return $isPrimary && $value !== null && $value !== '' ? $value : null;
     }
 
     private static function trimDecimal(string $value): string

@@ -93,7 +93,7 @@ it('renders REGISTRY KYC / PART-1 with real plot/village/chauhaddi/seller/buyer/
         ->toContain('Plot 220')
         ->toContain('Drain')
         // Seller / company
-        ->toContain('KING BUILDERS')
+        ->toContain('King Builders')
         ->toContain('Rajesh Kumar')
         ->toContain('Head Office, Lucknow')
         ->toContain('AAACK1234B')
@@ -133,4 +133,61 @@ it('prints blank/dash placeholders when seller PAN, witnesses and land records a
     $html = renderPlotKycHtml($s['booking']);
 
     expect($html)->toContain('REGISTRY KYC');
+});
+
+it('the header contains only REGISTRY KYC / PART-1 / Booking number / Date, center aligned (1)', function () {
+    $s = confirmedBookingScenario();
+
+    $html = renderPlotKycHtml($s['booking']->fresh());
+
+    expect($html)
+        ->toContain('class="header-center"')
+        ->toContain('REGISTRY KYC')
+        ->toContain('PART-1')
+        ->toContain('Booking: '.$s['booking']->booking_number)
+        ->toContain('Date: '.now()->format('d/m/Y'));
+});
+
+it('never renders a logo image or the old right-aligned company-name header block (2)', function () {
+    config(['branding.name' => 'King Builders', 'branding.logo_path' => 'branding/logo.png']);
+    $s = confirmedBookingScenario();
+
+    $html = renderPlotKycHtml($s['booking']->fresh());
+
+    expect($html)
+        ->not->toContain('<img')
+        ->not->toContain('class="logo"')
+        ->not->toContain('class="company-name"')
+        ->not->toContain('KING BUILDERS'); // the old strtoupper() header text is gone
+});
+
+it('renders a compass in the Plot Details area, without disturbing the Plot Details table (17)', function () {
+    $s = confirmedBookingScenario();
+
+    $html = renderPlotKycHtml($s['booking']->fresh());
+
+    expect($html)
+        ->toContain('class="compass-col"')
+        ->toContain('class="compass"')
+        ->toContain('>N<')
+        ->toContain('>E<')
+        ->toContain('>S<')
+        ->toContain('>W<')
+        ->toContain('class="plot-details-col"')
+        ->toContain('Plot No.');
+});
+
+it('never renders signature lines, or a seller/company footer (19, 20)', function () {
+    config(['branding.contact.head_office_address' => 'Head Office, Lucknow']);
+    $s = confirmedBookingScenario();
+
+    $html = renderPlotKycHtml($s['booking']->fresh());
+
+    expect($html)
+        ->not->toContain('sign-block')
+        ->not->toContain('signatures')
+        ->not->toContain('Witness 1 &amp; 2')
+        ->not->toContain('class="footer"')
+        ->not->toContain('system-generated Plot KYC')
+        ->not->toContain('Head Office:-');
 });

@@ -9,6 +9,7 @@ use App\Enums\TransferRequestStatus;
 use App\Exceptions\DomainException;
 use App\Models\TransferRequest;
 use App\Models\User;
+use App\Observers\BookingCommissionObserver;
 use App\Services\Transfer\TransferEligibilityService;
 use App\Support\Concerns\RunsInTransaction;
 use App\Support\Possession\PossessionTimeline;
@@ -123,6 +124,26 @@ class TransferWorkflowAction
     {
         $this->guard($actor, 'transfer.create');
 
+        return $this->applyCancel($transfer, $reason, $actor);
+    }
+
+    /**
+     * The exact same transition as {@see self::cancel()}, without the
+     * `transfer.create` permission gate. Used ONLY when a transfer request
+     * is cancelled as a side effect of cancelling its BOOKING (an
+     * already-authorised `bookings.cancel` action) — never reachable from a
+     * direct transfer screen. Same precedent as
+     * {@see BookingCommissionObserver} cascading a
+     * commission-case cancellation without checking a commission permission
+     * on the actor.
+     */
+    public function cancelForBookingCancellation(TransferRequest $transfer, string $reason, User $actor): TransferRequest
+    {
+        return $this->applyCancel($transfer, $reason, $actor);
+    }
+
+    private function applyCancel(TransferRequest $transfer, string $reason, User $actor): TransferRequest
+    {
         return $this->move($transfer, TransferRequestStatus::Cancelled, $actor, PossessionActivityType::TransferCancelled,
             fn ($t) => $t->forceFill(['cancelled_at' => now(), 'cancellation_reason' => $reason ?: null]));
     }

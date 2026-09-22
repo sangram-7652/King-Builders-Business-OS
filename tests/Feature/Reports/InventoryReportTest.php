@@ -5,13 +5,12 @@ declare(strict_types=1);
 use App\Enums\AgingBucket;
 use App\Enums\DatePreset;
 use App\Enums\PlotStatus;
-use App\Enums\RegistryCaseStatus;
+use App\Enums\RegistryStatus;
 use App\Models\Block;
 use App\Models\Booking;
 use App\Models\Masters\PlotSize;
 use App\Models\Plot;
 use App\Models\Project;
-use App\Models\RegistryCase;
 use App\Services\Reports\InventoryAnalytics;
 use App\Support\Reports\InventoryFilters;
 use App\Support\Reports\ReportFilterData;
@@ -58,8 +57,9 @@ function invWorld(): array
 
     // One booked plot gets a confirmed booking + completed registry → "registered" = 1
     $reg = $bookedA1->first();
-    $booking = Booking::factory()->confirmed()->forPlot($reg)->create(['final_amount' => '3500000', 'booking_date' => '2026-06-05']);
-    RegistryCase::factory()->forBooking($booking)->status(RegistryCaseStatus::Completed)->create();
+    Booking::factory()->confirmed()->forPlot($reg)->create([
+        'final_amount' => '3500000', 'booking_date' => '2026-06-05', 'registry_status' => RegistryStatus::Done->value,
+    ]);
 
     // A couple more confirmed bookings for price bands
     Booking::factory()->confirmed()->create(['project_id' => $pA->id, 'block_id' => $bA1->id, 'plot_id' => $bookedA1->last()->id, 'final_amount' => '1800000', 'booking_date' => '2026-06-08']);

@@ -72,11 +72,19 @@ final class BrandingConfigWriter
         return rtrim($contents, "\n")."\n".$line."\n";
     }
 
-    /** Quotes a value only when it needs it (spaces, #, quotes, backslashes) — matches typical .env conventions. */
+    /**
+     * Quotes a value only when it needs it (spaces, #, quotes, backslashes,
+     * `$`) — matches typical .env conventions. `$` is ALWAYS escaped when
+     * quoting: phpdotenv interpolates `${OTHER_VAR}` inside a double-quoted
+     * value, so an unescaped `$` here would let operator-entered text (e.g.
+     * a Plot KYC Receipt Director Name) pull the value of an unrelated
+     * secret env var (APP_KEY, DB_PASSWORD, …) into `.env` — which then
+     * renders straight into a customer-facing PDF the next time it loads.
+     */
     private function quote(string $value): string
     {
-        if ($value === '' || preg_match('/[\s#"\'\\\\]/', $value) === 1) {
-            return '"'.str_replace(['\\', '"'], ['\\\\', '\\"'], $value).'"';
+        if ($value === '' || preg_match('/[\s#"\'\\\\$]/', $value) === 1) {
+            return '"'.str_replace(['\\', '"', '$'], ['\\\\', '\\"', '\\$'], $value).'"';
         }
 
         return $value;

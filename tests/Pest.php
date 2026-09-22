@@ -20,7 +20,7 @@ use App\Enums\DatePreset;
 use App\Enums\InspectionStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\PlotStatus;
-use App\Enums\RegistryCaseStatus;
+use App\Enums\RegistryStatus;
 use App\Enums\RoleName;
 use App\Models\Agreement;
 use App\Models\Block;
@@ -36,7 +36,6 @@ use App\Models\Payment;
 use App\Models\Plot;
 use App\Models\PossessionCase;
 use App\Models\Project;
-use App\Models\RegistryCase;
 use App\Models\User;
 use App\Services\Communication\CommunicationRequest;
 use App\Services\Reports\MisAnalytics;
@@ -433,10 +432,7 @@ function possessionReadyScenario(string $finalAmount = '1000000'): array
     // "reads M7/M8 truth" test tightens it again explicitly.
     config()->set('possession.financial_clearance.max_outstanding', '100000000');
 
-    RegistryCase::factory()
-        ->forBooking($s['booking'])
-        ->status(RegistryCaseStatus::Completed)
-        ->create(['registered_document_number' => 'RD-'.fake()->numerify('#####')]);
+    $s['booking']->forceFill(['registry_status' => RegistryStatus::Done])->save();
 
     return $s;
 }

@@ -110,22 +110,24 @@
 
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Seller / Company</p>
-                    <p class="text-xs text-(--content-muted)">Company Name, Address and Mobile come from branding settings and cannot be edited here. Director Name and PAN are prefilled when already configured — otherwise fill them in here; they are saved back to branding settings.</p>
+                    <p class="text-xs text-(--content-muted)">Prefilled from branding settings when already configured — otherwise fill them in here. Saved back to branding settings, so editing Company Name, Address or Mobile here changes them everywhere else in the app too.</p>
                     <div class="mt-2 grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <p class="text-sm text-(--content-muted)">Company Name</p>
-                            <p class="text-sm font-medium">{{ $branding->name ?: '—' }}</p>
-                        </div>
+                        <x-ui.input label="Company Name" wire:model="companyName" :error="$errors->first('companyName')" />
                         <x-ui.input label="Director Name" wire:model="directorName" :error="$errors->first('directorName')" />
-                        <div class="sm:col-span-2">
-                            <p class="text-sm text-(--content-muted)">Address</p>
-                            <p class="text-sm font-medium">{{ $branding->contact['head_office_address'] ?: '—' }}</p>
-                        </div>
+                        <x-ui.input label="Address" wire:model="companyAddress" :error="$errors->first('companyAddress')" />
                         <x-ui.input label="PAN" wire:model="panNumber" :error="$errors->first('panNumber')" />
-                        <div>
-                            <p class="text-sm text-(--content-muted)">Mobile</p>
-                            <p class="text-sm font-medium">{{ $branding->contact['phone'] ?: '—' }}</p>
-                        </div>
+                        <x-ui.input label="Mobile" wire:model="companyMobile" :error="$errors->first('companyMobile')" />
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-(--content-muted)">Buyer / Customer (Registry Buyer)</p>
+                    <p class="text-xs text-(--content-muted)">Prefilled from the booking's buyer — edit if the person named in the registry KYC is different (e.g. a spouse or nominee). This never changes the booking's actual buyer record.</p>
+                    <div class="mt-2 grid gap-4 sm:grid-cols-2">
+                        <x-ui.input label="Name" wire:model="registryBuyerName" :error="$errors->first('registryBuyerName')" />
+                        <x-ui.input label="Mobile" wire:model="registryBuyerMobile" :error="$errors->first('registryBuyerMobile')" />
+                        <x-ui.input label="Address" wire:model="registryBuyerAddress" :error="$errors->first('registryBuyerAddress')" />
+                        <x-ui.input label="PAN" wire:model="registryBuyerPan" :error="$errors->first('registryBuyerPan')" />
                     </div>
                 </div>
 

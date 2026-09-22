@@ -92,10 +92,14 @@ class BookingShow extends Component
         $this->authorize('cancel', $this->booking);
         $this->validate(['cancelReason' => ['nullable', 'string', 'max:255']]);
 
+        $wasConfirmed = $this->booking->isConfirmed();
+
         try {
             app(CancelBookingAction::class)->handle($this->booking, auth()->user(), $this->cancelReason ?: null);
             $this->refreshBooking();
-            $this->dispatch('toast', message: 'Booking cancelled.', variant: 'success');
+            $this->dispatch('toast', message: $wasConfirmed
+                ? 'Booking cancelled successfully. Plot is now available.'
+                : 'Booking cancelled.', variant: 'success');
         } catch (DomainException $e) {
             $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
         }

@@ -104,6 +104,48 @@ it('maps buyer name, address, PAN (unmasked) and mobile (37)', function () {
         ->and($data['buyers'][0]['isPrimary'])->toBeTrue();
 });
 
+it('shows the registry buyer override for the primary buyer, per field, when set (11)', function () {
+    $s = confirmedBookingScenario();
+    $s['buyer']->update(['address' => '45 MG Road', 'pan_number' => 'BXPPK1234C', 'phone' => '9123456780']);
+    $s['booking']->update([
+        'registry_buyer_name' => 'Priya Singh',
+        'registry_buyer_mobile' => '9988776655',
+        'registry_buyer_address' => null, // left unset — falls back to the buyer's own address
+        'registry_buyer_pan' => 'ZZZZZ9999Z',
+    ]);
+
+    $data = plotKycData($s['booking']->fresh());
+
+    expect($data['buyers'])->toHaveCount(1)
+        ->and($data['buyers'][0]['name'])->toBe('Priya Singh')
+        ->and($data['buyers'][0]['mobile'])->toBe('9988776655')
+        ->and($data['buyers'][0]['pan'])->toBe('ZZZZZ9999Z')
+        // registry_buyer_address was left null — falls back to the buyer's real address
+        ->and($data['buyers'][0]['address'])->toBe('45 MG Road');
+});
+
+it('the registry buyer override never touches booking_buyers or the Buyer master (12)', function () {
+    $s = confirmedBookingScenario();
+    $originalName = $s['buyer']->fullName();
+
+    $s['booking']->update(['registry_buyer_name' => 'Priya Singh']);
+
+    expect($s['buyer']->fresh()->fullName())->toBe($originalName)
+        ->and($s['booking']->fresh()->bookingBuyers()->where('buyer_id', $s['buyer']->id)->exists())->toBeTrue();
+});
+
+it('with no registry buyer override set, the buyer section shows the actual booking buyer exactly as before', function () {
+    $s = confirmedBookingScenario();
+    $s['buyer']->update(['address' => '45 MG Road', 'pan_number' => 'BXPPK1234C', 'phone' => '9123456780']);
+
+    $data = plotKycData($s['booking']->fresh());
+
+    expect($data['buyers'][0]['name'])->toBe($s['buyer']->fullName())
+        ->and($data['buyers'][0]['address'])->toBe('45 MG Road')
+        ->and($data['buyers'][0]['pan'])->toBe('BXPPK1234C')
+        ->and($data['buyers'][0]['mobile'])->toBe('9123456780');
+});
+
 it('always returns exactly two witness slots, blank when not recorded, filled when present (38)', function () {
     $s = confirmedBookingScenario();
 

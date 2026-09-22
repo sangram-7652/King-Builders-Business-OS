@@ -61,7 +61,7 @@ class GeneratePlotKycReceiptAction
     ) {}
 
     /**
-     * @param  array{vikray_muly_amount?: string|null, witnesses?: list<array{name?: string|null, address?: string|null, mobile?: string|null}>, plot?: array{village_name?: string|null, gata_number?: string|null, boundary_east?: string|null, boundary_west?: string|null, boundary_north?: string|null, boundary_south?: string|null}, seller?: array{director_name?: string|null, pan_number?: string|null}}  $details  already-validated
+     * @param  array{vikray_muly_amount?: string|null, witnesses?: list<array{name?: string|null, address?: string|null, mobile?: string|null}>, plot?: array{village_name?: string|null, gata_number?: string|null, boundary_east?: string|null, boundary_west?: string|null, boundary_north?: string|null, boundary_south?: string|null}, seller?: array{company_name?: string|null, director_name?: string|null, address?: string|null, pan_number?: string|null, mobile?: string|null}, registry_buyer?: array{name?: string|null, mobile?: string|null, address?: string|null, pan?: string|null}}  $details  already-validated
      */
     public function handle(Booking $booking, User $actor, array $details = []): Document
     {
@@ -96,6 +96,10 @@ class GeneratePlotKycReceiptAction
 
             if (array_key_exists('seller', $details)) {
                 $this->syncSellerConfig($details['seller']);
+            }
+
+            if (array_key_exists('registry_buyer', $details)) {
+                $this->syncRegistryBuyer($locked, $details['registry_buyer']);
             }
 
             $type = DocumentType::query()->where('code', 'PLOT_KYC_RECEIPT')->firstOrFail();
@@ -191,10 +195,15 @@ class GeneratePlotKycReceiptAction
     }
 
     /**
-     * Fills the seller's Director Name / PAN — the SAME `branding.contact.
-     * director_name` / `pan_number` config keys (backed by `BRAND_DIRECTOR_NAME`
-     * / `BRAND_PAN_NUMBER` in `.env`) every other Plot KYC Receipt seller field
-     * already reads, never a second config system or table.
+     * Fills all five Seller / Company fields — the SAME `branding.*` config
+     * keys (backed by `.env`, via {@see BrandingConfigWriter}) every other
+     * Plot KYC Receipt seller field already reads, never a second config
+     * system or table. Company Name / Address / Mobile are the SAME
+     * tenant-wide `branding.name` / `contact.head_office_address` /
+     * `contact.phone` values every other document (payment receipts,
+     * possession certificates, the portal, the app shell) already reads —
+     * editing them here changes them everywhere, by design, since `.env` is
+     * the one existing branding source; there is no per-document override.
      *
      * The in-memory `config()` value is updated immediately — regardless of
      * whether the `.env` write below succeeds — so the operator's entered
@@ -204,39 +213,73 @@ class GeneratePlotKycReceiptAction
      * Generate/Regenerate won't see it prefilled; it must never block this
      * one.
      *
-     * @param  array{director_name?: string|null, pan_number?: string|null}  $seller
+     * @param  array{company_name?: string|null, director_name?: string|null, address?: string|null, pan_number?: string|null, mobile?: string|null}  $seller
      */
     private function syncSellerConfig(array $seller): void
     {
-        $map = ['director_name' => 'BRAND_DIRECTOR_NAME', 'pan_number' => 'BRAND_PAN_NUMBER'];
-        $updates = [];
+        // field => [config path, .env key]
+        $map = [
+            'company_name' => ['branding.name', 'BRAND_NAME'],
+            'director_name' => ['branding.contact.director_name', 'BRAND_DIRECTOR_NAME'],
+            'address' => ['branding.contact.head_office_address', 'BRAND_HEAD_OFFICE_ADDRESS'],
+            'pan_number' => ['branding.contact.pan_number', 'BRAND_PAN_NUMBER'],
+            'mobile' => ['branding.contact.phone', 'BRAND_PHONE'],
+        ];
 
-        foreach ($map as $field => $envKey) {
+        $envUpdates = [];
+        $configUpdates = [];
+
+        foreach ($map as $field => [$configPath, $envKey]) {
             if (! array_key_exists($field, $seller)) {
                 continue;
             }
 
             $new = trim((string) ($seller[$field] ?? ''));
-            $current = trim((string) (config("branding.contact.{$field}") ?? ''));
+            $current = trim((string) (config($configPath) ?? ''));
 
             if ($new !== $current) {
-                $updates[$envKey] = $new;
+                $envUpdates[$envKey] = $new;
+                $configUpdates[$configPath] = $new !== '' ? $new : null;
             }
         }
 
-        if ($updates === []) {
+        if ($envUpdates === []) {
             return;
         }
 
-        foreach ($updates as $envKey => $value) {
-            $field = array_search($envKey, $map, true);
-            config(["branding.contact.{$field}" => $value !== '' ? $value : null]);
+        foreach ($configUpdates as $path => $value) {
+            config([$path => $value]);
         }
 
         try {
-            $this->brandingWriter->update($updates);
+            $this->brandingWriter->update($envUpdates);
         } catch (Throwable $e) {
             Log::warning('plot_kyc_receipt.seller_config_persist_failed', ['error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Fills the Registry Buyer — the name/mobile/address/PAN shown on THIS
+     * document, which may deliberately differ from the booking's actual
+     * buyer (see the `registry_buyer_*` columns on `bookings`, added
+     * specifically for this). Plain overwrite, same as
+     * {@see self::syncPlotLandRecords()}: the Generate/Regenerate form always
+     * submits the current value for a field it didn't touch, and
+     * `Eloquent::save()` issues no UPDATE when nothing is actually dirty.
+     *
+     * This NEVER touches `booking_buyers`, `bookings.buyer` data, or the
+     * `Buyer` master — the booking's real buyer/ownership record is
+     * completely unaffected by what is entered here.
+     *
+     * @param  array{name?: string|null, mobile?: string|null, address?: string|null, pan?: string|null}  $fields
+     */
+    private function syncRegistryBuyer(Booking $booking, array $fields): void
+    {
+        $booking->forceFill([
+            'registry_buyer_name' => ($fields['name'] ?? null) ?: null,
+            'registry_buyer_mobile' => ($fields['mobile'] ?? null) ?: null,
+            'registry_buyer_address' => ($fields['address'] ?? null) ?: null,
+            'registry_buyer_pan' => ($fields['pan'] ?? null) ?: null,
+        ])->save();
     }
 }

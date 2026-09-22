@@ -6,7 +6,7 @@ namespace App\Services\Possession;
 
 use App\Enums\BookingStatus;
 use App\Enums\PlotStatus;
-use App\Enums\RegistryCaseStatus;
+use App\Enums\RegistryStatus;
 use App\Models\Booking;
 use App\Services\Documents\DocumentChecklistService;
 use App\Services\Payments\PaymentLedger;
@@ -20,7 +20,7 @@ use App\Support\Registry\EligibilityResult;
  *
  *   - booking is CONFIRMED
  *   - plot is valid and active
- *   - the M9 registry case is COMPLETED
+ *   - Registry status (booking-scoped, see App\Enums\RegistryStatus) is DONE
  *   - required booking documents are verified (M9)
  *   - financial prerequisite: ≥ N% collected (M7)
  *
@@ -50,10 +50,9 @@ class PossessionEligibilityService
             $plotOk ? null : 'Plot is not active / booked.');
 
         if ($cfg['require_registry_completed']) {
-            $registry = $booking->relationLoaded('registryCase') ? $booking->registryCase : $booking->registryCase()->first();
-            $registryOk = $registry !== null && $registry->status === RegistryCaseStatus::Completed;
+            $registryOk = $booking->registry_status === RegistryStatus::Done;
             $checks[] = $this->check('registry_completed', 'Registry completed', $registryOk,
-                $registryOk ? null : ($registry === null ? 'No registry case.' : "Registry is {$registry->status->label()}."));
+                $registryOk ? null : 'Registry is '.$booking->registry_status->label().'.');
         }
 
         if ($cfg['require_documents_verified']) {

@@ -4,9 +4,6 @@
 /** @var array<string, mixed> $data */
 $primary = $brand->colors['primary'];
 $money = fn ($v) => $v === null ? '—' : '₹'.number_format((float) $v, 2);
-$logoFile = $brand->logoPath ? public_path($brand->logoPath) : null;
-$signatureFile = $brand->signaturePath ? public_path($brand->signaturePath) : null;
-$stampFile = $brand->stampPath ? public_path($brand->stampPath) : null;
 ?>
 <!DOCTYPE html>
 <html>
@@ -18,13 +15,9 @@ $stampFile = $brand->stampPath ? public_path($brand->stampPath) : null;
         body { margin: 0; color: #1a1a1a; font-size: 10.5px; }
         .wrap { padding: 16px 32px; }
 
-        table.head { width: 100%; border-collapse: collapse; }
-        table.head td { vertical-align: top; }
-        .logo { height: 52px; margin-bottom: 2px; }
-        .company-name { font-size: 15px; font-weight: bold; color: #111; letter-spacing: .3px; }
-        .doc-title { text-align: right; }
-        .doc-title .t1 { font-size: 16px; font-weight: bold; letter-spacing: 1px; }
-        .doc-title .t2 { font-size: 11px; font-weight: bold; color: #444; letter-spacing: 2px; }
+        .header-center { text-align: center; }
+        .header-center .t1 { font-size: 17px; font-weight: bold; letter-spacing: 1px; }
+        .header-center .t2 { font-size: 12px; font-weight: bold; color: #444; letter-spacing: 2px; margin-top: 1px; }
         .meta { font-size: 9.5px; color: #444; margin-top: 2px; }
 
         .rule { border-bottom: 2px solid {{ $primary }}; margin: 6px 0 10px; }
@@ -46,36 +39,31 @@ $stampFile = $brand->stampPath ? public_path($brand->stampPath) : null;
 
         .not-tracked { color: #888; font-style: italic; font-weight: normal; }
 
-        .sign-block { page-break-inside: avoid; margin-top: 16px; }
-        table.signatures { width: 100%; border-collapse: collapse; }
-        table.signatures td { width: 33.33%; text-align: center; padding-top: 30px; font-size: 9.5px; }
-        table.signatures td .line { border-top: 1px solid #111; padding-top: 4px; display: inline-block; min-width: 80%; }
-        .sign .stamp-img { height: 18px; width: auto; }
-        .sign .signature-img { height: 30px; width: auto; margin-top: -8px; margin-bottom: -6px; }
+        /* Plot Details + compass, side by side — the compass never overlaps
+           or reflows the Plot Details grid, it just sits in the spare column. */
+        table.plot-with-compass { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        table.plot-with-compass td.plot-details-col { width: 72%; vertical-align: top; padding: 0; }
+        table.plot-with-compass td.compass-col { width: 28%; vertical-align: middle; text-align: center; padding: 0; }
 
-        .footer { margin-top: 10px; border-top: 2px solid {{ $primary }}; padding-top: 6px; font-size: 8.5px; color: #333; text-align: center; }
+        /* A simple N/E/S/W cross built from table-cell borders — reliable in
+           dompdf, unlike border-radius circles or CSS transforms. */
+        table.compass { border-collapse: collapse; margin: 4px auto 0; }
+        table.compass td { width: 20px; height: 18px; text-align: center; vertical-align: middle;
+            font-size: 8px; font-weight: bold; color: #444; padding: 0; }
+        table.compass td.c-mid { border-left: 1px solid #999; border-right: 1px solid #999; }
+        table.compass tr.c-row-mid td { border-top: 1px solid #999; border-bottom: 1px solid #999; }
     </style>
 </head>
 <body>
 <div class="wrap">
 
     {{-- HEADER --}}
-    <table class="head">
-        <tr>
-            <td style="width: 55%;">
-                @if ($logoFile && file_exists($logoFile))
-                    <img class="logo" src="{{ $logoFile }}"><br>
-                @endif
-                <div class="company-name">{{ strtoupper($brand->name) }}</div>
-            </td>
-            <td style="width: 45%;" class="doc-title">
-                <div class="t1">{{ $data['documentTitle'] }}</div>
-                <div class="t2">{{ $data['documentSubtitle'] }}</div>
-                <div class="meta">Booking: {{ $booking->booking_number }}</div>
-                <div class="meta">Date: {{ now()->format('d/m/Y') }}</div>
-            </td>
-        </tr>
-    </table>
+    <div class="header-center">
+        <div class="t1">{{ $data['documentTitle'] }}</div>
+        <div class="t2">{{ $data['documentSubtitle'] }}</div>
+        <div class="meta">Booking: {{ $booking->booking_number }}</div>
+        <div class="meta">Date: {{ now()->format('d/m/Y') }}</div>
+    </div>
     <div class="rule"></div>
 
     {{-- VILLAGE / GATA / VIKRAY MULY --}}
@@ -92,18 +80,43 @@ $stampFile = $brand->stampPath ? public_path($brand->stampPath) : null;
 
     {{-- PLOT DETAILS --}}
     <div class="section-title">Plot Details</div>
-    <table class="grid">
+    <table class="plot-with-compass">
         <tr>
-            <td class="lbl">Plot No.</td><td class="val">{{ $data['plot']['plotNumber'] ?: '—' }}</td>
-            <td class="lbl">Site Name</td><td class="val">{{ $data['plot']['siteName'] ?: '—' }}</td>
-        </tr>
-        <tr>
-            <td class="lbl">Plot Area</td><td class="val">{{ $data['plot']['area'] ?: '—' }}</td>
-            <td class="lbl"></td><td class="val"></td>
-        </tr>
-        <tr>
-            <td class="lbl">Front</td><td class="val">{{ $data['plot']['front'] ?: '—' }}</td>
-            <td class="lbl">Depth</td><td class="val">{{ $data['plot']['depth'] ?: '—' }}</td>
+            <td class="plot-details-col">
+                <table class="grid">
+                    <tr>
+                        <td class="lbl">Plot No.</td><td class="val">{{ $data['plot']['plotNumber'] ?: '—' }}</td>
+                        <td class="lbl">Site Name</td><td class="val">{{ $data['plot']['siteName'] ?: '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Plot Area</td><td class="val">{{ $data['plot']['area'] ?: '—' }}</td>
+                        <td class="lbl"></td><td class="val"></td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Front</td><td class="val">{{ $data['plot']['front'] ?: '—' }}</td>
+                        <td class="lbl">Depth</td><td class="val">{{ $data['plot']['depth'] ?: '—' }}</td>
+                    </tr>
+                </table>
+            </td>
+            <td class="compass-col">
+                <table class="compass">
+                    <tr>
+                        <td></td>
+                        <td class="c-mid">N</td>
+                        <td></td>
+                    </tr>
+                    <tr class="c-row-mid">
+                        <td>W</td>
+                        <td class="c-mid"></td>
+                        <td>E</td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td class="c-mid">S</td>
+                        <td></td>
+                    </tr>
+                </table>
+            </td>
         </tr>
     </table>
 
@@ -225,35 +238,6 @@ $stampFile = $brand->stampPath ? public_path($brand->stampPath) : null;
             </td>
         </tr>
     </table>
-
-    <div class="sign-block">
-        <table class="signatures">
-            <tr>
-                <td>
-                    <span class="line">Buyer / Customer</span>
-                </td>
-                <td>
-                    <span class="line">Witness 1 &amp; 2</span>
-                </td>
-                <td class="sign">
-                    @if ($stampFile && file_exists($stampFile))
-                        <img class="stamp-img" src="{{ $stampFile }}"><br>
-                    @endif
-                    @if ($signatureFile && file_exists($signatureFile))
-                        <img class="signature-img" src="{{ $signatureFile }}"><br>
-                    @endif
-                    <span class="line">Seller / Company</span>
-                </td>
-            </tr>
-        </table>
-
-        <div class="footer">
-            This is a system-generated Plot KYC / Registry KYC Receipt for {{ $booking->booking_number }}.
-            @if ($brand->contact['head_office_address'])
-                Head Office:- {{ $brand->contact['head_office_address'] }}
-            @endif
-        </div>
-    </div>
 </div>
 </body>
 </html>

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Reports;
 
+use App\Enums\BookingStatus;
 use App\Enums\DocumentStatus;
 use App\Enums\PossessionCaseStatus;
-use App\Enums\RegistryCaseStatus;
+use App\Enums\RegistryStatus;
 use App\Enums\TransferRequestStatus;
 use App\Queries\Reports\ReportFilterScope;
 use App\Support\Reports\ReportFilterData;
@@ -25,11 +26,22 @@ use Illuminate\Support\Facades\DB;
  */
 class OperationsAnalytics
 {
+    /**
+     * Confirmed bookings still at Registry = PENDING (the simplified,
+     * booking-level Registry status — see App\Enums\RegistryStatus). The
+     * legacy `registry_cases` table is no longer the source of truth for
+     * this count; it only ever holds historical data now.
+     */
     public function registryPending(ReportFilterData $filters): int
     {
-        return $this->bookingLinked('registry_cases', $filters)
-            ->whereNotIn('registry_cases.status', $this->terminal(RegistryCaseStatus::cases()))
-            ->count();
+        $query = DB::table('bookings')
+            ->whereNull('bookings.deleted_at')
+            ->where('bookings.status', BookingStatus::Confirmed->value)
+            ->where('bookings.registry_status', RegistryStatus::Pending->value);
+        ReportFilterScope::project($query, $filters, 'bookings.project_id');
+        ReportFilterScope::salesperson($query, $filters, 'bookings.created_by');
+
+        return $query->count();
     }
 
     public function possessionPending(ReportFilterData $filters): int
@@ -83,7 +95,7 @@ class OperationsAnalytics
     }
 
     /**
-     * @param  list<RegistryCaseStatus|PossessionCaseStatus>  $cases
+     * @param  list<PossessionCaseStatus>  $cases
      * @return list<string>
      */
     private function terminal(array $cases): array

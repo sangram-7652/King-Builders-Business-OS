@@ -43,6 +43,7 @@ enum DocumentActivityType: string
     case RegistryCancelled = 'registry_cancelled';
     case RegistryExpenseRecorded = 'registry_expense_recorded';
     case RegistryExpenseApproved = 'registry_expense_approved';
+    case RegistryStatusChanged = 'registry_status_changed';
 
     case HandoverDocumentsReady = 'handover_documents_ready';
     case HandoverScheduled = 'handover_scheduled';
@@ -77,6 +78,7 @@ enum DocumentActivityType: string
             self::RegistryCancelled => 'Registry cancelled',
             self::RegistryExpenseRecorded => 'Registry expense recorded',
             self::RegistryExpenseApproved => 'Registry expense approved',
+            self::RegistryStatusChanged => 'Registry status changed',
             self::HandoverDocumentsReady => 'Handover documents ready',
             self::HandoverScheduled => 'Handover scheduled',
             self::HandoverCompleted => 'Documents handed over',

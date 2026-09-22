@@ -4,36 +4,61 @@ declare(strict_types=1);
 
 namespace App\Support\Bookings;
 
+use App\Actions\Bookings\CancelBookingAction;
+use App\Actions\Registry\RegistryCaseWorkflowAction;
 use App\Enums\AgreementStatus;
 use App\Enums\PaymentStatus;
-use App\Enums\PossessionCaseStatus;
-use App\Enums\RegistryCaseStatus;
-use App\Enums\TransferRequestStatus;
-use App\Exceptions\DomainException;
+use App\Enums\PlotStatus;
 use App\Models\Booking;
-use App\Observers\BookingCommissionObserver;
 
 /**
- * Decides whether a CONFIRMED booking can still be cancelled through the normal
- * cancellation path (M6, finding F-M6-1).
+ * Decides whether a CONFIRMED booking can still be cancelled (F-M6-1,
+ * redesigned for the product requirement that "a confirmed booking must
+ * always be cancellable by an authorised operator" — see
+ * {@see CancelBookingAction}).
  *
- * A confirmed booking whose downstream financial / operational records already
- * exist must NOT be cancellable — cancelling it would free the plot while
- * payments, a registry case, a possession case, an ownership transfer or a
- * signed agreement still reference it. Those records must be unwound first
- * (reverse the payments, close the case, …).
+ * This guard now reports ONLY the blockers the cancellation workflow
+ * genuinely cannot resolve safely on its own:
  *
- * Commission cases (M14) are deliberately NOT a blocker: the existing
- * {@see BookingCommissionObserver} already cascades a booking
- * cancellation to its commission cases (cancel the pending ones, auto-reverse
- * the approved-unpaid ones, flag the partially-paid ones for manual reversal).
+ *  - Live money (a PENDING or SUCCESS payment) — cancelling for free while
+ *    money is held or in flight would force a refund/reversal decision this
+ *    guard must never make silently. The operator reverses the payment
+ *    through the existing M7 payment-reversal flow first; the message says
+ *    so.
+ *  - A signed / approved Agreement — a legally executed document, unrelated
+ *    to Registry/Possession/Transfer and deliberately left untouched here.
+ *  - The plot itself already sitting in a state cancellation cannot safely
+ *    undo (SOLD / POSSESSION_COMPLETED / TRANSFERRED / already CANCELLED) —
+ *    forcing such a plot back to AVAILABLE would risk double-occupancy or a
+ *    double-sale.
  *
- * DRAFT / PENDING bookings are unaffected — they hold no financial history.
- * This guard invents no "force cancel" flow: if a blocker is present, the
- * caller gets a clear {@see DomainException}.
+ * Registry / Possession / Transfer are DELIBERATELY NOT checked here any
+ * more. A still-active one is cancelled through its own state machine as
+ * part of the SAME cancellation transaction (see
+ * `CancelBookingAction::cancelActiveDownstreamRecords()`); a COMPLETED /
+ * terminal one is simply left alone as preserved historical data. Blocking
+ * on a completed Registry Case in particular used to make the booking
+ * PERMANENTLY stuck — {@see RegistryCaseWorkflowAction::cancel()}
+ * refuses to cancel a completed case, so "cancel it first" was never
+ * actually possible. Completing Possession always also flips the plot to
+ * POSSESSION_COMPLETED, and completing a Transfer always leaves the
+ * booking's CURRENT plot BOOKED (the transfer moves the booking onto a new
+ * plot) — so the plot-state check above is what actually catches the one
+ * remaining unsafe case (possession already physically handed over)
+ * without needing to special-case Possession by name.
+ *
+ * An empty list means cancellation is safe.
  */
 final class BookingCancellationGuard
 {
+    /** Plot states a booking cancellation must never try to reverse. */
+    private const UNRECOVERABLE_PLOT_STATES = [
+        PlotStatus::Sold,
+        PlotStatus::PossessionCompleted,
+        PlotStatus::Transferred,
+        PlotStatus::Cancelled,
+    ];
+
     /**
      * Human-readable reasons the confirmed booking cannot be safely cancelled.
      * An empty list means cancellation is safe.
@@ -54,14 +79,6 @@ final class BookingCancellationGuard
             $blockers[] = "{$livePayments} pending/successful payment(s) exist — reverse them first";
         }
 
-        // M9 — a live registry case.
-        if ($booking->registryCase()
-            ->where('status', '!=', RegistryCaseStatus::Cancelled->value)
-            ->exists()
-        ) {
-            $blockers[] = 'a registry case exists — cancel it first';
-        }
-
         // M9 — a signed / approved agreement.
         if ($booking->agreements()
             ->whereIn('status', [AgreementStatus::Signed->value, AgreementStatus::Approved->value])
@@ -70,20 +87,14 @@ final class BookingCancellationGuard
             $blockers[] = 'a signed agreement exists';
         }
 
-        // M10 — a live possession case.
-        if ($booking->possessionCase()
-            ->where('status', '!=', PossessionCaseStatus::Cancelled->value)
-            ->exists()
-        ) {
-            $blockers[] = 'a possession case exists — cancel it first';
-        }
+        // The plot itself must still be in a state cancellation can safely
+        // undo. Use the already-loaded relation when the caller has it (the
+        // caller typically holds a FOR UPDATE lock on it already) so this
+        // check reads the exact same row, not a stale second query.
+        $plot = $booking->relationLoaded('plot') ? $booking->plot : $booking->plot()->first();
 
-        // M10 — an ownership transfer request that is not terminated.
-        if ($booking->transferRequests()
-            ->whereNotIn('status', [TransferRequestStatus::Cancelled->value, TransferRequestStatus::Rejected->value])
-            ->exists()
-        ) {
-            $blockers[] = 'an ownership transfer request is in progress';
+        if ($plot !== null && in_array($plot->status, self::UNRECOVERABLE_PLOT_STATES, true)) {
+            $blockers[] = "the plot is already {$plot->status->label()} and cannot be safely returned to Available — this needs manual review before the booking can be cancelled";
         }
 
         return $blockers;

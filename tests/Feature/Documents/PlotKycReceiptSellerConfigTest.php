@@ -39,39 +39,79 @@ function fakeBrandingEnvFile(): string
 | 1. Existing config values are prefilled
 */
 
-it('prefills the Generate form from existing Director Name / PAN config values (1)', function () {
-    config(['branding.contact.director_name' => 'Rajesh Kumar', 'branding.contact.pan_number' => 'AAACK1234B']);
-    $s = confirmedBookingScenario();
-
-    Livewire::actingAs(registryOfficer())
-        ->test(BookingDocuments::class, ['booking' => $s['booking']])
-        ->call('openPlotKyc')
-        ->assertSet('directorName', 'Rajesh Kumar')
-        ->assertSet('panNumber', 'AAACK1234B');
-});
-
-it('shows the read-only Company Name, Address and Mobile straight from branding config, unchanged', function () {
+it('prefills the Generate form from existing Company Name / Director Name / Address / PAN / Mobile config values (1, 8)', function () {
     config([
         'branding.name' => 'King Builders Pvt Ltd',
+        'branding.contact.director_name' => 'Rajesh Kumar',
         'branding.contact.head_office_address' => '1 Head Office Road',
+        'branding.contact.pan_number' => 'AAACK1234B',
         'branding.contact.phone' => '9998887770',
     ]);
-    // The `$branding` variable every Blade view receives is shared once from
-    // a request-wide singleton at framework boot (AppServiceProvider), which
-    // in this test already happened with the PRE-override config — rebind it
-    // the same way GeneratePlotKycReceiptAction does, so the view reflects
-    // the config set just above.
-    app()->forgetInstance(Branding::class);
-    app('view')->share('branding', app(Branding::class));
-
     $s = confirmedBookingScenario();
 
     Livewire::actingAs(registryOfficer())
         ->test(BookingDocuments::class, ['booking' => $s['booking']])
         ->call('openPlotKyc')
-        ->assertSee('King Builders Pvt Ltd')
-        ->assertSee('1 Head Office Road')
-        ->assertSee('9998887770');
+        ->assertSet('companyName', 'King Builders Pvt Ltd')
+        ->assertSet('directorName', 'Rajesh Kumar')
+        ->assertSet('companyAddress', '1 Head Office Road')
+        ->assertSet('panNumber', 'AAACK1234B')
+        ->assertSet('companyMobile', '9998887770');
+});
+
+it('all five Seller / Company fields are editable inputs, not read-only text (3, 4, 5, 6, 7)', function () {
+    config(['branding.contact.director_name' => null, 'branding.contact.pan_number' => null]);
+    $s = confirmedBookingScenario();
+    fakeBrandingEnvFile();
+
+    Livewire::actingAs(registryOfficer())
+        ->test(BookingDocuments::class, ['booking' => $s['booking']])
+        ->call('openPlotKyc')
+        ->set('companyName', 'New Builders Pvt Ltd')
+        ->set('directorName', 'Anita Sharma')
+        ->set('companyAddress', 'New Head Office, Kanpur')
+        ->set('panNumber', 'BXPPK9876D')
+        ->set('companyMobile', '9111122223')
+        ->call('generatePlotKycReceipt')
+        ->assertHasNoErrors();
+
+    expect(config('branding.name'))->toBe('New Builders Pvt Ltd')
+        ->and(config('branding.contact.director_name'))->toBe('Anita Sharma')
+        ->and(config('branding.contact.head_office_address'))->toBe('New Head Office, Kanpur')
+        ->and(config('branding.contact.pan_number'))->toBe('BXPPK9876D')
+        ->and(config('branding.contact.phone'))->toBe('9111122223');
+});
+
+it('persists entered Company Name / Address / Mobile to the existing branding config source (.env) (9, 10)', function () {
+    config(['branding.name' => null, 'branding.contact.head_office_address' => null, 'branding.contact.phone' => null]);
+    $s = confirmedBookingScenario();
+    $envPath = fakeBrandingEnvFile();
+
+    Livewire::actingAs(registryOfficer())
+        ->test(BookingDocuments::class, ['booking' => $s['booking']])
+        ->call('openPlotKyc')
+        ->assertSet('companyName', '')
+        ->assertSet('companyAddress', '')
+        ->assertSet('companyMobile', '')
+        ->set('companyName', 'Sunrise Builders')
+        ->set('companyAddress', '5 Market Road, Kanpur')
+        ->set('companyMobile', '9812345670')
+        ->call('generatePlotKycReceipt')
+        ->assertHasNoErrors();
+
+    $envContents = file_get_contents($envPath);
+    expect($envContents)
+        ->toContain('BRAND_NAME="Sunrise Builders"')
+        ->toContain('BRAND_HEAD_OFFICE_ADDRESS="5 Market Road, Kanpur"')
+        ->toContain('BRAND_PHONE=9812345670');
+
+    // Regeneration automatically prefills what was just saved.
+    Livewire::actingAs(registryOfficer())
+        ->test(BookingDocuments::class, ['booking' => $s['booking']->fresh()])
+        ->call('openPlotKyc')
+        ->assertSet('companyName', 'Sunrise Builders')
+        ->assertSet('companyAddress', '5 Market Road, Kanpur')
+        ->assertSet('companyMobile', '9812345670');
 });
 
 /*
@@ -127,19 +167,19 @@ it('persists entered Director Name / PAN to the existing branding config source 
 });
 
 it('leaves an already-configured value untouched, and writes nothing to .env, when the operator does not edit it', function () {
-    config(['branding.contact.director_name' => 'Original Director', 'branding.contact.pan_number' => 'ORIGPAN123']);
+    config(['branding.contact.director_name' => 'Original Director', 'branding.contact.pan_number' => 'ORIGP1234N']);
     $s = confirmedBookingScenario();
     $envPath = fakeBrandingEnvFile();
     $before = file_get_contents($envPath);
 
     Livewire::actingAs(registryOfficer())
         ->test(BookingDocuments::class, ['booking' => $s['booking']])
-        ->call('openPlotKyc') // prefills directorName = 'Original Director', panNumber = 'ORIGPAN123'
+        ->call('openPlotKyc') // prefills directorName = 'Original Director', panNumber = 'ORIGP1234N'
         ->call('generatePlotKycReceipt')
         ->assertHasNoErrors();
 
     expect(config('branding.contact.director_name'))->toBe('Original Director')
-        ->and(config('branding.contact.pan_number'))->toBe('ORIGPAN123')
+        ->and(config('branding.contact.pan_number'))->toBe('ORIGP1234N')
         ->and(file_get_contents($envPath))->toBe($before); // no write when nothing changed
 });
 
@@ -190,7 +230,7 @@ it('the next Regenerate automatically prefills the Director Name / PAN just save
         ->test(BookingDocuments::class, ['booking' => $s['booking']])
         ->call('openPlotKyc')
         ->set('directorName', 'Saved Director')
-        ->set('panNumber', 'SAVEDPAN1Z')
+        ->set('panNumber', 'SAVED1234Z')
         ->call('generatePlotKycReceipt')
         ->assertHasNoErrors();
 
@@ -198,7 +238,7 @@ it('the next Regenerate automatically prefills the Director Name / PAN just save
         ->test(BookingDocuments::class, ['booking' => $s['booking']->fresh()])
         ->call('openPlotKyc')
         ->assertSet('directorName', 'Saved Director')
-        ->assertSet('panNumber', 'SAVEDPAN1Z');
+        ->assertSet('panNumber', 'SAVED1234Z');
 });
 
 /*

@@ -81,14 +81,36 @@ class BookingDocuments extends Component
 
     public string $boundarySouth = '';
 
-    // Seller / Company — Director Name and PAN are the only two fields with
-    // no other source; prefilled from config/branding.php when present,
-    // blank and editable otherwise (see openPlotKyc()). Company Name,
-    // Address and Mobile stay exactly as they are today (read straight from
-    // Branding in the Blade — no form field, never editable here).
+    // Seller / Company — all five fields, prefilled from config/branding.php
+    // when present, blank and editable otherwise (see openPlotKyc()).
+    // Persisted back to the SAME branding config source (.env) — see
+    // GeneratePlotKycReceiptAction::syncSellerConfig(). Editing Company
+    // Name/Address/Mobile here changes them everywhere else in the app too,
+    // since branding config is tenant-wide, not per-document.
+    public string $companyName = '';
+
     public string $directorName = '';
 
+    public string $companyAddress = '';
+
     public string $panNumber = '';
+
+    public string $companyMobile = '';
+
+    // Registry Buyer — the name/mobile/address/PAN shown on THIS receipt,
+    // which may differ from the booking's actual buyer (e.g. a spouse or
+    // nominee). Prefilled from a previously-saved registry_buyer_* value
+    // when present, otherwise from the booking's primary buyer — editable
+    // either way. Persisted to bookings.registry_buyer_* only; the actual
+    // booking_buyers / Buyer record is never touched (see
+    // GeneratePlotKycReceiptAction::syncRegistryBuyer()).
+    public string $registryBuyerName = '';
+
+    public string $registryBuyerMobile = '';
+
+    public string $registryBuyerAddress = '';
+
+    public string $registryBuyerPan = '';
 
     // --- Multi-file categories (Payment Documents / Registry Documents) --
 
@@ -172,7 +194,7 @@ class BookingDocuments extends Component
 
     public function openPlotKyc(): void
     {
-        $this->booking->loadMissing(['witnesses', 'plot']);
+        $this->booking->loadMissing(['witnesses', 'plot', 'bookingBuyers.buyer']);
 
         $this->vikrayMulyAmount = $this->booking->vikray_muly_amount !== null
             ? (string) $this->booking->vikray_muly_amount
@@ -197,12 +219,25 @@ class BookingDocuments extends Component
         $this->boundaryNorth = (string) ($plot?->boundary_north ?? '');
         $this->boundarySouth = (string) ($plot?->boundary_south ?? '');
 
-        // Seller / Company — Director Name and PAN, prefilled from Branding
-        // config when present, blank (editable) otherwise. Company Name /
-        // Address / Mobile are shown read-only in the Blade straight from
-        // Branding — no property needed for them.
+        // Seller / Company — all five, prefilled from Branding config when
+        // present, blank (editable) otherwise.
+        $this->companyName = (string) (config('branding.name') ?? '');
         $this->directorName = (string) (config('branding.contact.director_name') ?? '');
+        $this->companyAddress = (string) (config('branding.contact.head_office_address') ?? '');
         $this->panNumber = (string) (config('branding.contact.pan_number') ?? '');
+        $this->companyMobile = (string) (config('branding.contact.phone') ?? '');
+
+        // Registry Buyer — prefilled from a previously-saved value when
+        // present, otherwise from the booking's primary buyer (falling back
+        // to the first buyer if none is flagged primary).
+        $primaryBuyer = $this->booking->bookingBuyers->firstWhere('is_primary', true)
+            ?? $this->booking->bookingBuyers->first();
+        $buyer = $primaryBuyer?->buyer;
+
+        $this->registryBuyerName = (string) ($this->booking->registry_buyer_name ?: ($buyer?->fullName() ?? ''));
+        $this->registryBuyerMobile = (string) ($this->booking->registry_buyer_mobile ?: ($buyer?->phone ?? ''));
+        $this->registryBuyerAddress = (string) ($this->booking->registry_buyer_address ?: ($buyer?->address ?? ''));
+        $this->registryBuyerPan = (string) ($this->booking->registry_buyer_pan ?: ($buyer?->pan_number ?? ''));
 
         $this->showPlotKyc = true;
     }
@@ -213,6 +248,14 @@ class BookingDocuments extends Component
     protected function plotKycRules(): array
     {
         $mobile = ['nullable', 'string', 'max:20', 'regex:/^[0-9+()\-\s]{6,20}$/'];
+        $pan = ['nullable', 'string', 'max:20', 'regex:/^[A-Za-z]{5}[0-9]{4}[A-Za-z]$/'];
+        // No $ / { } / control characters — these are the exact
+        // metacharacters phpdotenv treats specially when it re-reads .env
+        // (see BrandingConfigWriter), so rejecting them here stops an
+        // env-interpolation payload from ever reaching that file. Only
+        // applies to fields that flow into branding config — the Registry
+        // Buyer fields below persist to the `bookings` table, not `.env`.
+        $envSafeText = 'regex:/^[^$\{\}\x00-\x1F\x7F]*$/';
 
         return [
             'vikrayMulyAmount' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
@@ -228,8 +271,29 @@ class BookingDocuments extends Component
             'boundaryWest' => ['nullable', 'string', 'max:255'],
             'boundaryNorth' => ['nullable', 'string', 'max:255'],
             'boundarySouth' => ['nullable', 'string', 'max:255'],
-            'directorName' => ['nullable', 'string', 'max:255'],
-            'panNumber' => ['nullable', 'string', 'max:20'],
+            'companyName' => ['nullable', 'string', 'max:255', $envSafeText],
+            'directorName' => ['nullable', 'string', 'max:255', $envSafeText],
+            'companyAddress' => ['nullable', 'string', 'max:500', $envSafeText],
+            'panNumber' => $pan,
+            'companyMobile' => $mobile,
+            'registryBuyerName' => ['nullable', 'string', 'max:255'],
+            'registryBuyerMobile' => $mobile,
+            'registryBuyerAddress' => ['nullable', 'string', 'max:255'],
+            'registryBuyerPan' => $pan,
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function messages(): array
+    {
+        return [
+            'companyName.regex' => 'Company Name cannot contain $, { }, or control characters.',
+            'directorName.regex' => 'Director Name cannot contain $, { }, or control characters.',
+            'companyAddress.regex' => 'Address cannot contain $, { }, or control characters.',
+            'panNumber.regex' => 'Enter a valid PAN (AAAAA9999A).',
+            'registryBuyerPan.regex' => 'Enter a valid PAN (AAAAA9999A).',
         ];
     }
 
@@ -263,8 +327,17 @@ class BookingDocuments extends Component
                     'boundary_south' => $data['boundarySouth'],
                 ],
                 'seller' => [
+                    'company_name' => $data['companyName'],
                     'director_name' => $data['directorName'],
+                    'address' => $data['companyAddress'],
                     'pan_number' => $data['panNumber'],
+                    'mobile' => $data['companyMobile'],
+                ],
+                'registry_buyer' => [
+                    'name' => $data['registryBuyerName'],
+                    'mobile' => $data['registryBuyerMobile'],
+                    'address' => $data['registryBuyerAddress'],
+                    'pan' => $data['registryBuyerPan'],
                 ],
             ]);
 

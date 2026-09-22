@@ -12,11 +12,10 @@ use App\Enums\ClearanceCategory;
 use App\Enums\ClearanceStatus;
 use App\Enums\InspectionStatus;
 use App\Enums\PossessionCaseStatus;
-use App\Enums\RegistryCaseStatus;
+use App\Enums\RegistryStatus;
 use App\Exceptions\DomainException;
 use App\Models\PlotOwnershipHistory;
 use App\Models\PossessionCase;
-use App\Models\RegistryCase;
 use App\Services\Possession\PossessionChecklistService;
 use App\Services\Possession\PossessionEligibilityService;
 use Illuminate\Database\QueryException;
@@ -97,7 +96,7 @@ it('refreshes eligibility and flips EligibilityPending to Ready', function () {
     $case = app(InitiatePossessionCaseAction::class)->handle($s['booking']->fresh(), possessionOfficer());
     expect($case->status)->toBe(PossessionCaseStatus::EligibilityPending);
 
-    RegistryCase::factory()->forBooking($s['booking'])->status(RegistryCaseStatus::Completed)->create();
+    $s['booking']->forceFill(['registry_status' => RegistryStatus::Done])->save();
 
     $case = app(RefreshPossessionEligibilityAction::class)->handle($case->fresh(), possessionOfficer());
     expect($case->status)->toBe(PossessionCaseStatus::Ready);

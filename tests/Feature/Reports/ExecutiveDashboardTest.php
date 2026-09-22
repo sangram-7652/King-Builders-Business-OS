@@ -9,7 +9,6 @@ use App\Enums\DatePreset;
 use App\Enums\PaymentStatus;
 use App\Enums\PlotStatus;
 use App\Enums\PossessionCaseStatus;
-use App\Enums\RegistryCaseStatus;
 use App\Enums\TransferRequestStatus;
 use App\Models\Block;
 use App\Models\Booking;
@@ -19,7 +18,6 @@ use App\Models\Document;
 use App\Models\Plot;
 use App\Models\PossessionCase;
 use App\Models\Project;
-use App\Models\RegistryCase;
 use App\Models\TransferRequest;
 use App\Models\User;
 use App\Services\Reports\ExecutiveDashboardService;
@@ -96,7 +94,8 @@ function execWorld(): array
     execPay($b1->fresh(), $actor, '500000', '2026-06-13');
 
     // --- Operational (M9/M10) -----------------------------------
-    RegistryCase::factory()->forBooking($a1)->status(RegistryCaseStatus::Scheduled)->create();
+    // Registry is now a simple booking-level status (RegistryStatus) that
+    // defaults to Pending — a1/a2/b1 all start Pending with no extra setup.
     PossessionCase::factory()->forBooking($b1)->status(PossessionCaseStatus::Ready)->create();
     TransferRequest::factory()->forBooking($a1)->status(TransferRequestStatus::UnderReview)->create();
     Document::factory()->uploaded()->forDocumentable($a1)->create();
@@ -191,7 +190,10 @@ it('computes the inventory + project + operational snapshot KPIs', function () {
         ->and($d->kpi('total_plots')->value)->toBe(Plot::where('is_active', true)->count())
         ->and($d->kpi('available_plots')->value)->toBe(Plot::where('status', 'available')->count())
         ->and($d->kpi('booked_plots')->value)->toBe(Plot::where('status', 'booked')->count())
-        ->and($d->kpi('registry_pending')->value)->toBe(1)
+        // Registry defaults to Pending for every confirmed booking now, and
+        // (like possession/transfer) this KPI is not date-windowed — all 4
+        // confirmed bookings count: a1, a2, b1, may.
+        ->and($d->kpi('registry_pending')->value)->toBe(4)
         ->and($d->kpi('possession_pending')->value)->toBe(1)
         ->and($d->kpi('transfer_pending')->value)->toBe(1);
 });
@@ -348,7 +350,8 @@ it('counts operational alerts from real M9/M10 rows only', function () {
     $d = execDashboard(ReportFilterData::default());
 
     $alerts = collect($d->attention)->keyBy('key');
-    expect($alerts['registry']['count'])->toBe(1)
+    // Registry defaults to Pending for every confirmed booking now (a1, a2, b1, may)
+    expect($alerts['registry']['count'])->toBe(4)
         ->and($alerts['possession']['count'])->toBe(1)
         ->and($alerts['transfers']['count'])->toBe(1)     // the under_review transfer
         ->and($alerts['documents']['count'])->toBe(1);
@@ -372,13 +375,15 @@ it('does not count a completed transfer as pending (transferred ownership edge c
 it('reports a section error instead of a fake zero when a query fails', function () {
     execWorld();
 
-    // break the registry_cases table so OperationsAnalytics::registryPending() throws
-    Schema::drop('registry_cases');
+    // Registry is now a plain `bookings.registry_status` column (no longer
+    // reads `registry_cases`), so break `possession_cases` instead to prove
+    // the SAME error-isolation behaviour for OperationsAnalytics::possessionPending().
+    Schema::drop('possession_cases');
 
     $d = execDashboard(ReportFilterData::default());
 
-    expect($d->kpi('registry_pending')->value)->toBeNull()
-        ->and($d->kpi('registry_pending')->failed())->toBeTrue()
+    expect($d->kpi('possession_pending')->value)->toBeNull()
+        ->and($d->kpi('possession_pending')->failed())->toBeTrue()
         ->and($d->hasErrors())->toBeTrue()
         // the rest of the dashboard still works
         ->and($d->kpi('total_bookings')->value)->toBe(3);
