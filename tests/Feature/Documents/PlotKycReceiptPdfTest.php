@@ -112,6 +112,7 @@ it('renders REGISTRY KYC / PART-1 with real plot/village/chauhaddi/seller/buyer/
         ->toContain('PAY-REF-9')
         ->toContain(number_format(300000, 2))
         // Financial summary
+        ->toContain('Total Plot Amount (incl. PLC)')
         ->toContain(number_format(900000, 2)) // Total Plot Amount = final_amount
         ->toContain(number_format(600000, 2)) // Balance = 900000 - 300000
         ->toContain(number_format(25000, 2))  // Total PLC

@@ -24,8 +24,11 @@ use Illuminate\Support\Facades\Log;
  * The ONLY transfer workflow the product now exposes: move a confirmed
  * booking from its current plot to a different, available plot in the same
  * project. The buyer, booking number, pricing snapshot, payments, documents,
- * Registry status and Possession status are never touched — only which plot
- * the booking sits on changes.
+ * promoter/commission, Registry status and Possession status are never
+ * touched — only which plot the booking sits on changes. A transfer is
+ * allowed even when Registry and/or Possession are DONE: the old plot is
+ * released to AVAILABLE and the new plot takes the booking's inventory state
+ * (SOLD if Registry is DONE, otherwise BOOKED) — see PlotTransferService.
  *
  * This is a single, atomic, one-step action — there is no Draft / Submitted /
  * UnderReview / Approved ceremony for a plot transfer: every one of
@@ -72,15 +75,19 @@ class ExecutePlotTransferAction
                 throw new DomainException('A plot can only be transferred for a confirmed booking.');
             }
 
-            /** @var Plot $oldPlot */
-            $oldPlot = Plot::query()->whereKey($lockedBooking->plot_id)->lockForUpdate()->firstOrFail();
+            // Lock both plots in ONE statement, in a STABLE id order, so two
+            // simultaneous transfers touching the same pair of plots (in
+            // either direction) can never deadlock against each other.
+            $plots = Plot::query()
+                ->whereKey(array_unique([$lockedBooking->plot_id, $newPlotId]))
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
 
-            // Lock both plots in a STABLE id order so two simultaneous
-            // transfers touching the same pair of plots (in either direction)
-            // can never deadlock against each other.
-            $newPlot = $newPlotId === $oldPlot->id
-                ? $oldPlot
-                : Plot::query()->whereKey($newPlotId)->lockForUpdate()->first();
+            /** @var Plot $oldPlot */
+            $oldPlot = $plots->get($lockedBooking->plot_id) ?? throw new DomainException('The booking\'s current plot no longer exists.');
+            $newPlot = $plots->get($newPlotId);
 
             if ($newPlot === null) {
                 throw new DomainException('The selected plot no longer exists.');

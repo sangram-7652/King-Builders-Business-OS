@@ -21,7 +21,9 @@ use App\Models\Masters\PlcType;
 use App\Models\Masters\TaxRate;
 use App\Models\Plot;
 use App\Models\Project;
+use App\Services\Pricing\PriceOverrideService;
 use App\Support\Pricing\PriceBreakdown;
+use App\Support\Pricing\PricingArea;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -31,6 +33,9 @@ use Livewire\Component;
 #[Title('Booking')]
 class BookingForm extends Component
 {
+    /** Sentinel `block_id` value meaning "Direct Project Plot — no Block" (a Block is always OPTIONAL). */
+    public const DIRECT_BLOCK = 'direct';
+
     public ?Booking $booking = null;
 
     public string $project_id = '';
@@ -64,6 +69,16 @@ class BookingForm extends Component
 
     public ?array $preview = null;
 
+    /**
+     * The booking's persisted price override (edit only), shown read-only.
+     * It is NOT an editable line: the server carries it forward on save
+     * (see PriceOverrideService) and it can only be changed or removed via
+     * the booking page's Override action.
+     *
+     * @var array{target_final: string, reason: string, by: int|null, at: string|null}|null
+     */
+    public ?array $override = null;
+
     public ?string $previewError = null;
 
     public function mount(?Booking $booking = null): void
@@ -72,7 +87,7 @@ class BookingForm extends Component
 
         if ($booking?->exists) {
             $this->authorize('update', $booking);
-            $booking->load(['bookingBuyers', 'priceLines']);
+            $booking->load(['bookingBuyers', 'priceLines', 'plot']);
             $this->booking = $booking;
             $this->hydrateFromBooking($booking);
         } else {
@@ -86,14 +101,21 @@ class BookingForm extends Component
     private function hydrateFromBooking(Booking $booking): void
     {
         $this->project_id = (string) $booking->project_id;
-        $this->block_id = (string) $booking->block_id;
+        $this->block_id = $booking->block_id !== null ? (string) $booking->block_id : self::DIRECT_BLOCK;
         $this->plot_id = (string) $booking->plot_id;
         $this->booking_date = $booking->booking_date->toDateString();
         $this->notes = (string) $booking->notes;
-        $this->base_area = (string) $booking->base_area;
+        // The pricing quantity always follows the plot — the same value the
+        // server will derive on save — so the preview never shows a stale one.
+        $this->base_area = $booking->plot !== null ? PricingArea::fromPlot($booking->plot) : (string) $booking->base_area;
         $this->base_rate = (string) $booking->base_rate;
+        $this->override = PriceOverrideService::persisted($booking);
 
         foreach ($booking->priceLines as $line) {
+            if ((bool) data_get($line->metadata, 'override', false)) {
+                continue;
+            }
+
             $row = [
                 'name' => $line->name,
                 'calculation_type' => $line->calculation_type->value,
@@ -117,15 +139,27 @@ class BookingForm extends Component
         ])->all();
     }
 
+    /** A new Project invalidates the chosen Block, Plot and pricing area. */
+    public function updatedProjectId(): void
+    {
+        $this->reset('block_id', 'plot_id', 'base_area');
+    }
+
+    /** A new Block (or Direct) invalidates the chosen Plot and pricing area. */
+    public function updatedBlockId(): void
+    {
+        $this->reset('plot_id', 'base_area');
+    }
+
+    /**
+     * Every plot change re-derives the pricing area from THAT plot (its area
+     * converted to sq ft — see PricingArea) — never keeps a previous plot's.
+     */
     public function updatedPlotId(): void
     {
-        $plot = Plot::find($this->plot_id);
+        $plot = $this->plot_id !== '' ? Plot::find($this->plot_id) : null;
 
-        if ($plot && $this->base_area === '') {
-            $this->base_area = (string) $plot->area;
-        }
-
-        $this->recalculate();
+        $this->base_area = $plot !== null ? PricingArea::fromPlot($plot) : '';
     }
 
     // --- Line management ------------------------------------------------
@@ -277,7 +311,15 @@ class BookingForm extends Component
 
         try {
             /** @var PriceBreakdown $breakdown */
-            $breakdown = app(CalculateBookingPriceAction::class)->handle($this->buildPricingConfig());
+            $config = $this->buildPricingConfig();
+
+            // Preview exactly what the server will persist: the same carried-
+            // forward override (UpdateBookingAction does the same reapply()).
+            if ($this->booking !== null) {
+                $config = app(PriceOverrideService::class)->reapply($config, $this->override);
+            }
+
+            $breakdown = app(CalculateBookingPriceAction::class)->handle($config);
             $this->preview = $breakdown->toArray();
         } catch (DomainException $e) {
             $this->preview = null;
@@ -342,12 +384,36 @@ class BookingForm extends Component
     {
         return [
             'project_id' => ['required', 'exists:projects,id'],
-            'block_id' => ['required', 'exists:blocks,id'],
-            'plot_id' => ['required', 'exists:plots,id'],
+            'block_id' => ['required', function (string $attribute, mixed $value, \Closure $fail): void {
+                if ($value === self::DIRECT_BLOCK) {
+                    return;
+                }
+                if (! Block::query()->whereKey($value)->where('project_id', $this->project_id)->exists()) {
+                    $fail('Select a valid block, or choose Direct Project Plot.');
+                }
+            }],
+            'plot_id' => ['required', 'exists:plots,id', function (string $attribute, mixed $value, \Closure $fail): void {
+                // Must match the chosen Project AND Block/Direct exactly —
+                // never trust a client-supplied plot id (CreateBookingAction
+                // re-checks this against the locked row too).
+                $matches = Plot::query()
+                    ->whereKey($value)
+                    ->where('project_id', $this->project_id)
+                    ->when(
+                        $this->block_id === self::DIRECT_BLOCK,
+                        fn ($q) => $q->whereNull('block_id'),
+                        fn ($q) => $q->where('block_id', $this->block_id),
+                    )
+                    ->exists();
+
+                if (! $matches) {
+                    $fail('That plot does not belong to the selected project and block.');
+                }
+            }],
             'booking_date' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'base_area' => ['required', 'numeric', 'min:0'],
-            'base_rate' => ['required', 'numeric', 'min:0'],
+            'base_rate' => ['required', 'numeric', 'min:0', 'regex:/^\d+(\.\d{1,4})?$/'],
             'buyers' => ['required', 'array', 'min:1'],
             'buyers.*.buyer_id' => ['required', 'exists:buyers,id'],
             'buyers.*.ownership_percentage' => ['required', 'numeric', 'gt:0', 'max:100'],
@@ -358,7 +424,7 @@ class BookingForm extends Component
     {
         return [
             'project_id' => (int) $this->project_id,
-            'block_id' => (int) $this->block_id,
+            'block_id' => $this->block_id === self::DIRECT_BLOCK ? null : (int) $this->block_id,
             'plot_id' => (int) $this->plot_id,
             'booking_date' => $this->booking_date,
             'notes' => $this->notes ?: null,
@@ -368,6 +434,14 @@ class BookingForm extends Component
                 'ownership_percentage' => (string) $b['ownership_percentage'],
                 'is_primary' => (bool) ($b['is_primary'] ?? false),
             ], $this->buyers),
+        ];
+    }
+
+    /** @return array<string, string> */
+    protected function messages(): array
+    {
+        return [
+            'base_rate.regex' => 'Base rate may have at most 4 decimal places.',
         ];
     }
 
@@ -414,9 +488,16 @@ class BookingForm extends Component
     {
         $plotQuery = Plot::query()
             ->where(function ($q) {
-                $q->where('is_active', true)
+                $q->where('project_id', $this->project_id !== '' ? $this->project_id : 0)
+                    ->where('is_active', true)
                     ->whereIn('status', [PlotStatus::Available->value, PlotStatus::Hold->value])
-                    ->when($this->block_id !== '', fn ($q) => $q->where('block_id', $this->block_id));
+                    // Never mix the two kinds: Direct → ONLY block_id IS NULL;
+                    // a Block → ONLY that block's plots; nothing chosen → none.
+                    ->when(
+                        $this->block_id === self::DIRECT_BLOCK,
+                        fn ($q) => $q->whereNull('block_id'),
+                        fn ($q) => $q->where('block_id', $this->block_id !== '' ? $this->block_id : 0),
+                    );
             })
             // On edit the plot is fixed — make sure it stays selectable.
             ->when($this->booking, fn ($q) => $q->orWhere('id', $this->booking->plot_id));
@@ -424,7 +505,11 @@ class BookingForm extends Component
         return view('livewire.bookings.booking-form', [
             'projects' => Project::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'),
             'blocks' => $this->project_id !== ''
-                ? Block::query()->where('project_id', $this->project_id)->where('is_active', true)->orderBy('name')->pluck('name', 'id')
+                // union(), NOT merge(): merge() is array_merge(), which
+                // renumbers integer keys — every Block id became 0, 1, 2…
+                // so choosing a Block filtered plots by a wrong block_id.
+                ? collect([self::DIRECT_BLOCK => 'Direct Project Plot (no block)'])
+                    ->union(Block::query()->where('project_id', $this->project_id)->where('is_active', true)->orderBy('name')->pluck('name', 'id'))
                 : collect(),
             'plots' => $plotQuery->orderBy('plot_number')->get(['id', 'plot_number', 'area', 'area_unit', 'status'])
                 ->mapWithKeys(fn ($p) => [$p->id => "Plot {$p->plot_number} ({$p->status->label()}, {$p->areaLabel()})"]),
@@ -435,6 +520,7 @@ class BookingForm extends Component
                 ->get(['id', 'customer_code', 'first_name', 'middle_name', 'last_name'])
                 ->mapWithKeys(fn ($b) => [$b->id => "{$b->fullName()} ({$b->customer_code})"]),
             'calcTypes' => PriceCalculationType::options(),
+            'selectedPlot' => $this->plot_id !== '' ? Plot::query()->find($this->plot_id, ['id', 'plot_number', 'area', 'area_unit']) : null,
         ]);
     }
 }

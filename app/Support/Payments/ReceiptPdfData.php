@@ -45,7 +45,16 @@ final class ReceiptPdfData
             'customerCode' => $buyer?->customer_code,
             'customerMobile' => $buyer?->phone,
             'customerCity' => $buyer?->city?->name ?: $buyer?->address,
-            'plotArea' => $plot !== null ? $plot->area.' '.$plot->area_unit->abbreviation() : null,
+            // The booking's FROZEN pricing quantity (sq ft — the unit its rate
+            // is in), not the plot's current area: a later plot edit or a
+            // Plot Transfer must never make an old receipt's Area × Rate
+            // disagree with its Total Plot Amount. Falls back to the plot's
+            // own area only for a booking with no priced area.
+            'plotArea' => $booking !== null && bccomp((string) $booking->base_area, '0', 4) > 0
+                ? self::trimDecimalString((string) $booking->base_area).' sq ft'
+                : ($plot !== null ? $plot->area.' '.$plot->area_unit->abbreviation() : null),
+            // Full stored precision (up to 4 dp), trailing zeros trimmed.
+            'rate' => $booking !== null ? self::trimDecimalString((string) $booking->base_rate) : null,
             'plotDimension' => $plot?->dimension !== null
                 ? self::trimDecimal($plot->dimension->width).' X '.self::trimDecimal($plot->dimension->length).' '.$plot->dimension->unit->abbreviation()
                 : null,
@@ -57,6 +66,12 @@ final class ReceiptPdfData
             'paidAmountInWords' => AmountInWords::rupees((string) $receipt->amount),
             'discountRemark' => $booking !== null ? self::discountRemark($booking) : null,
         ];
+    }
+
+    /** Trailing-zero trim on a decimal string, without any float round-trip. */
+    private static function trimDecimalString(string $value): string
+    {
+        return str_contains($value, '.') ? rtrim(rtrim($value, '0'), '.') : $value;
     }
 
     /** Drops a redundant ".00" / trailing zero from a decimal-cast value for display. */

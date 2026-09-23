@@ -18,20 +18,31 @@
             <span class="text-sm text-(--content-muted)">Status:</span>
             <x-ui.badge :variant="$booking->possession_status->color()">{{ $booking->possession_status->label() }}</x-ui.badge>
 
-            @if ($booking->possession_status === PossessionStatus::Pending)
-                @can('possession.complete')
+            @can('possession.complete')
+                @if ($booking->possession_status->nextAction() === PossessionStatus::Done)
                     <x-ui.button size="sm" wire:click="markDone" wire:confirm="Mark Possession as Done?">
                         Mark Done
                     </x-ui.button>
-                @endcan
-            @endif
+                @else
+                    <x-ui.button size="sm" variant="danger" wire:click="markUndone" wire:confirm="Mark Possession as Undone?">
+                        Mark Undone
+                    </x-ui.button>
+                @endif
+            @endcan
         </div>
 
-        @if ($booking->possession_status === PossessionStatus::Done)
-            <p class="mt-3 text-sm text-(--content-muted)">Possession is Done.</p>
-        @else
-            <p class="mt-3 text-sm text-(--content-muted)">Possession is Pending.</p>
-        @endif
+        <p class="mt-3 text-sm text-(--content-muted)">
+            @switch($booking->possession_status)
+                @case(PossessionStatus::Done)
+                    Possession is Done — handover completed.
+                    @break
+                @case(PossessionStatus::Undone)
+                    Possession was reversed — handover is no longer marked complete.
+                    @break
+                @default
+                    Possession is Pending.
+            @endswitch
+        </p>
     </x-ui.card>
 
     @if ($history->isNotEmpty())

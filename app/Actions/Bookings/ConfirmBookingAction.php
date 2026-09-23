@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Log;
  *     lock the plot row               (serialises against every other booking)
  *     re-read plot status; must still be AVAILABLE / HOLD and active
  *     no other live booking for the plot
+ *     pricing area still matches the plot (sq ft) — refuse, never re-price
  *     recalculate the price from the persisted config
  *     freeze it into pricing_snapshot
  *     booking -> CONFIRMED (+ confirmed_at / confirmed_by)
@@ -85,6 +86,7 @@ class ConfirmBookingAction
             $this->assertHierarchyConsistent($locked->project_id, $locked->block_id, $plot);
             $this->assertPlotBookable($plot);
             $this->assertNoLiveBooking($plot->id, $locked->id);
+            $this->assertPricingAreaCurrent($locked, $plot);
 
             // Recalculate from the stored inputs and freeze the result.
             $this->applyPricing(

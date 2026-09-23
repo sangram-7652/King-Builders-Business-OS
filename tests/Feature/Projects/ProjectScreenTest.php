@@ -69,6 +69,7 @@ it('does not show fake plot statistics on the detail page', function () {
 
     $response = $this->get(route('projects.show', $project))->assertOk();
     $response->assertSee('Blocks');           // blocks are real in M3
-    $response->assertDontSee('Total plots');  // plot inventory is M4 — no fabricated counts
+    // Plot counts are real DB aggregates (M4+) — an empty project shows 0, never fabricated numbers.
+    expect($response->getContent())->toMatch('/Total plots<\/dt><dd[^>]*>0</');
     $response->assertDontSee('Sold');
 });

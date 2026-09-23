@@ -18,20 +18,31 @@
             <span class="text-sm text-(--content-muted)">Status:</span>
             <x-ui.badge :variant="$booking->registry_status->color()">{{ $booking->registry_status->label() }}</x-ui.badge>
 
-            @if ($booking->registry_status === RegistryStatus::Pending)
-                @can('registry.complete')
-                    <x-ui.button size="sm" wire:click="markDone" wire:confirm="Mark Registry as Done? The plot will become Sold.">
+            @can('registry.complete')
+                @if ($booking->registry_status->nextAction() === RegistryStatus::Done)
+                    <x-ui.button size="sm" wire:click="markDone" wire:confirm="Mark Registry as Done? Plot {{ $booking->plot?->plot_number }} will become Sold.">
                         Mark Done
                     </x-ui.button>
-                @endcan
-            @endif
+                @else
+                    <x-ui.button size="sm" variant="danger" wire:click="markUndone" wire:confirm="Mark Registry as Undone? Plot {{ $booking->plot?->plot_number }} will go back to Booked.">
+                        Mark Undone
+                    </x-ui.button>
+                @endif
+            @endcan
         </div>
 
-        @if ($booking->registry_status === RegistryStatus::Done)
-            <p class="mt-3 text-sm text-(--content-muted)">Registry is Done. Plot {{ $booking->plot?->plot_number }} is Sold.</p>
-        @else
-            <p class="mt-3 text-sm text-(--content-muted)">Registry is Pending. The plot stays Booked until Registry is marked Done.</p>
-        @endif
+        <p class="mt-3 text-sm text-(--content-muted)">
+            @switch($booking->registry_status)
+                @case(RegistryStatus::Done)
+                    Registry is Done. Plot {{ $booking->plot?->plot_number }} is Sold.
+                    @break
+                @case(RegistryStatus::Undone)
+                    Registry was reversed. Plot {{ $booking->plot?->plot_number }} is Booked until Registry is marked Done again.
+                    @break
+                @default
+                    Registry is Pending. Plot {{ $booking->plot?->plot_number }} stays Booked until Registry is marked Done.
+            @endswitch
+        </p>
     </x-ui.card>
 
     @if ($history->isNotEmpty())

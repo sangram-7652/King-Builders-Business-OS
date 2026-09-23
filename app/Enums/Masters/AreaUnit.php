@@ -37,4 +37,22 @@ enum AreaUnit: string
             self::Hectare => 'ha',
         };
     }
+
+    /**
+     * How many SQUARE FEET one unit of this area unit is — the exact factors
+     * used to normalise a plot's area into the booking's pricing quantity
+     * (booking rates are ₹ / sq ft; see App\Support\Pricing\PricingArea).
+     *
+     * Returned as a decimal STRING for bcmath — never a float.
+     */
+    public function squareFeetFactor(): string
+    {
+        return match ($this) {
+            self::SquareFeet => '1',
+            self::SquareYards => '9',
+            self::SquareMetres => '10.7639104167',
+            self::Acre => '43560',
+            self::Hectare => '107639.104167',
+        };
+    }
 }

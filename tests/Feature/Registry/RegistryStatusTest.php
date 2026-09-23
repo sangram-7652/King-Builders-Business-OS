@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Bookings\CancelBookingAction;
 use App\Actions\Bookings\CreateBookingAction;
-use App\Actions\Registry\MarkRegistryDoneAction;
+use App\Actions\Registry\ChangeRegistryStatusAction;
 use App\Enums\BookingStatus;
 use App\Enums\PlotStatus;
 use App\Enums\RegistryStatus;
@@ -61,7 +61,7 @@ it('BK-000002 scenario: Registry Pending/Booked, then marked Done → Registry D
     expect($booking->fresh()->registry_status)->toBe(RegistryStatus::Pending)
         ->and($booking->plot->fresh()->status)->toBe(PlotStatus::Booked);
 
-    $updated = app(MarkRegistryDoneAction::class)->handle($booking->fresh(), registryOfficer());
+    $updated = app(ChangeRegistryStatusAction::class)->handle($booking->fresh(), RegistryStatus::Done, registryOfficer());
 
     expect($updated->registry_status)->toBe(RegistryStatus::Done)
         ->and($updated->plot->status)->toBe(PlotStatus::Sold)
@@ -78,7 +78,7 @@ it('changes Registry to Done without any collection percentage (3)', function ()
     $s = confirmedBookingScenario('5000000'); // large amount, ZERO collected
     $officer = registryOfficer();
 
-    $updated = app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), $officer);
+    $updated = app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, $officer);
 
     expect($updated->registry_status)->toBe(RegistryStatus::Done);
 });
@@ -86,7 +86,7 @@ it('changes Registry to Done without any collection percentage (3)', function ()
 it('Registry Done changes the plot to Sold (4, 18)', function () {
     $s = confirmedBookingScenario();
 
-    app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), registryOfficer());
+    app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, registryOfficer());
 
     expect($s['booking']->plot->fresh()->status)->toBe(PlotStatus::Sold);
 });
@@ -105,7 +105,7 @@ it('Registry Done does not delete the booking, buyer, payments or documents (5, 
     $document = Document::factory()->verified()->forDocumentable($booking)
         ->state(['document_type_id' => docType('BOOKING_FORM')->id])->create();
 
-    app(MarkRegistryDoneAction::class)->handle($booking->fresh(), registryOfficer());
+    app(ChangeRegistryStatusAction::class)->handle($booking->fresh(), RegistryStatus::Done, registryOfficer());
 
     expect(Booking::find($booking->id))->not->toBeNull()
         ->and(Buyer::find($s['buyer']->id))->not->toBeNull()
@@ -123,7 +123,7 @@ it('Registry Done does not require buyer or booking document verification (9, 10
     $s = confirmedBookingScenario();
     // Explicitly leave buyer + booking documents completely unverified/absent.
 
-    $updated = app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), registryOfficer());
+    $updated = app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, registryOfficer());
 
     expect($updated->registry_status)->toBe(RegistryStatus::Done);
 });
@@ -132,7 +132,7 @@ it('Registry Done does not require a signed Agreement (11)', function () {
     $s = confirmedBookingScenario();
     // No Agreement row created at all for this booking.
 
-    $updated = app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), registryOfficer());
+    $updated = app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, registryOfficer());
 
     expect($updated->registry_status)->toBe(RegistryStatus::Done);
 });
@@ -143,7 +143,7 @@ it('RegistryEligibilityService is no longer consulted by the Registry workflow (
 
     $s = confirmedBookingScenario('5000000'); // zero collected — would fail the OLD gate
 
-    $updated = app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), registryOfficer());
+    $updated = app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, registryOfficer());
 
     expect($updated->registry_status)->toBe(RegistryStatus::Done)
         ->and($updated->plot->status)->toBe(PlotStatus::Sold);
@@ -158,7 +158,7 @@ it('RegistryEligibilityService is no longer consulted by the Registry workflow (
 it('marking Registry Done never creates a Registry Case (12)', function () {
     $s = confirmedBookingScenario();
 
-    app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), registryOfficer());
+    app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, registryOfficer());
 
     expect(RegistryCase::count())->toBe(0);
 });
@@ -190,7 +190,7 @@ it('an unauthorised user cannot change the Registry status (16)', function () {
     $s = confirmedBookingScenario();
     $noPermission = makeUser(permissions: ['registry.view', 'bookings.view']);
 
-    expect(fn () => app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), $noPermission))
+    expect(fn () => app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, $noPermission))
         ->toThrow(DomainException::class, 'not authorised');
 
     expect($s['booking']->fresh()->registry_status)->toBe(RegistryStatus::Pending)
@@ -218,7 +218,7 @@ it('the Registry status change and Plot status change are atomic (17)', function
     $sql = [];
     DB::listen(fn ($q) => $sql[] = strtolower($q->sql));
 
-    app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), registryOfficer());
+    app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, registryOfficer());
 
     $forUpdateCount = collect($sql)->filter(fn (string $q) => str_contains($q, 'for update'))->count();
     expect($forUpdateCount)->toBeGreaterThanOrEqual(2, 'MarkRegistryDoneAction must lock both the booking and the plot row FOR UPDATE');
@@ -228,7 +228,7 @@ it('refuses to mark Done when the plot is not in a state that can become Sold, a
     $s = confirmedBookingScenario();
     $s['booking']->plot->forceFill(['status' => PlotStatus::Cancelled])->save();
 
-    expect(fn () => app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), registryOfficer()))
+    expect(fn () => app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, registryOfficer()))
         ->toThrow(DomainException::class);
 
     expect($s['booking']->fresh()->registry_status)->toBe(RegistryStatus::Pending)
@@ -238,8 +238,8 @@ it('refuses to mark Done when the plot is not in a state that can become Sold, a
 it('is idempotent — marking an already-Done booking Done again is a safe no-op', function () {
     $s = confirmedBookingScenario();
 
-    app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), registryOfficer());
-    $again = app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), registryOfficer());
+    app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, registryOfficer());
+    $again = app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, registryOfficer());
 
     expect($again->registry_status)->toBe(RegistryStatus::Done)
         ->and($s['booking']->plot->fresh()->status)->toBe(PlotStatus::Sold);
@@ -249,7 +249,7 @@ it('rejects changing Registry status for a booking that is not confirmed', funct
     $s = bookingScenario();
     $booking = app(CreateBookingAction::class)->handle(bookingPayload($s), $s['actor']);
 
-    expect(fn () => app(MarkRegistryDoneAction::class)->handle($booking, registryOfficer()))
+    expect(fn () => app(ChangeRegistryStatusAction::class)->handle($booking, RegistryStatus::Done, registryOfficer()))
         ->toThrow(DomainException::class, 'confirmed');
 });
 
@@ -263,7 +263,7 @@ it('records who/when/previous/new status when Registry is marked Done', function
     $s = confirmedBookingScenario();
     $officer = registryOfficer();
 
-    app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), $officer);
+    app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, $officer);
 
     $event = DocumentActivity::where('booking_id', $s['booking']->id)->latest('id')->first();
     expect($event)->not->toBeNull()

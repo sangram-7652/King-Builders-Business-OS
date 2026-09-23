@@ -73,15 +73,15 @@
 
     {{-- Tabs --}}
     <div class="border-b border-(--border)">
-        <nav class="-mb-px flex gap-6 text-sm">
-            @foreach ($tabs as $t)
+        <nav class="-mb-px flex gap-6 overflow-x-auto text-sm">
+            @foreach ($tabs as $t => $label)
                 <button type="button" wire:click="setTab('{{ $t }}')"
                     @class([
-                        'border-b-2 px-1 py-3 font-medium capitalize transition',
+                        'border-b-2 px-1 py-3 font-medium whitespace-nowrap transition',
                         'border-(--brand-primary) text-(--brand-primary)' => $tab === $t,
                         'border-transparent text-(--content-muted) hover:text-(--content)' => $tab !== $t,
                     ])>
-                    {{ $t }}
+                    {{ $label }}
                 </button>
             @endforeach
         </nav>
@@ -107,6 +107,13 @@
                     <span class="text-sm text-(--content-muted)">active of {{ $blockStats['total'] }}</span>
                 </div>
                 <x-ui.button variant="ghost" size="sm" class="mt-3" wire:click="setTab('blocks')">Manage blocks →</x-ui.button>
+
+                <dl class="mt-4 space-y-1.5 border-t border-(--border) pt-3 text-sm">
+                    <div class="flex justify-between"><dt class="text-(--content-muted)">Total plots</dt><dd class="font-semibold tabular-nums">{{ (int) $plotStats->total }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-(--content-muted)">Block-based plots</dt><dd class="tabular-nums">{{ (int) $plotStats->in_blocks }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-(--content-muted)">Direct plots</dt><dd class="tabular-nums">{{ (int) $plotStats->total - (int) $plotStats->in_blocks }}</dd></div>
+                </dl>
+                <x-ui.button variant="ghost" size="sm" class="mt-2" wire:click="setTab('inventory')">View inventory →</x-ui.button>
             </x-ui.card>
         </div>
     @endif
@@ -137,6 +144,27 @@
     {{-- Tab: Blocks --}}
     @if ($tab === 'blocks')
         @livewire('projects.project-blocks', ['project' => $project], key('blocks-'.$project->id))
+    @endif
+
+    {{-- Tab: Create Plots — DIRECT project plots only (block_id = NULL). --}}
+    @if ($tab === 'create-plots')
+        <div class="space-y-4">
+            <x-ui.card>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-sm text-(--content-muted)">
+                        Create plots directly under <span class="font-medium text-(--content)">{{ $project->name }}</span>, with no Block.
+                        New plots start Available. To add a plot inside a Block, use <button type="button" class="text-(--brand-primary) hover:underline" wire:click="setTab('blocks')">Blocks</button> → Block → Plots.
+                    </p>
+                    <div class="flex shrink-0 gap-2">
+                        @can('bulkCreate', App\Models\Plot::class)
+                            <x-ui.button variant="secondary" size="sm" :href="route('plots.direct.bulk', ['project' => $project->id])" wire:navigate>Bulk create</x-ui.button>
+                        @endcan
+                        <x-ui.button variant="ghost" size="sm" :href="route('plots.direct.index', ['project' => $project->id])" wire:navigate>Direct plots →</x-ui.button>
+                    </div>
+                </div>
+            </x-ui.card>
+            @livewire('plots.plot-form', ['project' => $project, 'embedded' => true], key('create-plots-'.$project->id))
+        </div>
     @endif
 
     {{-- Tab: Activity --}}

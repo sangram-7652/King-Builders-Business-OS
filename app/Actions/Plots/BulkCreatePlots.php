@@ -36,7 +36,7 @@ class BulkCreatePlots
      * @param  array<string, mixed>  $config
      * @return int number of plots created
      */
-    public function handle(Project $project, Block $block, array $config): int
+    public function handle(Project $project, ?Block $block, array $config): int
     {
         $this->assertBlockBelongsToProject($project, $block);
 
@@ -62,14 +62,15 @@ class BulkCreatePlots
 
         $existing = Plot::withTrashed()
             ->where('project_id', $project->id)
-            ->where('block_id', $block->id)
+            ->when($block !== null, fn ($q) => $q->where('block_id', $block->id), fn ($q) => $q->whereNull('block_id'))
             ->whereIn('plot_number', $numbers)
             ->pluck('plot_number')
             ->all();
 
         if ($existing !== []) {
             sort($existing);
-            throw new DomainException('These plot numbers already exist in this block: '.implode(', ', array_slice($existing, 0, 10))
+            $scope = $block !== null ? 'in this block' : 'as direct project plots';
+            throw new DomainException("These plot numbers already exist {$scope}: ".implode(', ', array_slice($existing, 0, 10))
                 .(count($existing) > 10 ? ' …' : ''));
         }
 
@@ -78,7 +79,7 @@ class BulkCreatePlots
 
         $rows = array_map(fn (string $number): array => [
             'project_id' => $project->id,
-            'block_id' => $block->id,
+            'block_id' => $block?->id,
             'plot_number' => $number,
             'plot_category_id' => $config['plot_category_id'] ?: null,
             'plot_size_id' => $config['plot_size_id'] ?: null,
@@ -105,7 +106,7 @@ class BulkCreatePlots
 
             Log::info('plot.bulk_created', [
                 'project_id' => $project->id,
-                'block_id' => $block->id,
+                'block_id' => $block?->id,
                 'count' => $count,
                 'by' => auth()->id(),
             ]);

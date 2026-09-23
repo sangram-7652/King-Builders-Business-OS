@@ -15,6 +15,7 @@ use App\Models\Masters\PlotDimension;
 use App\Models\Masters\PlotSize;
 use App\Models\Plot;
 use App\Models\Project;
+use App\Support\Plots\PlotRoutes;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -27,11 +28,23 @@ class PlotForm extends Component
 {
     public Project $project;
 
-    public Block $block;
+    /** The Block context this form was opened from (route-scoped), if any — NOT necessarily the plot's final Block; see $block_id. */
+    public ?Block $block = null;
 
     public ?Plot $plot = null;
 
+    /**
+     * Rendered inside the Project page's "Create Plots" tab rather than as a
+     * full page: no breadcrumb/header, and after a create the form resets in
+     * place (so several direct plots can be added in a row) instead of
+     * redirecting away.
+     */
+    public bool $embedded = false;
+
     public string $plot_number = '';
+
+    /** The chosen Block for this plot — '' means "None / Direct Project Plot". A Block is always OPTIONAL. */
+    public string $block_id = '';
 
     public string $plot_category_id = '';
 
@@ -59,15 +72,31 @@ class PlotForm extends Component
 
     public bool $is_active = true;
 
-    public function mount(Project $project, Block $block, ?Plot $plot = null): void
+    public function mount(Project $project, ?Block $block = null, ?Plot $plot = null): void
     {
+        // A route parameter with no {block} segment (the "direct plot"
+        // routes) still resolves to an EMPTY, unsaved Block instance here —
+        // not null — per Laravel's own optional-route-model-binding
+        // convention. ->exists is the correct "was it actually there?" check.
+        $block = $block?->exists ? $block : null;
+
         $this->project = $project;
         $this->block = $block;
+        $this->block_id = (string) ($block?->id ?? '');
 
         if ($plot?->exists) {
+            // A NULLABLE route-model-bound {block} makes Laravel's
+            // scopeBindings() skip its usual strict "child belongs to
+            // parent" 404 for this binding — restore that guarantee
+            // explicitly (see the identical check in PlotShow::mount()).
+            if ($plot->project_id !== $project->id || $plot->block_id !== $block?->id) {
+                abort(404);
+            }
+
             $this->authorize('update', $plot);
             $this->plot = $plot;
             $this->plot_number = $plot->plot_number;
+            $this->block_id = (string) ($plot->block_id ?? '');
             $this->plot_category_id = (string) ($plot->plot_category_id ?? '');
             $this->plot_size_id = (string) ($plot->plot_size_id ?? '');
             $this->plot_dimension_id = (string) ($plot->plot_dimension_id ?? '');
@@ -116,11 +145,12 @@ class PlotForm extends Component
     protected function rules(): array
     {
         return [
+            'block_id' => ['nullable', Rule::exists('blocks', 'id')->where('project_id', $this->project->id)],
             'plot_number' => [
                 'required', 'string', 'max:32', 'regex:/^[A-Za-z0-9\/-]+$/',
                 Rule::unique('plots', 'plot_number')
                     ->where('project_id', $this->project->id)
-                    ->where('block_id', $this->block->id)
+                    ->where(fn ($q) => $this->block_id !== '' ? $q->where('block_id', $this->block_id) : $q->whereNull('block_id'))
                     ->ignore($this->plot?->id)
                     ->withoutTrashed(),
             ],
@@ -143,42 +173,65 @@ class PlotForm extends Component
     protected function messages(): array
     {
         return [
-            'plot_number.unique' => 'This plot number already exists in this block.',
+            'plot_number.unique' => 'This plot number already exists in this block/project.',
             'plot_number.regex' => 'Plot number may only contain letters, numbers, / and -.',
+            'block_id.exists' => 'The selected block does not belong to this project.',
         ];
     }
 
     public function save()
     {
+        // On CREATE the Block is fixed by where the form was opened —
+        // Project → Block → Create Plot (that Block) or Project → Create
+        // Plots (none, a direct plot) — never by a client-supplied value.
+        // Only EDIT offers the Block picker (reassignment, incl. to none).
+        if (! $this->editing) {
+            $this->block_id = (string) ($this->block?->id ?? '');
+        }
+
         $data = $this->validate();
+        $data['block_id'] = $data['block_id'] !== '' && $data['block_id'] !== null ? (int) $data['block_id'] : null;
 
         try {
-            $plot = $this->editing
-                ? app(UpdatePlot::class)->handle($this->plot, $data)
-                : app(CreatePlot::class)->handle($this->project, $this->block, $data);
+            if ($this->editing) {
+                $plot = app(UpdatePlot::class)->handle($this->plot, $data);
+            } else {
+                $block = $data['block_id'] !== null ? Block::findOrFail($data['block_id']) : null;
+                $plot = app(CreatePlot::class)->handle($this->project, $block, $data);
+            }
         } catch (DomainException $e) {
-            $this->addError('plot_number', $e->getMessage());
+            $this->addError('block_id', $e->getMessage());
 
             return;
         }
 
+        if ($this->embedded && ! $this->editing) {
+            $this->dispatch('toast', message: "Plot {$plot->plot_number} created.", variant: 'success');
+            $this->dispatch('plot-created');
+            $this->reset(
+                'plot_number', 'plot_category_id', 'plot_size_id', 'plot_dimension_id', 'area', 'area_unit', 'facing',
+                'village_name', 'gata_number', 'boundary_east', 'boundary_west', 'boundary_north', 'boundary_south', 'is_active',
+            );
+            $this->resetValidation();
+
+            return null;
+        }
+
         $this->dispatch('toast', message: $this->editing ? 'Plot updated.' : 'Plot created.', variant: 'success');
 
-        $this->redirectRoute('plots.show', [
-            'project' => $this->project->id,
-            'block' => $this->block->id,
-            'plot' => $plot->id,
-        ], navigate: true);
+        $route = PlotRoutes::forPlot($plot, 'show');
+        $this->redirectRoute($route['name'], $route['params'], navigate: true);
     }
 
     public function render(): View
     {
         return view('livewire.plots.plot-form', [
+            'blocks' => Block::query()->where('project_id', $this->project->id)->orderBy('sort_order')->orderBy('name')->pluck('name', 'id'),
             'categories' => PlotCategory::query()->active()->ordered()->pluck('name', 'id'),
             'sizes' => PlotSize::query()->active()->ordered()->pluck('name', 'id'),
             'dimensions' => PlotDimension::query()->active()->ordered()->pluck('display_name', 'id'),
             'areaUnits' => AreaUnit::options(),
             'facings' => PlotFacing::options(),
-        ])->title(($this->editing ? 'Edit plot ' : 'New plot').' · '.$this->block->name);
+        ])->title(($this->editing ? 'Edit plot' : 'New plot').' · '.$this->project->name);
     }
 }

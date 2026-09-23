@@ -47,6 +47,15 @@ class PlotFactory extends Factory
         ]);
     }
 
+    /** A direct project plot — no Block (a Block is always OPTIONAL). */
+    public function direct(): static
+    {
+        return $this->state(fn () => [
+            'block_id' => null,
+            'project_id' => Project::factory(),
+        ]);
+    }
+
     public function status(PlotStatus $status): static
     {
         return $this->state(fn () => ['status' => $status->value]);

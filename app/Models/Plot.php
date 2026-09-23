@@ -189,6 +189,12 @@ class Plot extends Model
         return $this->status === PlotStatus::Hold;
     }
 
+    /** A "direct project plot" — sits directly under its Project, with no Block. */
+    public function isDirect(): bool
+    {
+        return $this->block_id === null;
+    }
+
     public function isHoldExpired(): bool
     {
         return $this->isOnHold()

@@ -85,13 +85,41 @@ frozen into `bookings.pricing_snapshot` (base area/rate/amount, every total, an
 tax master **never** move a confirmed booking's totals — verified by
 `PriceSnapshotTest`.
 
+### Pricing area — `App\Support\Pricing\PricingArea`
+
+Every booking rate is **₹ / sq ft**. `bookings.base_area` (the pricing quantity)
+is therefore **always derived on the server from the plot**: `plot.area ×
+AreaUnit::squareFeetFactor()` (sq ft 1 · sq yd 9 · sq m 10.7639104167 · acre
+43560 · hectare 107639.104167), bcmath only, rounded half-up to 4 dp. A
+`base_area` in a request is ignored — there is no manual-area override. The
+plot's own `area` / `area_unit` are never changed. Confirmation refuses (never
+silently re-prices) a booking whose stored area no longer matches its plot;
+re-saving the booking re-prices it. Plot Size and Dimension are reference /
+descriptive only and never enter the calculation.
+
+### Precision
+
+Base area, base rate and every line rate / quantity may have **at most 4
+decimal places** (the `DECIMAL(15,4)` columns). More is rejected — never
+silently rounded — by `CalculateBookingPriceAction`, so the preview, the stored
+row and the confirmation recalculation always use the identical inputs.
+
 ### Manual override — `App\Actions\Bookings\OverrideBookingPriceAction`
 
 Only a holder of `pricing.override`; a reason is mandatory and recorded with who
 and when (`price_override_*`). The override is **not** a silent mutation — the
 difference is added as an explicit, labelled `Manual price override` line
-(`metadata.override = true`) applied after tax, so the breakdown still shows
-exactly where the number comes from.
+(`metadata = {override, target_final, reason, by, at}`) applied after tax, so
+the breakdown still shows exactly where the number comes from. The
+representation lives in `App\Services\Pricing\PriceOverrideService`.
+
+- It is the ONLY way to create or remove an override (`handle()` / `remove()`).
+  Override rows in a create/update payload are ignored.
+- Editing a booking (`UpdateBookingAction`, the booking form) carries the
+  persisted override forward unchanged — same target final amount, reason,
+  user and time. The form shows it read-only.
+- `price_overridden` and `price_override_by/at/reason` are always derived from
+  the override line, so removing it clears all four together.
 
 ## Concurrency
 

@@ -24,7 +24,13 @@ class BookingFactory extends Factory
             'booking_number' => 'BK-'.fake()->unique()->numerify('######'),
             'plot_id' => Plot::factory(),
             'project_id' => fn (array $attributes) => Plot::find($attributes['plot_id'])?->project_id ?? Project::factory(),
-            'block_id' => fn (array $attributes) => Plot::find($attributes['plot_id'])?->block_id ?? Block::factory(),
+            // A direct plot legitimately has block_id = null — only fall
+            // back to a fresh Block when the plot itself can't be resolved.
+            'block_id' => function (array $attributes) {
+                $plot = Plot::find($attributes['plot_id'] ?? null);
+
+                return $plot !== null ? $plot->block_id : Block::factory();
+            },
             'booking_date' => now()->toDateString(),
             'status' => BookingStatus::Draft->value,
             'base_area' => 0,

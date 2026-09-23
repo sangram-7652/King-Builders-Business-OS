@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Bookings;
 
-use App\Actions\Possession\MarkPossessionDoneAction;
+use App\Actions\Possession\ChangePossessionStatusAction;
 use App\Enums\Permission;
 use App\Enums\PossessionActivityType;
+use App\Enums\PossessionStatus;
 use App\Exceptions\DomainException;
 use App\Models\Booking;
 use App\Models\PossessionActivity;
@@ -16,7 +17,7 @@ use Livewire\Component;
 
 /**
  * Possession (simplified). Per the client's product requirement, Possession
- * is nothing more than a booking-level status — PENDING or DONE — with no
+ * is nothing more than a booking-level status — PENDING / DONE / UNDONE — with no
  * Possession Case, no eligibility gate (no collection percentage, no
  * document verification, no Registry dependency) and no "Open possession
  * case" workflow.
@@ -29,10 +30,10 @@ use Livewire\Component;
  * PossessionInspection, PossessionHandover, GeneratePossessionCertificateAction,
  * PossessionEligibilityService) is kept intact for any booking that already
  * has historical data there. Nothing new is ever written to those tables
- * from this screen — see {@see MarkPossessionDoneAction}, the ONLY write
+ * from this screen — see {@see ChangePossessionStatusAction}, the ONLY write
  * path for the new Possession status.
  *
- * Marking Possession Done NEVER changes the plot's status — see the
+ * Changing Possession NEVER changes the plot's status — see the
  * docblock on that action.
  */
 #[Layout('components.layouts.app')]
@@ -56,10 +57,20 @@ class BookingPossession extends Component
 
     public function markDone(): void
     {
+        $this->changeStatus(PossessionStatus::Done);
+    }
+
+    public function markUndone(): void
+    {
+        $this->changeStatus(PossessionStatus::Undone);
+    }
+
+    private function changeStatus(PossessionStatus $target): void
+    {
         try {
-            app(MarkPossessionDoneAction::class)->handle($this->booking, auth()->user());
+            app(ChangePossessionStatusAction::class)->handle($this->booking, $target, auth()->user());
             $this->booking->refresh();
-            $this->dispatch('toast', message: 'Possession marked Done.', variant: 'success');
+            $this->dispatch('toast', message: "Possession marked {$target->label()}.", variant: 'success');
         } catch (DomainException $e) {
             $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
         }

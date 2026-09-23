@@ -153,7 +153,7 @@ $watermarkFile = $brand->watermarkPath ? public_path($brand->watermarkPath) : nu
     <table class="grid">
         <tr>
             <td class="lbl">Rate</td>
-            <td class="val">{{ $booking?->base_rate !== null ? number_format((float) $booking->base_rate, 2) : '—' }}</td>
+            <td class="val">{{ $extra['rate'] ?? '—' }}</td>
             <td class="lbl">Chq / NEFT / RTGS No.</td>
             <td class="val">{{ $payment->reference_number ?: '—' }}</td>
         </tr>

@@ -154,7 +154,10 @@ first if you don't have one yet), and the plot you want must be
 3. **Add buyer(s)** — at least one, with exactly one marked **primary**.
    For a co-owned purchase, add every buyer and set each one's ownership
    share — the shares must add up to exactly 100%.
-4. **Set the price** — enter the base area/rate, then optionally add PLC
+4. **Set the price** — the pricing area is filled in from the plot you
+   picked (converted to sq ft if the plot is measured in sq yd, sq m, acre or
+   hectare) and can't be typed over; enter the base rate (₹ per sq ft, up to
+   4 decimal places), then optionally add PLC
    (location charge), other charges, discounts and tax lines. A live
    preview below the form recalculates as you type: Base + PLC + Charges
    − Discount = Subtotal, then + Tax = Final. This is the same calculation

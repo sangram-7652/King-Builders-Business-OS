@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Bookings;
 
-use App\Actions\Registry\MarkRegistryDoneAction;
+use App\Actions\Registry\ChangeRegistryStatusAction;
 use App\Enums\DocumentActivityType;
 use App\Enums\Permission;
+use App\Enums\RegistryStatus;
 use App\Exceptions\DomainException;
 use App\Models\Booking;
 use App\Models\DocumentActivity;
@@ -16,7 +17,7 @@ use Livewire\Component;
 
 /**
  * Registry (simplified). Per the client's product requirement, Registry is
- * nothing more than a booking-level status — PENDING or DONE — with no
+ * nothing more than a booking-level status — PENDING / DONE / UNDONE — with no
  * Registry Case, no eligibility gate (no collection percentage, no document
  * verification, no agreement check) and no "Open registry case" workflow.
  *
@@ -27,7 +28,7 @@ use Livewire\Component;
  * RegistryExpense, DocumentHandover, RegistryEligibilityService) is kept
  * intact for any booking that already has historical data there. Nothing new
  * is ever written to those tables from this screen — see
- * {@see MarkRegistryDoneAction}, the ONLY write path
+ * {@see ChangeRegistryStatusAction}, the ONLY write path
  * for the new Registry status.
  */
 #[Layout('components.layouts.app')]
@@ -51,10 +52,21 @@ class BookingRegistry extends Component
 
     public function markDone(): void
     {
+        $this->changeStatus(RegistryStatus::Done);
+    }
+
+    public function markUndone(): void
+    {
+        $this->changeStatus(RegistryStatus::Undone);
+    }
+
+    private function changeStatus(RegistryStatus $target): void
+    {
         try {
-            app(MarkRegistryDoneAction::class)->handle($this->booking, auth()->user());
+            app(ChangeRegistryStatusAction::class)->handle($this->booking, $target, auth()->user());
             $this->booking->refresh();
-            $this->dispatch('toast', message: 'Registry marked Done. Plot is now Sold.', variant: 'success');
+            $plotStatus = $target === RegistryStatus::Done ? 'Sold' : 'Booked';
+            $this->dispatch('toast', message: "Registry marked {$target->label()}. Plot is now {$plotStatus}.", variant: 'success');
         } catch (DomainException $e) {
             $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
         }

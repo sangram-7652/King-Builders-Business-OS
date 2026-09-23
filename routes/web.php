@@ -135,6 +135,34 @@ Route::middleware(['auth:web', 'active'])->group(function (): void {
                 ->name('plots.index');
         });
 
+    // --- Plot Inventory (M4) — DIRECT project-level plots (no Block) -----
+    // A Block is OPTIONAL: a Plot may instead sit directly under its
+    // Project. Same components as above (App\Support\Plots\PlotRoutes picks
+    // between the two route groups based on the Plot/Block in hand), just
+    // without a {block} segment — Livewire resolves `?Block $block = null`.
+    Route::prefix('projects/{project}/plots')
+        ->scopeBindings()
+        ->whereNumber('project')
+        ->group(function (): void {
+            Route::get('/create', PlotForm::class)
+                ->middleware('permission:'.Permission::PlotsCreate->value)
+                ->name('plots.direct.create');
+            Route::get('/bulk', PlotBulkCreate::class)
+                ->middleware('permission:'.Permission::PlotsBulkCreate->value)
+                ->name('plots.direct.bulk');
+            Route::get('/{plot}/edit', PlotForm::class)
+                ->middleware('permission:'.Permission::PlotsUpdate->value)
+                ->whereNumber('plot')
+                ->name('plots.direct.edit');
+            Route::get('/{plot}', PlotShow::class)
+                ->middleware('permission:'.Permission::PlotsView->value)
+                ->whereNumber('plot')
+                ->name('plots.direct.show');
+            Route::get('/', PlotIndex::class)
+                ->middleware('permission:'.Permission::PlotsView->value)
+                ->name('plots.direct.index');
+        });
+
     // --- Buyers / Customers (M5) --------------------------------------
     Route::get('/buyers/create', BuyerForm::class)
         ->middleware('permission:'.Permission::BuyersCreate->value)

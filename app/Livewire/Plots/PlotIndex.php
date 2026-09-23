@@ -34,7 +34,7 @@ class PlotIndex extends Component
 
     public Project $project;
 
-    public Block $block;
+    public ?Block $block = null;
 
     #[Url(as: 'q')]
     public string $search = '';
@@ -73,11 +73,14 @@ class PlotIndex extends Component
 
     public string $holdExpiresAt = '';
 
-    public function mount(Project $project, Block $block): void
+    public function mount(Project $project, ?Block $block = null): void
     {
+        // A route with no {block} segment (the "direct plot" routes) still
+        // resolves to an EMPTY, unsaved Block instance here — not null — per
+        // Laravel's own optional-route-model-binding convention.
         $this->authorize('viewAny', Plot::class);
         $this->project = $project;
-        $this->block = $block;
+        $this->block = $block?->exists ? $block : null;
     }
 
     public function updated(string $property): void
@@ -102,7 +105,17 @@ class PlotIndex extends Component
     #[Computed]
     public function counts(): PlotStatusCounts
     {
-        return PlotStatusCounts::for(Plot::query()->where('block_id', $this->block->id));
+        return PlotStatusCounts::for($this->scopedQuery());
+    }
+
+    /**
+     * @return Builder<Plot>
+     */
+    private function scopedQuery(): Builder
+    {
+        return Plot::query()
+            ->where('project_id', $this->project->id)
+            ->when($this->block !== null, fn (Builder $q) => $q->where('block_id', $this->block->id), fn (Builder $q) => $q->whereNull('block_id'));
     }
 
     // --- Lifecycle actions ------------------------------------------------
@@ -195,7 +208,7 @@ class PlotIndex extends Component
 
     private function plotOrFail(int $id): Plot
     {
-        return $this->block->plots()->findOrFail($id);
+        return $this->scopedQuery()->findOrFail($id);
     }
 
     /**
@@ -207,8 +220,7 @@ class PlotIndex extends Component
         $sort = in_array($this->sort, $sortable, true) ? $this->sort : 'plot_number';
         $direction = $this->direction === 'desc' ? 'desc' : 'asc';
 
-        return Plot::query()
-            ->where('block_id', $this->block->id)
+        return $this->scopedQuery()
             ->with(['size:id,name', 'dimension:id,display_name', 'category:id,name'])
             ->search($this->search)
             ->when($this->status !== '', fn (Builder $q) => $q->where('status', $this->status))
@@ -231,6 +243,6 @@ class PlotIndex extends Component
             'categories' => PlotCategory::query()->orderBy('name')->pluck('name', 'id'),
             'sizes' => PlotSize::query()->orderBy('name')->pluck('name', 'id'),
             'dimensions' => PlotDimension::query()->orderBy('display_name')->pluck('display_name', 'id'),
-        ])->title("{$this->block->name} · Plots");
+        ])->title(($this->block?->name ?? 'Direct Plots')." · {$this->project->name}");
     }
 }

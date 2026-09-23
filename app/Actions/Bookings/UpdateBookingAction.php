@@ -11,6 +11,7 @@ use App\Exceptions\DomainException;
 use App\Models\Booking;
 use App\Models\Plot;
 use App\Models\User;
+use App\Services\Pricing\PriceOverrideService;
 use App\Support\Concerns\RunsInTransaction;
 use Illuminate\Support\Facades\Log;
 
@@ -21,6 +22,9 @@ use Illuminate\Support\Facades\Log;
  *
  * The whole thing runs in one transaction with the plot row locked, so a
  * DRAFT → PENDING promotion cannot race another booking onto the same plot.
+ *
+ * `base_area` is re-derived from the plot on every save, and an existing
+ * price override survives an unrelated edit exactly as it was.
  */
 class UpdateBookingAction
 {
@@ -28,7 +32,10 @@ class UpdateBookingAction
     use RunsInTransaction;
     use ValidatesBookingConsistency;
 
-    public function __construct(private readonly SyncBookingBuyersAction $syncBuyers) {}
+    public function __construct(
+        private readonly SyncBookingBuyersAction $syncBuyers,
+        private readonly PriceOverrideService $overrides,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data  already validated
@@ -38,8 +45,6 @@ class UpdateBookingAction
         if (! $booking->isEditable()) {
             throw new DomainException('Only a draft or pending booking can be edited.');
         }
-
-        $this->assertOverrideAuthorised($data['pricing']['components'] ?? [], $actor);
 
         return $this->transaction(function () use ($booking, $data, $actor): Booking {
             /** @var Booking $locked */
@@ -70,7 +75,14 @@ class UpdateBookingAction
             $locked->status = $target;
             $locked->save();
 
-            $this->applyPricing($locked, $data['pricing'] ?? CalculateBookingPriceAction::configFromBooking($locked));
+            // Pricing quantity from the plot (never the client); any override
+            // already on the booking is carried forward unchanged — client
+            // override rows are ignored (see PriceOverrideService).
+            $locked->load('priceLines');
+            $config = $this->withPlotPricingArea($data['pricing'] ?? CalculateBookingPriceAction::configFromBooking($locked), $plot);
+            $config = $this->overrides->reapply($config, PriceOverrideService::persisted($locked));
+
+            $this->applyPricing($locked, $config);
             $this->syncBuyers->handle($locked, $data['buyers'] ?? $this->currentBuyerRows($locked));
 
             Log::info('booking.updated', [

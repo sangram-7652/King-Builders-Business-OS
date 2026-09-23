@@ -11,7 +11,9 @@ use App\Exceptions\DomainException;
 use App\Models\Booking;
 use App\Models\Plot;
 use App\Models\User;
+use App\Services\Pricing\PriceOverrideService;
 use App\Support\Concerns\RunsInTransaction;
+use App\Support\Pricing\PricingArea;
 use App\Support\Sequences\SequenceGenerator;
 use Illuminate\Support\Facades\Log;
 
@@ -22,6 +24,12 @@ use Illuminate\Support\Facades\Log;
  * DRAFT / PENDING never flip Plot::status — that happens only on confirmation —
  * but PENDING does claim the plot: no second booking may be PENDING/CONFIRMED
  * for it (checked here AND guaranteed by the `active_plot_id` unique index).
+ *
+ * The pricing quantity is NEVER taken from the client: `base_area` is derived
+ * from the locked plot's own area, converted to sq ft (see
+ * {@see PricingArea}). Override rows in the payload are
+ * dropped — an override is only ever applied through
+ * {@see OverrideBookingPriceAction} on an existing booking.
  */
 class CreateBookingAction
 {
@@ -46,13 +54,12 @@ class CreateBookingAction
             throw new DomainException('A new booking can only start as a draft or pending.');
         }
 
-        $this->assertOverrideAuthorised($data['pricing']['components'] ?? [], $actor);
-
         return $this->transaction(function () use ($data, $actor, $target): Booking {
             /** @var Plot $plot */
             $plot = Plot::query()->whereKey($data['plot_id'])->lockForUpdate()->firstOrFail();
 
-            $this->assertHierarchyConsistent((int) $data['project_id'], (int) $data['block_id'], $plot);
+            $blockId = $data['block_id'] !== null && $data['block_id'] !== '' ? (int) $data['block_id'] : null;
+            $this->assertHierarchyConsistent((int) $data['project_id'], $blockId, $plot);
             $this->assertPlotBookable($plot);
 
             if ($target->reservesPlot()) {
@@ -70,7 +77,7 @@ class CreateBookingAction
                 'created_by' => $actor->id,
             ]);
 
-            $this->applyPricing($booking, $data['pricing'] ?? []);
+            $this->applyPricing($booking, $this->serverPricingConfig($data['pricing'] ?? [], $plot));
             $this->syncBuyers->handle($booking, $data['buyers'] ?? []);
 
             Log::info('booking.created', [
@@ -84,5 +91,16 @@ class CreateBookingAction
 
             return $booking->load(['project', 'block', 'plot', 'bookingBuyers.buyer', 'priceLines']);
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $pricing
+     * @return array<string, mixed>
+     */
+    private function serverPricingConfig(array $pricing, Plot $plot): array
+    {
+        $pricing['components'] = PriceOverrideService::withoutOverrides($pricing['components'] ?? []);
+
+        return $this->withPlotPricingArea($pricing, $plot);
     }
 }

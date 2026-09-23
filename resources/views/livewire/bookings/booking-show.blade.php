@@ -1,4 +1,4 @@
-@php use App\Enums\BookingStatus; @endphp
+@php use App\Enums\BookingStatus; use App\Support\Plots\PlotRoutes; @endphp
 
 <div class="space-y-6">
     <x-ui.breadcrumb :items="[
@@ -17,7 +17,7 @@
                 @endif
             </div>
             <p class="mt-1 text-sm text-(--content-muted)">
-                {{ $booking->project?->name }} · {{ $booking->block?->name }} · Plot {{ $booking->plot?->plot_number }}
+                {{ $booking->project?->name }} · {{ $booking->block?->name ?? 'Direct Plot' }} · Plot {{ $booking->plot?->plot_number }}
             </p>
         </div>
 
@@ -86,8 +86,9 @@
                     <dt class="text-(--content-muted)">Plot</dt>
                     <dd class="mt-0.5">
                         @if ($booking->plot)
+                            @php $plotRoute = PlotRoutes::forPlot($booking->plot, 'show'); @endphp
                             <a class="text-(--brand-primary) hover:underline" wire:navigate
-                               href="{{ route('plots.show', ['project' => $booking->project_id, 'block' => $booking->block_id, 'plot' => $booking->plot_id]) }}">
+                               href="{{ route($plotRoute['name'], $plotRoute['params']) }}">
                                 {{ $booking->plot->plot_number }}
                             </a>
                             ({{ $booking->plot->status->label() }})
@@ -181,6 +182,10 @@
                     Price overridden by {{ $booking->priceOverrideBy?->name ?? 'a user' }}
                     on {{ $booking->price_override_at?->format('d M Y H:i') }} —
                     “{{ $booking->price_override_reason }}”
+                    @can('overridePricing', $booking)
+                        <x-ui.button variant="ghost" size="sm" class="ml-2" wire:click="removeOverride"
+                            wire:confirm="Remove the price override? The booking goes back to its calculated price.">Remove override</x-ui.button>
+                    @endcan
                 </div>
             @endif
 

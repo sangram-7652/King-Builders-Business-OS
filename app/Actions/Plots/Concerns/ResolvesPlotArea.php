@@ -12,9 +12,14 @@ use App\Models\Project;
 
 trait ResolvesPlotArea
 {
-    protected function assertBlockBelongsToProject(Project $project, Block $block): void
+    /**
+     * A Block is OPTIONAL — a Plot may sit directly under its Project
+     * instead (`$block === null`). When a Block IS given, it must belong to
+     * the SAME project; cross-project assignment is always rejected.
+     */
+    protected function assertBlockBelongsToProject(Project $project, ?Block $block): void
     {
-        if ($block->project_id !== $project->id) {
+        if ($block !== null && $block->project_id !== $project->id) {
             throw new DomainException('The selected block does not belong to this project.');
         }
     }

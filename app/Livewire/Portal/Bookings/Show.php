@@ -28,7 +28,7 @@ class Show extends Component
     public function render(): View
     {
         $booking = $this->booking->load([
-            'priceLines', 'registryCase', 'possessionCase', 'agreement',
+            'priceLines', 'agreement',
             'documents' => fn ($q) => $q->whereNotNull('current_version_id')->with(['documentType', 'currentVersion']),
         ]);
 

@@ -29,10 +29,33 @@
 
         {{-- Pricing --}}
         <x-ui.card title="Pricing" subtitle="Base + PLC + charges − discount + tax = final amount.">
-            <div class="grid gap-4 sm:grid-cols-2">
-                <x-ui.input type="number" step="0.0001" label="Base area (sq ft)" wire:model.live.debounce.400ms="base_area" :error="$errors->first('base_area')" />
-                <x-ui.input type="number" step="0.0001" label="Base rate (₹ / sq ft)" wire:model.live.debounce.400ms="base_rate" :error="$errors->first('base_rate')" />
+            <div class="grid gap-4 sm:grid-cols-3">
+                <div>
+                    <p class="text-sm font-medium text-(--content)">Plot area</p>
+                    <p class="mt-2 text-sm text-(--content)" data-test="plot-area">
+                        @if ($selectedPlot)
+                            {{ $selectedPlot->areaLabel() }}
+                            @if ($selectedPlot->area_unit !== \App\Enums\Masters\AreaUnit::SquareFeet)
+                                <span class="text-(--content-muted)">= {{ rtrim(rtrim($base_area, '0'), '.') }} sq ft</span>
+                            @endif
+                        @else
+                            <span class="text-(--content-muted)">Select a plot</span>
+                        @endif
+                    </p>
+                </div>
+                <x-ui.input label="Pricing area (sq ft)" wire:model="base_area" readonly
+                    :error="$errors->first('base_area')" hint="Taken from the selected plot, converted to sq ft." />
+                <x-ui.input type="number" step="0.0001" label="Base rate (₹ / sq ft)" wire:model.live.debounce.400ms="base_rate" :error="$errors->first('base_rate')" hint="Up to 4 decimal places." />
             </div>
+
+            @if ($override)
+                <div class="mt-4 rounded-lg border border-(--border) bg-(--surface-muted) px-4 py-3 text-sm" data-test="override-notice">
+                    <span class="font-medium">Manual price override active</span> — final amount fixed at
+                    ₹{{ number_format((float) $override['target_final'], 2) }}
+                    @if ($override['reason'] !== '') (“{{ $override['reason'] }}”)@endif.
+                    It is kept when you save; change or remove it from the booking page.
+                </div>
+            @endif
 
             @php
                 $lineBlock = function ($label, $rows, $addMethod, $removeMethod, $masterKey, $masterOptions, $calcTypes) {

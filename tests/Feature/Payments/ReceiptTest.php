@@ -9,8 +9,8 @@ use App\Enums\Masters\AreaUnit;
 use App\Enums\PaymentStatus;
 use App\Enums\PlotFacing;
 use App\Models\Block;
-use App\Models\BookingBuyer;
 use App\Models\Booking;
+use App\Models\BookingBuyer;
 use App\Models\Buyer;
 use App\Models\Masters\City;
 use App\Models\Masters\PlotDimension;
@@ -106,7 +106,7 @@ it('renders the receipt as a tenant-branded PDF (32)', function () {
  */
 it('always fits on exactly one A4 page, even with a long amount-in-words and a long remark', function () {
     $s = confirmedBookingScenario('100000000');
-    $p = app(\App\Actions\Payments\RecordPaymentAction::class)->handle([
+    $p = app(RecordPaymentAction::class)->handle([
         'booking_id' => $s['booking']->id, 'payment_mode_id' => cashMode()->id,
         'amount' => '39999977.53', 'reference_number' => 'REF-LONG',
         'notes' => 'Kindly note that this partial payment reflects a negotiated discount adjustment credited against the buyer\'s outstanding ledger balance as per the mutually agreed settlement terms.',
@@ -147,7 +147,7 @@ it('renders every receipt field from real booking, plot, buyer and ledger data â
 
     $booking = Booking::factory()->confirmed()->forPlot($plot)->create([
         'final_amount' => '791154', 'base_amount' => '791154', 'subtotal' => '791154',
-        'base_rate' => '800', 'charge_amount' => '5000',
+        'base_area' => '1130.22', 'base_rate' => '800', 'charge_amount' => '5000',
     ]);
 
     $buyerCity = City::factory()->create(['name' => 'Mau']);
@@ -203,8 +203,8 @@ it('renders every receipt field from real booking, plot, buyer and ledger data â
         ->toContain('West')
         ->toContain('Phase 2')
         ->toContain('Sold')
-        // Rate / Total plot amount
-        ->toContain('800.00')
+        // Rate (stored precision, trailing zeros trimmed) / Total plot amount
+        ->toContain('<td class="val">800</td>')
         ->toContain(number_format(791154, 2))
         // Current payment
         ->toContain(number_format(3000, 2))

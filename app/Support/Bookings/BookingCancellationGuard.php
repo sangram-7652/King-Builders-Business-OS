@@ -32,21 +32,26 @@ use App\Models\Booking;
  *    forcing such a plot back to AVAILABLE would risk double-occupancy or a
  *    double-sale.
  *
- * Registry / Possession / Transfer are DELIBERATELY NOT checked here any
- * more. A still-active one is cancelled through its own state machine as
- * part of the SAME cancellation transaction (see
+ * Legacy Registry Case / Possession Case / Transfer Request records are
+ * DELIBERATELY NOT checked here. A still-active one is cancelled through its
+ * own state machine as part of the SAME cancellation transaction (see
  * `CancelBookingAction::cancelActiveDownstreamRecords()`); a COMPLETED /
  * terminal one is simply left alone as preserved historical data. Blocking
  * on a completed Registry Case in particular used to make the booking
  * PERMANENTLY stuck — {@see RegistryCaseWorkflowAction::cancel()}
  * refuses to cancel a completed case, so "cancel it first" was never
- * actually possible. Completing Possession always also flips the plot to
- * POSSESSION_COMPLETED, and completing a Transfer always leaves the
- * booking's CURRENT plot BOOKED (the transfer moves the booking onto a new
- * plot) — so the plot-state check above is what actually catches the one
- * remaining unsafe case (possession already physically handed over)
- * without needing to special-case Possession by name.
+ * actually possible.
  *
+ * The simplified booking-level statuses never create an impossible blocker:
+ *  - Possession (Pending/Done/Undone) never changes the plot, so it never
+ *    blocks cancellation.
+ *  - Registry DONE makes the current plot SOLD. That is reported with the
+ *    exact resolution — mark Registry UNDONE (plot back to BOOKED), then
+ *    cancel — so reversing a registered sale is always an explicit,
+ *    audited operator step, never a side effect of cancellation.
+ *  - A plot released by an earlier Plot Transfer is no longer the booking's
+ *    plot and is never checked; only the CURRENT plot is.
+
  * An empty list means cancellation is safe.
  */
 final class BookingCancellationGuard
@@ -93,7 +98,9 @@ final class BookingCancellationGuard
         // check reads the exact same row, not a stale second query.
         $plot = $booking->relationLoaded('plot') ? $booking->plot : $booking->plot()->first();
 
-        if ($plot !== null && in_array($plot->status, self::UNRECOVERABLE_PLOT_STATES, true)) {
+        if ($plot !== null && $plot->status === PlotStatus::Sold && $booking->isRegistryDone()) {
+            $blockers[] = "Registry is Done and plot {$plot->plot_number} is Sold — mark Registry Undone first (plot returns to Booked), then cancel";
+        } elseif ($plot !== null && in_array($plot->status, self::UNRECOVERABLE_PLOT_STATES, true)) {
             $blockers[] = "the plot is already {$plot->status->label()} and cannot be safely returned to Available — this needs manual review before the booking can be cancelled";
         }
 

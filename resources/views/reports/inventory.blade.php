@@ -1,6 +1,7 @@
 @php
     use App\Enums\AgingBucket;
     use App\Enums\PlotStatus;
+    use App\Support\Plots\PlotRoutes;
     use App\Support\Reports\ReportFormat;
 
     /** @var array{title:string,description:string,milestone:string,route:string} $meta */
@@ -193,9 +194,10 @@
                 <tbody class="divide-y divide-(--border)">
                     @foreach ($inventory->availablePlots as $plot)
                         <tr class="hover:bg-(--surface-muted)/50">
+                            @php $plotRoute = PlotRoutes::forPlot($plot, 'show'); @endphp
                             <td class="py-2 pr-4 font-medium">
                                 @can('plots.view')
-                                    <a href="{{ route('plots.show', ['project' => $plot->project_id, 'block' => $plot->block_id, 'plot' => $plot->id]) }}" wire:navigate class="text-(--brand-primary) hover:underline">{{ $plot->plot_number }}</a>
+                                    <a href="{{ route($plotRoute['name'], $plotRoute['params']) }}" wire:navigate class="text-(--brand-primary) hover:underline">{{ $plot->plot_number }}</a>
                                 @else {{ $plot->plot_number }} @endcan
                             </td>
                             <td class="py-2 pr-4">{{ $plot->block?->name ?? '—' }}</td>

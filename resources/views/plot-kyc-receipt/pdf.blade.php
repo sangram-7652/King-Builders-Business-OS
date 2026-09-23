@@ -212,7 +212,7 @@ $money = fn ($v) => $v === null ? '—' : '₹'.number_format((float) $v, 2);
     <div class="section-title">Financial Summary</div>
     <table class="grid">
         <tr>
-            <td class="lbl">Total Plot Amount</td><td class="val">{{ $money($data['financial']['totalPlotAmount']) }}</td>
+            <td class="lbl">Total Plot Amount (incl. PLC)</td><td class="val">{{ $money($data['financial']['totalPlotAmount']) }}</td>
             <td class="lbl">Total PLC Amount</td><td class="val">{{ $money($data['financial']['totalPlcAmount']) }}</td>
         </tr>
         <tr>

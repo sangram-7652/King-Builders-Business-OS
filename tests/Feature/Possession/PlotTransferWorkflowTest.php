@@ -11,6 +11,7 @@ use App\Enums\OwnershipType;
 use App\Enums\PaymentStatus;
 use App\Enums\PlotStatus;
 use App\Enums\PossessionStatus;
+use App\Enums\RegistryStatus;
 use App\Enums\TransferRequestStatus;
 use App\Enums\TransferType;
 use App\Exceptions\DomainException;
@@ -301,14 +302,20 @@ it('17: retrying a completed plot transfer is idempotent — no duplicate histor
         ->and(PlotOwnershipHistory::where('booking_id', $s['booking']->id)->where('ownership_type', OwnershipType::PlotChange->value)->count())->toBe(1);
 });
 
-// --- possession guard (F-M10-PLOT) ------------------------------------------
+// --- Done states never block a plot transfer (client requirement) ----------
 
-it('blocks approval and completion once Possession is already Done for the booking', function () {
+it('allows approval and completion when Registry and Possession are already Done', function () {
     $s = plotTransferReadyScenario();
-    $s['booking']->forceFill(['possession_status' => PossessionStatus::Done])->save();
+    $s['oldPlot']->forceFill(['status' => PlotStatus::Sold])->save();
+    $s['booking']->forceFill(['registry_status' => RegistryStatus::Done, 'possession_status' => PossessionStatus::Done])->save();
 
     $t = plotTransferInReview($s);
+    app(TransferWorkflowAction::class)->approve($t->fresh(), possessionOfficer());
+    app(CompleteTransferAction::class)->handle($t->fresh(), possessionOfficer());
 
-    expect(fn () => app(TransferWorkflowAction::class)->approve($t->fresh(), possessionOfficer()))
-        ->toThrow(DomainException::class);
+    expect($s['booking']->fresh()->plot_id)->toBe($s['newPlot']->id)
+        ->and($s['booking']->fresh()->registry_status)->toBe(RegistryStatus::Done)
+        ->and($s['booking']->fresh()->possession_status)->toBe(PossessionStatus::Done)
+        ->and($s['oldPlot']->fresh()->status)->toBe(PlotStatus::Available)
+        ->and($s['newPlot']->fresh()->status)->toBe(PlotStatus::Sold);
 });

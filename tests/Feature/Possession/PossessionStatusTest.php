@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Actions\Bookings\CancelBookingAction;
 use App\Actions\Bookings\CreateBookingAction;
-use App\Actions\Possession\MarkPossessionDoneAction;
-use App\Actions\Registry\MarkRegistryDoneAction;
+use App\Actions\Possession\ChangePossessionStatusAction;
+use App\Actions\Registry\ChangeRegistryStatusAction;
 use App\Enums\BookingStatus;
 use App\Enums\PlotStatus;
 use App\Enums\PossessionStatus;
@@ -72,7 +72,7 @@ it('Possession Pending does not require documents (4)', function () {
 it('an authorised user can change Possession to Done (5)', function () {
     $s = confirmedBookingScenario();
 
-    $updated = app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), possessionOfficer());
+    $updated = app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, possessionOfficer());
 
     expect($updated->possession_status)->toBe(PossessionStatus::Done);
 });
@@ -81,7 +81,7 @@ it('Possession Done does not require 100% collection (6)', function () {
     $s = confirmedBookingScenario('5000000'); // zero collected — would fail the OLD 100% gate
     config(['possession.eligibility.required_paid_percent' => 100]);
 
-    $updated = app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), possessionOfficer());
+    $updated = app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, possessionOfficer());
 
     expect($updated->possession_status)->toBe(PossessionStatus::Done);
 });
@@ -90,7 +90,7 @@ it('Possession Done does not require document verification (7)', function () {
     $s = confirmedBookingScenario();
     // Explicitly leave buyer + booking documents completely unverified/absent.
 
-    $updated = app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), possessionOfficer());
+    $updated = app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, possessionOfficer());
 
     expect($updated->possession_status)->toBe(PossessionStatus::Done);
 });
@@ -104,7 +104,7 @@ it('Possession Done does not require document verification (7)', function () {
 it('Possession Done does not change Plot status (8)', function () {
     $s = confirmedBookingScenario();
 
-    app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), possessionOfficer());
+    app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, possessionOfficer());
 
     expect($s['booking']->plot->fresh()->status)->toBe(PlotStatus::Booked);
 });
@@ -112,8 +112,8 @@ it('Possession Done does not change Plot status (8)', function () {
 it('Registry Done still controls Plot = Sold, independent of Possession (9)', function () {
     $s = confirmedBookingScenario();
 
-    app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), possessionOfficer());
-    app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), registryOfficer());
+    app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, possessionOfficer());
+    app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, registryOfficer());
 
     expect($s['booking']->plot->fresh()->status)->toBe(PlotStatus::Sold)
         ->and($s['booking']->fresh()->possession_status)->toBe(PossessionStatus::Done)
@@ -123,10 +123,10 @@ it('Registry Done still controls Plot = Sold, independent of Possession (9)', fu
 it('if Registry already made the plot Sold, marking Possession Done leaves it Sold — never overwritten', function () {
     $s = confirmedBookingScenario();
 
-    app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), registryOfficer());
+    app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, registryOfficer());
     expect($s['booking']->plot->fresh()->status)->toBe(PlotStatus::Sold);
 
-    app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), possessionOfficer());
+    app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, possessionOfficer());
 
     expect($s['booking']->plot->fresh()->status)->toBe(PlotStatus::Sold);
 });
@@ -145,13 +145,13 @@ it('BK-000002 scenario: Possession Done first, then Registry Done — Plot only 
         ->and($booking->fresh()->possession_status)->toBe(PossessionStatus::Pending)
         ->and($booking->plot->fresh()->status)->toBe(PlotStatus::Booked);
 
-    app(MarkPossessionDoneAction::class)->handle($booking->fresh(), possessionOfficer());
+    app(ChangePossessionStatusAction::class)->handle($booking->fresh(), PossessionStatus::Done, possessionOfficer());
 
     expect($booking->fresh()->registry_status)->toBe(RegistryStatus::Pending)
         ->and($booking->fresh()->possession_status)->toBe(PossessionStatus::Done)
         ->and($booking->plot->fresh()->status)->toBe(PlotStatus::Booked);
 
-    app(MarkRegistryDoneAction::class)->handle($booking->fresh(), registryOfficer());
+    app(ChangeRegistryStatusAction::class)->handle($booking->fresh(), RegistryStatus::Done, registryOfficer());
 
     expect($booking->fresh()->registry_status)->toBe(RegistryStatus::Done)
         ->and($booking->fresh()->possession_status)->toBe(PossessionStatus::Done)
@@ -167,8 +167,8 @@ it('BK-000002 scenario: Possession Done first, then Registry Done — Plot only 
 it('Possession status is preserved — marking Done twice is a safe no-op (10)', function () {
     $s = confirmedBookingScenario();
 
-    app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), possessionOfficer());
-    $again = app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), possessionOfficer());
+    app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, possessionOfficer());
+    $again = app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, possessionOfficer());
 
     expect($again->possession_status)->toBe(PossessionStatus::Done)
         ->and($s['booking']->fresh()->possession_status)->toBe(PossessionStatus::Done);
@@ -178,7 +178,7 @@ it('rejects changing Possession status for a booking that is not confirmed', fun
     $s = bookingScenario();
     $booking = app(CreateBookingAction::class)->handle(bookingPayload($s), $s['actor']);
 
-    expect(fn () => app(MarkPossessionDoneAction::class)->handle($booking, possessionOfficer()))
+    expect(fn () => app(ChangePossessionStatusAction::class)->handle($booking, PossessionStatus::Done, possessionOfficer()))
         ->toThrow(DomainException::class, 'confirmed');
 });
 
@@ -192,7 +192,7 @@ it('an unauthorised user cannot change the Possession status (11)', function () 
     $s = confirmedBookingScenario();
     $noPermission = makeUser(permissions: ['possession.view', 'bookings.view']);
 
-    expect(fn () => app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), $noPermission))
+    expect(fn () => app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, $noPermission))
         ->toThrow(DomainException::class, 'not authorised');
 
     expect($s['booking']->fresh()->possession_status)->toBe(PossessionStatus::Pending);
@@ -234,7 +234,7 @@ it('existing historical Possession Case records are preserved untouched (12)', f
     $s = confirmedBookingScenario();
     $case = PossessionCase::factory()->forBooking($s['booking'])->create();
 
-    app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), possessionOfficer());
+    app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, possessionOfficer());
 
     expect(PossessionCase::find($case->id))->not->toBeNull()
         ->and(PossessionCase::count())->toBe(1);
@@ -243,7 +243,7 @@ it('existing historical Possession Case records are preserved untouched (12)', f
 it('marking Possession Done never creates a Possession Case', function () {
     $s = confirmedBookingScenario();
 
-    app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), possessionOfficer());
+    app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, possessionOfficer());
 
     expect(PossessionCase::count())->toBe(0);
 });
@@ -260,7 +260,7 @@ it('locks the booking row FOR UPDATE while changing the Possession status', func
     $sql = [];
     DB::listen(fn ($q) => $sql[] = strtolower($q->sql));
 
-    app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), possessionOfficer());
+    app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, possessionOfficer());
 
     expect(collect($sql)->contains(fn (string $q) => str_contains($q, 'for update')))->toBeTrue();
 })->skip(fn () => DB::connection()->getDriverName() === 'sqlite', 'SQLite has no row-level FOR UPDATE');
@@ -275,7 +275,7 @@ it('records who/when/previous/new status when Possession is marked Done', functi
     $s = confirmedBookingScenario();
     $officer = possessionOfficer();
 
-    app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), $officer);
+    app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, $officer);
 
     $event = PossessionActivity::where('booking_id', $s['booking']->id)->latest('id')->first();
     expect($event)->not->toBeNull()
@@ -302,7 +302,7 @@ it('booking cancellation remains compatible with Possession Pending (13)', funct
 
 it('booking cancellation remains compatible with Possession Done (plot untouched by Possession, still Booked)', function () {
     $s = confirmedBookingScenario();
-    app(MarkPossessionDoneAction::class)->handle($s['booking']->fresh(), possessionOfficer());
+    app(ChangePossessionStatusAction::class)->handle($s['booking']->fresh(), PossessionStatus::Done, possessionOfficer());
 
     $cancelled = app(CancelBookingAction::class)->handle($s['booking']->fresh(), $s['actor'], 'buyer withdrew');
 
@@ -335,7 +335,7 @@ it('Possession Done does not delete the booking, buyer, payments or documents', 
     $document = Document::factory()->verified()->forDocumentable($booking)
         ->state(['document_type_id' => docType('BOOKING_FORM')->id])->create();
 
-    app(MarkPossessionDoneAction::class)->handle($booking->fresh(), possessionOfficer());
+    app(ChangePossessionStatusAction::class)->handle($booking->fresh(), PossessionStatus::Done, possessionOfficer());
 
     expect(Booking::find($booking->id))->not->toBeNull()
         ->and(Buyer::find($s['buyer']->id))->not->toBeNull()

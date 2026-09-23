@@ -1,12 +1,13 @@
+@php use App\Support\Plots\PlotRoutes; @endphp
 <div class="space-y-6">
     <x-ui.breadcrumb :items="[
         ['label' => 'Projects', 'url' => route('projects.index')],
         ['label' => $project->name, 'url' => route('projects.show', $project)],
-        ['label' => $block->name, 'url' => route('plots.index', ['project' => $project->id, 'block' => $block->id])],
+        ['label' => $block?->name ?? 'Direct Plots', 'url' => route(PlotRoutes::name('index', $block), PlotRoutes::params($project, $block))],
         ['label' => 'Bulk add plots'],
     ]" />
 
-    <x-ui.page-header title="Bulk add plots" :description="$project->name.' · '.$block->name" />
+    <x-ui.page-header title="Bulk add plots" :description="$project->name.' · '.($block?->name ?? 'Direct Project Plot')" />
 
     <form wire:submit="create" class="space-y-6">
         <x-ui.card title="Number range" subtitle="Generates one plot per number in the range, all in a single transaction.">
@@ -37,7 +38,7 @@
         </x-ui.card>
 
         <div class="flex justify-end gap-2">
-            <x-ui.button variant="secondary" :href="route('plots.index', ['project' => $project->id, 'block' => $block->id])" wire:navigate>Cancel</x-ui.button>
+            <x-ui.button variant="secondary" :href="route(PlotRoutes::name('index', $block), PlotRoutes::params($project, $block))" wire:navigate>Cancel</x-ui.button>
             <x-ui.button type="submit" wire:loading.attr="disabled">
                 <span wire:loading.remove wire:target="create">Create plots</span>
                 <span wire:loading wire:target="create">Creating…</span>

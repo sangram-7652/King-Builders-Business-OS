@@ -159,6 +159,19 @@ class BookingShow extends Component
         $this->closeOverride();
     }
 
+    public function removeOverride(): void
+    {
+        $this->authorize('overridePricing', $this->booking);
+
+        try {
+            app(OverrideBookingPriceAction::class)->remove($this->booking, auth()->user());
+            $this->refreshBooking();
+            $this->dispatch('toast', message: 'Price override removed.', variant: 'success');
+        } catch (DomainException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), variant: 'danger');
+        }
+    }
+
     public function render(): View
     {
         $summary = $this->booking->isConfirmed()

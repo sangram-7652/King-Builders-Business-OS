@@ -6,7 +6,7 @@ use App\Actions\Bookings\CreateBookingAction;
 use App\Actions\Commission\GenerateCommissionCases;
 use App\Actions\Partners\AuthorizePartnerForProjectAction;
 use App\Actions\Partners\SetBookingPartnerAttribution;
-use App\Actions\Registry\MarkRegistryDoneAction;
+use App\Actions\Registry\ChangeRegistryStatusAction;
 use App\Actions\Transfer\CreateTransferRequestAction;
 use App\Actions\Transfer\ExecutePlotTransferAction;
 use App\Enums\CommissionCaseStatus;
@@ -366,20 +366,21 @@ it('the Transfers screen has no ownership/nominee UI', function () {
 
 /*
 | ---------------------------------------------------------------------------
-| Registry-Done conflict (audited business rule, new guard).
+| Registry Done no longer blocks a plot transfer (client requirement).
 | ---------------------------------------------------------------------------
 */
 
-it('refuses a plot transfer once Registry is already Done for the booking', function () {
+it('allows a plot transfer once Registry is already Done — new plot becomes Sold', function () {
     $s = plotTransferReadyScenario();
-    app(MarkRegistryDoneAction::class)->handle($s['booking']->fresh(), registryOfficer());
+    app(ChangeRegistryStatusAction::class)->handle($s['booking']->fresh(), RegistryStatus::Done, registryOfficer());
     expect($s['oldPlot']->fresh()->status)->toBe(PlotStatus::Sold);
 
-    expect(fn () => app(ExecutePlotTransferAction::class)->handle($s['booking']->fresh(), $s['newPlot']->id, null, possessionOfficer()))
-        ->toThrow(DomainException::class, 'not eligible');
+    app(ExecutePlotTransferAction::class)->handle($s['booking']->fresh(), $s['newPlot']->id, null, possessionOfficer());
 
-    expect($s['booking']->fresh()->plot_id)->toBe($s['oldPlot']->id)
-        ->and($s['oldPlot']->fresh()->status)->toBe(PlotStatus::Sold);
+    expect($s['booking']->fresh()->plot_id)->toBe($s['newPlot']->id)
+        ->and($s['booking']->fresh()->registry_status)->toBe(RegistryStatus::Done)
+        ->and($s['oldPlot']->fresh()->status)->toBe(PlotStatus::Available)
+        ->and($s['newPlot']->fresh()->status)->toBe(PlotStatus::Sold);
 });
 
 /*

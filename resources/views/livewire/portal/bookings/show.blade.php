@@ -23,8 +23,8 @@
                 <div><dt class="text-(--content-muted)">Status</dt><dd>{{ $booking->status->label() }}</dd></div>
                 <div><dt class="text-(--content-muted)">Booking value</dt><dd class="tabular-nums font-semibold">₹{{ number_format((float) $booking->final_amount, 2) }}</dd></div>
                 <div><dt class="text-(--content-muted)">Agreement</dt><dd>{{ $booking->agreement?->status?->label() ?? 'Not started' }}</dd></div>
-                <div><dt class="text-(--content-muted)">Registry</dt><dd>{{ $booking->registryCase?->status?->label() ?? 'Not started' }}</dd></div>
-                <div><dt class="text-(--content-muted)">Possession</dt><dd>{{ $booking->possessionCase?->status?->label() ?? 'Not started' }}</dd></div>
+                <div><dt class="text-(--content-muted)">Registry</dt><dd>{{ $booking->registry_status->label() }}</dd></div>
+                <div><dt class="text-(--content-muted)">Possession</dt><dd>{{ $booking->possession_status->label() }}</dd></div>
                 @if ($transfer)
                     <div><dt class="text-(--content-muted)">Transfer</dt><dd>{{ $transfer->request_number }} — {{ $transfer->status->label() }}</dd></div>
                 @endif

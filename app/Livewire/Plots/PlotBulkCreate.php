@@ -14,6 +14,7 @@ use App\Models\Masters\PlotDimension;
 use App\Models\Masters\PlotSize;
 use App\Models\Plot;
 use App\Models\Project;
+use App\Support\Plots\PlotRoutes;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -26,7 +27,7 @@ class PlotBulkCreate extends Component
 {
     public Project $project;
 
-    public Block $block;
+    public ?Block $block = null;
 
     public string $prefix = '';
 
@@ -50,11 +51,14 @@ class PlotBulkCreate extends Component
 
     public bool $is_active = true;
 
-    public function mount(Project $project, Block $block): void
+    public function mount(Project $project, ?Block $block = null): void
     {
+        // A route with no {block} segment (the "direct plot" routes) still
+        // resolves to an EMPTY, unsaved Block instance here — not null — per
+        // Laravel's own optional-route-model-binding convention.
         $this->authorize('bulkCreate', Plot::class);
         $this->project = $project;
-        $this->block = $block;
+        $this->block = $block?->exists ? $block : null;
     }
 
     public function updatedPlotSizeId(mixed $value): void
@@ -121,10 +125,11 @@ class PlotBulkCreate extends Component
 
         $this->dispatch('toast', message: "{$count} plots created.", variant: 'success');
 
-        $this->redirectRoute('plots.index', [
-            'project' => $this->project->id,
-            'block' => $this->block->id,
-        ], navigate: true);
+        $this->redirectRoute(
+            PlotRoutes::name('index', $this->block),
+            PlotRoutes::params($this->project, $this->block),
+            navigate: true,
+        );
     }
 
     public function render(): View
@@ -135,6 +140,6 @@ class PlotBulkCreate extends Component
             'dimensions' => PlotDimension::query()->active()->ordered()->pluck('display_name', 'id'),
             'areaUnits' => AreaUnit::options(),
             'facings' => PlotFacing::options(),
-        ])->title("Bulk add plots · {$this->block->name}");
+        ])->title('Bulk add plots · '.($this->block?->name ?? 'Direct — '.$this->project->name));
     }
 }

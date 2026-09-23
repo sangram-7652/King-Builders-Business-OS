@@ -31,13 +31,11 @@ use App\Support\Registry\EligibilityResult;
  * Plot transfer (buyer unchanged, plot changes):
  *   - booking is CONFIRMED and still sits on the plot the request was raised for
  *   - there is no OTHER active transfer on the same booking, or on the target plot
- *   - the target plot is still active, AVAILABLE/HOLD, and has no live booking
- *   - Possession is not yet DONE for this booking (booking-level
- *     PossessionStatus — real physical work would be tied to the old plot;
- *     see CompleteTransferAction)
- *   - Registry is not yet DONE for this booking (booking-level RegistryStatus
- *     — Registry Done means the CURRENT plot is already legally SOLD; see
- *     CompleteTransferAction)
+ *   - the target plot is in the same project, still active, AVAILABLE, and
+ *     has no live booking
+ *   - Registry / Possession status are deliberately NOT checked — a plot
+ *     transfer is allowed even when both are DONE (client requirement); the
+ *     statuses carry over to the new plot unchanged (see PlotTransferService)
  *   - financial clearance and transfer-document checks never apply
  */
 class TransferEligibilityService
@@ -168,20 +166,6 @@ class TransferEligibilityService
             $checks[] = $this->check('target_plot_no_live_booking', 'Target plot has no live booking', ! $liveBooking,
                 $liveBooking ? 'Target plot already has a live booking.' : null);
         }
-
-        $noPossession = $booking === null || ! $booking->isPossessionDone();
-        $checks[] = $this->check('no_possession_case', 'Possession is not yet Done for this booking', $noPossession,
-            $noPossession ? null : 'Possession is already Done for this booking — the plot cannot be changed anymore.');
-
-        // Registry Done means the CURRENT plot has already been legally
-        // registered/sold (Plot status SOLD — see MarkRegistryDoneAction).
-        // Swapping the booking onto a different physical plot after that
-        // would leave the registry pointing at a plot the booking no longer
-        // sits on — a real legal inconsistency, not something this workflow
-        // can safely paper over. Same reasoning as the Possession check above.
-        $noRegistry = $booking === null || ! $booking->isRegistryDone();
-        $checks[] = $this->check('registry_not_done', 'Registry is not yet Done for this booking', $noRegistry,
-            $noRegistry ? null : 'Registry is already Done for this booking — the plot cannot be changed anymore.');
 
         $eligible = ! in_array(false, array_column($checks, 'passed'), true);
 

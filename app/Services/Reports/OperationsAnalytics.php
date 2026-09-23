@@ -27,8 +27,9 @@ use Illuminate\Support\Facades\DB;
 class OperationsAnalytics
 {
     /**
-     * Confirmed bookings still at Registry = PENDING (the simplified,
-     * booking-level Registry status — see App\Enums\RegistryStatus). The
+     * Confirmed bookings whose Registry is not DONE — PENDING or UNDONE (a
+     * reversed registry is outstanding again). The simplified, booking-level
+     * Registry status — see App\Enums\RegistryStatus. The
      * legacy `registry_cases` table is no longer the source of truth for
      * this count; it only ever holds historical data now.
      */
@@ -37,7 +38,7 @@ class OperationsAnalytics
         $query = DB::table('bookings')
             ->whereNull('bookings.deleted_at')
             ->where('bookings.status', BookingStatus::Confirmed->value)
-            ->where('bookings.registry_status', RegistryStatus::Pending->value);
+            ->where('bookings.registry_status', '!=', RegistryStatus::Done->value);
         ReportFilterScope::project($query, $filters, 'bookings.project_id');
         ReportFilterScope::salesperson($query, $filters, 'bookings.created_by');
 
@@ -45,8 +46,9 @@ class OperationsAnalytics
     }
 
     /**
-     * Confirmed bookings still at Possession = PENDING (the simplified,
-     * booking-level Possession status — see App\Enums\PossessionStatus). The
+     * Confirmed bookings whose Possession is not DONE — PENDING or UNDONE.
+     * The simplified, booking-level Possession status — see
+     * App\Enums\PossessionStatus. The
      * legacy `possession_cases` table is no longer the source of truth for
      * this count; it only ever holds historical data now.
      */
@@ -55,7 +57,7 @@ class OperationsAnalytics
         $query = DB::table('bookings')
             ->whereNull('bookings.deleted_at')
             ->where('bookings.status', BookingStatus::Confirmed->value)
-            ->where('bookings.possession_status', PossessionStatus::Pending->value);
+            ->where('bookings.possession_status', '!=', PossessionStatus::Done->value);
         ReportFilterScope::project($query, $filters, 'bookings.project_id');
         ReportFilterScope::salesperson($query, $filters, 'bookings.created_by');
 

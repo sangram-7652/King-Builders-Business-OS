@@ -8,6 +8,7 @@ use App\Actions\Bookings\CalculateBookingPriceAction;
 use App\Models\Booking;
 use App\Support\Pricing\PriceBreakdown;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 
 /**
  * Writes an engine-computed {@see PriceBreakdown} onto a booking: the money
@@ -24,8 +25,22 @@ trait PersistsBookingPricing
         $breakdown = app(CalculateBookingPriceAction::class)->handle($config);
 
         $booking->fill($breakdown->toBookingAttributes());
-        $booking->price_overridden = collect($config['components'] ?? [])
-            ->contains(fn ($row) => (bool) Arr::get($row, 'metadata.override', false));
+
+        // The override flag AND its who/when/why are derived from the
+        // override line itself — never set independently — so they can
+        // never drift apart: an override line present ⇒ all four set from
+        // its metadata; absent ⇒ all four cleared together.
+        $override = collect($config['components'] ?? [])
+            ->first(fn ($row) => (bool) Arr::get($row, 'metadata.override', false));
+
+        $booking->forceFill([
+            'price_overridden' => $override !== null,
+            'price_override_by' => $override !== null ? Arr::get($override, 'metadata.by') : null,
+            'price_override_at' => $override !== null && Arr::get($override, 'metadata.at') !== null
+                ? Carbon::parse((string) Arr::get($override, 'metadata.at'))
+                : null,
+            'price_override_reason' => $override !== null ? Arr::get($override, 'metadata.reason') : null,
+        ]);
 
         if ($freezeSnapshot) {
             $booking->pricing_snapshot = $breakdown->toSnapshot();

@@ -6,6 +6,7 @@ namespace App\Actions\Plots;
 
 use App\Actions\Plots\Concerns\ResolvesPlotArea;
 use App\Enums\PlotStatus;
+use App\Exceptions\DomainException;
 use App\Models\Block;
 use App\Models\Plot;
 use App\Models\Project;
@@ -20,17 +21,36 @@ class CreatePlot
     /**
      * @param  array<string, mixed>  $data  already-validated
      */
-    public function handle(Project $project, Block $block, array $data): Plot
+    public function handle(Project $project, ?Block $block, array $data): Plot
     {
         $this->assertBlockBelongsToProject($project, $block);
 
         return $this->transaction(function () use ($project, $block, $data): Plot {
+            $plotNumber = trim((string) $data['plot_number']);
+
+            // Defense-in-depth beyond the (project_id, block_id, plot_number)
+            // DB unique index: MySQL treats every NULL block_id as distinct,
+            // so that index alone never catches a duplicate plot_number
+            // between two DIRECT plots in the same project. Same convention
+            // as BulkCreatePlots's own pre-check.
+            $duplicate = Plot::withTrashed()
+                ->where('project_id', $project->id)
+                ->when($block !== null, fn ($q) => $q->where('block_id', $block->id), fn ($q) => $q->whereNull('block_id'))
+                ->where('plot_number', $plotNumber)
+                ->exists();
+
+            if ($duplicate) {
+                throw new DomainException($block !== null
+                    ? 'This plot number already exists in this block.'
+                    : 'This plot number already exists as a direct project plot.');
+            }
+
             $snapshot = $this->resolveAreaSnapshot($data);
 
             $plot = Plot::create([
                 'project_id' => $project->id,
-                'block_id' => $block->id,
-                'plot_number' => trim((string) $data['plot_number']),
+                'block_id' => $block?->id,
+                'plot_number' => $plotNumber,
                 'plot_category_id' => $data['plot_category_id'] ?: null,
                 'plot_size_id' => $data['plot_size_id'] ?: null,
                 'plot_dimension_id' => $data['plot_dimension_id'] ?: null,
@@ -50,7 +70,7 @@ class CreatePlot
             Log::info('plot.created', [
                 'plot_id' => $plot->id,
                 'project_id' => $project->id,
-                'block_id' => $block->id,
+                'block_id' => $block?->id,
                 'plot_number' => $plot->plot_number,
                 'by' => auth()->id(),
             ]);

@@ -29,7 +29,9 @@ beforeEach(fn () => seedRbac());
  */
 function draftBookingWithValue(string $finalAmount): array
 {
-    $s = bookingScenario();
+    // The pricing area is derived from the plot, so a 1 sq ft plot at a rate
+    // of $finalAmount lands exactly on $finalAmount.
+    $s = bookingScenario(['area' => 1]);
 
     $booking = app(CreateBookingAction::class)->handle(
         bookingPayload($s, ['pricing' => ['base_area' => '1', 'base_rate' => $finalAmount, 'components' => []]]),

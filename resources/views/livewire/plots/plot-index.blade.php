@@ -1,24 +1,24 @@
-@php use App\Enums\PlotStatus; @endphp
+@php use App\Enums\PlotStatus; use App\Support\Plots\PlotRoutes; @endphp
 
 <div class="space-y-6">
     <x-ui.breadcrumb :items="[
         ['label' => 'Projects', 'url' => route('projects.index')],
         ['label' => $project->name, 'url' => route('projects.show', $project)],
-        ['label' => $block->name.' · Plots'],
+        ['label' => ($block?->name ?? 'Direct Plots').' · Plots'],
     ]" />
 
     <x-ui.page-header
-        :title="$block->name.' — Plots'"
+        :title="($block?->name ?? 'Direct Plots').' — Plots'"
         :description="$project->name.' · '.$project->code">
         <x-slot:actions>
             @can('bulkCreate', App\Models\Plot::class)
                 <x-ui.button variant="secondary"
-                    :href="route('plots.bulk', ['project' => $project->id, 'block' => $block->id])" wire:navigate>
+                    :href="route(PlotRoutes::name('bulk', $block), PlotRoutes::params($project, $block))" wire:navigate>
                     Bulk add
                 </x-ui.button>
             @endcan
             @can('create', App\Models\Plot::class)
-                <x-ui.button :href="route('plots.create', ['project' => $project->id, 'block' => $block->id])" wire:navigate>
+                <x-ui.button :href="route(PlotRoutes::name('create', $block), PlotRoutes::params($project, $block))" wire:navigate>
                     <x-app.icon name="plus" class="size-4" /> New plot
                 </x-ui.button>
             @endcan
@@ -69,7 +69,7 @@
                         @foreach ($plots as $plot)
                             <tr wire:key="plot-{{ $plot->id }}" class="hover:bg-(--surface-muted)/50">
                                 <td class="px-4 py-3">
-                                    <a href="{{ route('plots.show', ['project' => $project->id, 'block' => $block->id, 'plot' => $plot->id]) }}"
+                                    <a href="{{ route(PlotRoutes::name('show', $block), PlotRoutes::params($project, $block, $plot)) }}"
                                        wire:navigate class="font-medium text-(--content) hover:text-(--brand-primary)">{{ $plot->plot_number }}</a>
                                     @unless ($plot->is_active)<x-ui.badge variant="muted" size="sm" class="ml-1">Archived</x-ui.badge>@endunless
                                 </td>
@@ -92,7 +92,7 @@
                                         @endif
                                         @can('update', $plot)
                                             <x-ui.button variant="ghost" size="sm"
-                                                :href="route('plots.edit', ['project' => $project->id, 'block' => $block->id, 'plot' => $plot->id])"
+                                                :href="route(PlotRoutes::name('edit', $block), PlotRoutes::params($project, $block, $plot))"
                                                 wire:navigate>Edit</x-ui.button>
                                         @endcan
                                         @can('delete', $plot)

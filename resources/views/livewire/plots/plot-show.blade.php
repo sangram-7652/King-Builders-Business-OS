@@ -1,10 +1,10 @@
-@php use App\Enums\PlotStatus; @endphp
+@php use App\Enums\PlotStatus; use App\Support\Plots\PlotRoutes; @endphp
 
 <div class="space-y-6">
     <x-ui.breadcrumb :items="[
         ['label' => 'Projects', 'url' => route('projects.index')],
         ['label' => $project->name, 'url' => route('projects.show', $project)],
-        ['label' => $block->name, 'url' => route('plots.index', ['project' => $project->id, 'block' => $block->id])],
+        ['label' => $block?->name ?? 'Direct Plots', 'url' => route(PlotRoutes::name('index', $block), PlotRoutes::params($project, $block))],
         ['label' => 'Plot '.$plot->plot_number],
     ]" />
 
@@ -16,7 +16,7 @@
                 <x-ui.badge :variant="$plot->status->color()">{{ $plot->status->label() }}</x-ui.badge>
                 @unless ($plot->is_active)<x-ui.badge variant="muted">Archived</x-ui.badge>@endunless
             </div>
-            <p class="mt-1 text-sm text-(--content-muted)">{{ $project->name }} · {{ $block->name }}</p>
+            <p class="mt-1 text-sm text-(--content-muted)">{{ $project->name }} · {{ $block?->name ?? 'Direct Project Plot' }}</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
@@ -60,7 +60,8 @@
             @endcan
 
             @can('update', $plot)
-                <x-ui.button size="sm" :href="route('plots.edit', ['project' => $project->id, 'block' => $block->id, 'plot' => $plot->id])" wire:navigate>Edit</x-ui.button>
+                @php $editRoute = PlotRoutes::forPlot($plot, 'edit'); @endphp
+                <x-ui.button size="sm" :href="route($editRoute['name'], $editRoute['params'])" wire:navigate>Edit</x-ui.button>
             @endcan
         </div>
     </div>
@@ -69,7 +70,7 @@
         <x-ui.card title="Details" class="lg:col-span-2">
             <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
                 <div><dt class="text-(--content-muted)">Project</dt><dd class="mt-0.5">{{ $project->name }}</dd></div>
-                <div><dt class="text-(--content-muted)">Block</dt><dd class="mt-0.5">{{ $block->name }}</dd></div>
+                <div><dt class="text-(--content-muted)">Block</dt><dd class="mt-0.5">{{ $block?->name ?? '—' }}</dd></div>
                 <div><dt class="text-(--content-muted)">Category</dt><dd class="mt-0.5">{{ $plot->category?->name ?? '—' }}</dd></div>
                 <div><dt class="text-(--content-muted)">Size</dt><dd class="mt-0.5">{{ $plot->size?->name ?? '—' }}</dd></div>
                 <div><dt class="text-(--content-muted)">Area</dt><dd class="mt-0.5">{{ $plot->areaLabel() }}</dd></div>

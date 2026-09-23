@@ -84,16 +84,6 @@ class CompleteTransferAction
                     throw new DomainException('No target plot is set on this transfer.');
                 }
 
-                // Re-checked here too, immediately before completion — never
-                // trust the Draft screen or the approval-time snapshot.
-                if ($locked->booking->isPossessionDone()) {
-                    throw new DomainException('Possession is already Done for this booking — the plot cannot be changed anymore.');
-                }
-
-                if ($locked->booking->isRegistryDone()) {
-                    throw new DomainException('Registry is already Done for this booking — the plot cannot be changed anymore.');
-                }
-
                 $this->plotTransfer->applyPlotChange($locked, $oldPlot, $newPlot, $actor);
             } elseif ($locked->transfer_type->movesOwnership()) {
                 $this->ownership->applyTransfer($locked, $actor);

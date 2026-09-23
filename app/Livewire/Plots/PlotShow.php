@@ -23,7 +23,7 @@ class PlotShow extends Component
 {
     public Project $project;
 
-    public Block $block;
+    public ?Block $block = null;
 
     public Plot $plot;
 
@@ -33,8 +33,22 @@ class PlotShow extends Component
 
     public string $holdExpiresAt = '';
 
-    public function mount(Project $project, Block $block, Plot $plot): void
+    public function mount(Project $project, Plot $plot, ?Block $block = null): void
     {
+        // A route with no {block} segment (the "direct plot" routes) still
+        // resolves to an EMPTY, unsaved Block instance here — not null — per
+        // Laravel's own optional-route-model-binding convention.
+        $block = $block?->exists ? $block : null;
+
+        // That same nullable binding also makes Laravel's scopeBindings()
+        // skip its usual strict "child belongs to parent" 404 — restore
+        // that guarantee explicitly, for both directions: a block-scoped
+        // URL must match the plot's actual block, and a direct URL must
+        // only serve a plot that has none.
+        if ($plot->project_id !== $project->id || $plot->block_id !== $block?->id) {
+            abort(404);
+        }
+
         $this->authorize('view', $plot);
         $this->project = $project;
         $this->block = $block;
